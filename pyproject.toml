@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "simesh"
+version = "0.1.0"
+description = "A mesh handling package for simulation data"
+authors = ["Astery <aster0502@outlook.com>"]
+packages = [
+    { include = "simesh", from = "src" }
+]
+license = "GPL-3.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^2.2.1"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.4"
+yt = "^4.4.0"
+f90nml = "^1.4.4"
+jupyterlab = "^4.3.4"
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

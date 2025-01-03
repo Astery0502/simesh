@@ -1,0 +1,22 @@
+# directories
+.ipynb_checkpoints/
+__pycache__/
+/figs/
+.vscode/
+build/
+
+# cython compilation files excluded
+*.so
+*.c
+*.cpp
+
+# big files extensions excluded 
+*.j
+*.h5
+*.csv
+*.bin
+*.dat
+*.tar.gz
+
+# spared
+*bak.*
