@@ -21,6 +21,11 @@ f90nml = "^1.4.4"
 jupyterlab = "^4.3.4"
 ipykernel = "^6.29.5"
 
+
+[tool.poetry.group.ext.dependencies]
+pandas = "^2.2.3"
+scipy = "^1.15.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

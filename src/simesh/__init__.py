@@ -6,8 +6,8 @@ AMRVAC data handling and visualization.
 """
 
 __version__ = "0.1.0"
-__author__ = "Your Name"
-__license__ = "MIT"  # or whatever license you're using
+__author__ = "Hao Wu"
+__license__ = "GPL-3.0"
 
 # Version information tuple
 VERSION_INFO = tuple(map(int, __version__.split(".")))
