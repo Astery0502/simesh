@@ -2,7 +2,7 @@ import abc
 import numpy as np
 from simesh.meshes.mesh import Mesh
 from simesh.meshes.amr_mesh import AMRMesh
-from simesh.frontends.amrvac.datio import get_single_block_data
+from simesh.frontends.amrvac.datio import get_single_block_data, find_uniform_fields
 from typing import Tuple
 
 class DataSet(abc.ABC):
@@ -77,9 +77,15 @@ class AMRDataSet(DataSet):
 
     def load_data(self, load_ghost: bool = True):
 
+        # if the mesh is uniform, load the uniform grid into the mesh in the mesh.udata
+
         offsets = self.tree[2]
         with open(self.sfile, 'rb') as fb:
             nw = len(self.fieldnames)
+
+            if self.header['levmax'] == 1:
+                # load the slab uniform grid into a uniform grid
+                self.mesh.udata = find_uniform_fields(fb, self.header, self.tree)
 
             for i in range(self.header['nleafs']):
                 offset = offsets[i]
@@ -115,5 +121,5 @@ class AMRDataSet(DataSet):
         print("Load Clear")
 
     def update(self):
-
+        # update the mesh with ghostcells
         self.mesh.getbc()

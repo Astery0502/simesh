@@ -36,3 +36,8 @@ def amr_loader(file_path: str, nghostcells: int = 2, load_ghost: bool = True):
         ds.load_data(load_ghost=load_ghost)
 
         return ds
+
+def amr_from_uniform(nw_arrays, nw_names, xmin, xmax, block_nx, **kwargs):
+    if len(nw_arrays.shape) != 4:
+        pass
+    pass

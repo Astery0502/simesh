@@ -23,7 +23,7 @@ class OctreeNode:
     ig3: int = 0
     # refinement level
     level: int = 0
-    # morton index
+    # sfc index starting from 1, leave 0 for illegal node in neighbor search
     igrid: int = 0
     # if the node is a leaf node
     is_leaf: bool = True

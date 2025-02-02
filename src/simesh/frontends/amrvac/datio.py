@@ -218,6 +218,62 @@ def get_single_block_field_data(istream, offset, block_shape, field_idx:int, ndi
         data = data[..., np.newaxis]
     return data
 
+def find_uniform_fields(fb, header, tree):
+
+    domain_nx = header['domain_nx']
+    block_nx = header['block_nx']
+    nleafs = header['nleafs']
+    lenw = len(header['w_names'])
+
+    fields = np.zeros((*domain_nx, lenw), dtype=np.float64)
+
+    for ileaf in range(nleafs):
+        block_idx = tree[1][ileaf]
+        offset = tree[2][ileaf]
+
+        x0, y0, z0 = (block_idx-1) * block_nx
+        x1, y1, z1 = block_idx * block_nx
+        for i, field_idx in enumerate(field_indices):
+            field = get_single_block_field_data(fi, offset, block_nx, header['ndim'], field_idx)
+            fields[x0:x1, y0:y1, z0:z1, i] = field
+    
+    return fields
+
+def extract_uniform_fields(file:str, field_indices:Union[int, Iterable[int]]):
+
+    with open(file, 'rb+') as fi:
+
+        header = get_header(fi)
+        assert (header['levmax'] == 1), "The mesh is not uniform"
+        domain_nx = header['domain_nx']
+        block_nx = header['block_nx']
+        nblock_nx = (header['domain_nx'] / header['block_nx']).astype(np.int32)
+        nleafs = header['nleafs']
+        lenw = len(header['w_names'])
+
+        if isinstance(field_indices, int):
+            field_indices = [field_indices]
+        assert lenw > max(field_indices), "Field index is out of range"
+        assert isinstance(field_indices, list), "Field indices must be a list or iterable"
+
+        tree = get_tree_info(fi)
+        block_indices = tree[1]
+        block_offsets = tree[2]
+
+        fields = np.zeros((*domain_nx, len(field_indices)), dtype=np.float64)
+
+        for ileaf in range(nleafs):
+            block_idx = tree[1][ileaf]
+            offset = tree[2][ileaf]
+
+            x0, y0, z0 = (block_idx-1) * block_nx
+            x1, y1, z1 = block_idx * block_nx
+            for i, field_idx in enumerate(field_indices):
+                field = get_single_block_field_data(fi, offset, block_nx, header['ndim'], field_idx)
+                fields[x0:x1, y0:y1, z0:z1, i] = field
+        
+        return fields
+
 def check_tree(fi):
     """
     Check if the tree is consistent with the header information.
@@ -418,157 +474,145 @@ def write_block_data(fi, fr, offsets):
         if (i < len(offsets)-1):
             assert(fi.tell() == block_offsets[i+1])
 
-# def create_new_tree(fi, nx, ny, nz):
+def selected_lev1_indices(fi, nx, ny, nz):
 
-#     header = get_header(fi)
-#     forest = get_forest(fi)
+    """
+    return the indices of the selected blocks in the lev1 tree
+    """
 
-#     selected_indices = selected_lev1_indices(fi, nx, ny, nz)
-#     lev1_indices_tree = read_lev1_indices_from_tree(header, forest)
-#     tree = get_tree_info(fi)
+    header = get_header(fi)
+    nw, ndir, ndim = header['nw'], header['ndir'], header['ndim']
+    domain_nx = header['domain_nx']
+    block_nx = header['block_nx']
+    numblocks = np.array(domain_nx / block_nx, dtype=int)
 
-#     lev1_index_tree = [lev1_indices_tree[lev1_index] for lev1_index in selected_indices]
+    assert((nx[1] <= numblocks[0]) and (ny[1] <= numblocks[1]) and (nz[1] <= numblocks[2]))
+    nglev1_morton_all = nglev1_morton([0,numblocks[0]], [0,numblocks[1]], [0,numblocks[2]])
+    nglev1_morton_selected = nglev1_morton([nx[0], nx[1]], [ny[0], ny[1]], [nz[0], nz[1]])
 
-#     levels = tree[0].tolist()
-#     indices = tree[1].tolist()
-#     offsets = tree[2].tolist()
+    selected_indices = nglev1_selected_indices(nglev1_morton_all, nglev1_morton_selected)
 
-#     levels_new = []
-#     indices_new = []
-#     offsets_new = []
+    # sort the normalised selected indices
+    nglev1_morton_normalised = nglev1_morton_selected - np.array([nx[0], ny[0], nz[0]])
+    morton_normalised = [interleave_bits(index) for index in nglev1_morton_normalised]
+    iindex_sorted = np.argsort(morton_normalised)
+    return np.array(selected_indices)[iindex_sorted]
 
-#     for i in range(len(lev1_index_tree)):
-#         i1 = lev1_index_tree[i]
-#         i_lev1_indices_tree = lev1_indices_tree.index(i1)
-#         if i_lev1_indices_tree < len(lev1_indices_tree)-1:
-#             levels_new.extend(levels[i1:lev1_indices_tree[i_lev1_indices_tree+1]])
-#             indices_new.extend(indices[i1:lev1_indices_tree[i_lev1_indices_tree+1]])
-#             offsets_new.extend(offsets[i1:lev1_indices_tree[i_lev1_indices_tree+1]])
-#         else: # if it is the last block
-#             levels_new.extend(levels[i1:])
-#             indices_new.extend(indices[i1:])
-#             offsets_new.extend(offsets[i1:])
+def create_new_tree(fi, nx, ny, nz):
 
-#     assert(len(levels_new) == len(indices_new) == len(offsets_new))
+    header = get_header(fi)
+    forest = get_forest(fi)
 
-#     return levels_new, indices_new, offsets_new
+    selected_indices = selected_lev1_indices(fi, nx, ny, nz)
+    lev1_indices_tree = read_lev1_indices_from_tree(header, forest)
+    tree = get_tree_info(fi)
 
-# def check_new_tree(fi, nx:int, ny:int, nz:int):
+    lev1_index_tree = [lev1_indices_tree[lev1_index] for lev1_index in selected_indices]
 
-#     header = get_header(fi)
-#     tree = get_tree_info(fi)
+    levels = tree[0].tolist()
+    indices = tree[1].tolist()
+    offsets = tree[2].tolist()
 
-#     lvls, indices, offsets = tree
-#     lvls_new, indices_new, offsets_new = create_new_tree(fi, nx, ny, nz)
+    levels_new = []
+    indices_new = []
+    offsets_new = []
 
-#     count = 0
+    for i in range(len(lev1_index_tree)):
+        i1 = lev1_index_tree[i]
+        i_lev1_indices_tree = lev1_indices_tree.index(i1)
+        if i_lev1_indices_tree < len(lev1_indices_tree)-1:
+            levels_new.extend(levels[i1:lev1_indices_tree[i_lev1_indices_tree+1]])
+            indices_new.extend(indices[i1:lev1_indices_tree[i_lev1_indices_tree+1]])
+            offsets_new.extend(offsets[i1:lev1_indices_tree[i_lev1_indices_tree+1]])
+        else: # if it is the last block
+            levels_new.extend(levels[i1:])
+            indices_new.extend(indices[i1:])
+            offsets_new.extend(offsets[i1:])
 
-#     for i in range(len(lvls)):
-#         lx = math.ceil(indices[i][0]/2**(lvls[i]-1))-1
-#         ly = math.ceil(indices[i][1]/2**(lvls[i]-1))-1
-#         lz = math.ceil(indices[i][2]/2**(lvls[i]-1))-1 
-#         if ((lx >= nx[0]) and (lx < nx[1]) and (ly >= ny[0]) and (ly < ny[1]) and (lz >= nz[0]) and (lz < nz[1])):
-#             count += 1
-#             assert(any(np.all(index_new == indices[i]) for index_new in indices_new)), f"Block index {indices[i]} is not in the new tree"
+    assert(len(levels_new) == len(indices_new) == len(offsets_new))
+
+    return levels_new, indices_new, offsets_new
+
+def check_new_tree(fi, nx:int, ny:int, nz:int):
+
+    header = get_header(fi)
+    tree = get_tree_info(fi)
+
+    lvls, indices, offsets = tree
+    lvls_new, indices_new, offsets_new = create_new_tree(fi, nx, ny, nz)
+
+    count = 0
+
+    for i in range(len(lvls)):
+        lx = math.ceil(indices[i][0]/2**(lvls[i]-1))-1
+        ly = math.ceil(indices[i][1]/2**(lvls[i]-1))-1
+        lz = math.ceil(indices[i][2]/2**(lvls[i]-1))-1 
+        if ((lx >= nx[0]) and (lx < nx[1]) and (ly >= ny[0]) and (ly < ny[1]) and (lz >= nz[0]) and (lz < nz[1])):
+            count += 1
+            assert(any(np.all(index_new == indices[i]) for index_new in indices_new)), f"Block index {indices[i]} is not in the new tree"
     
-#     assert(count == len(lvls_new)), f"Number of blocks in the new tree is not correct, {count} != {len(lvls_new)}"
-#     # not applied as multiple level blocks in the indices list
-#     # morton_number_new = [interleave_bits(index) for index in indices_new]
-#     # assert(all(x < y for x, y in zip(morton_number_new, morton_number_new[1:])))
+    assert(count == len(lvls_new)), f"Number of blocks in the new tree is not correct, {count} != {len(lvls_new)}"
+    # not applied as multiple level blocks in the indices list
+    # morton_number_new = [interleave_bits(index) for index in indices_new]
+    # assert(all(x < y for x, y in zip(morton_number_new, morton_number_new[1:])))
 
-def extract_uniform_fields(file:str, field_indices:Union[int, Iterable[int]]):
+def write_new_datfile(fi, path, nx, ny, nz):
 
-    with open(file, 'rb+') as fi:
+    # create new forest and tree with new nx,ny,nz
+    forest_new = create_new_forest(fi, nx, ny, nz)
+    lvls_new, indices_new, offsets_new = create_new_tree(fi, nx, ny, nz)
 
-        header = get_header(fi)
-        assert (header['levmax'] == 1), "The mesh is not uniform"
-        domain_nx = header['domain_nx']
-        block_nx = header['block_nx']
-        nblock_nx = (header['domain_nx'] / header['block_nx']).astype(np.int32)
-        nleafs = header['nleafs']
-        lenw = len(header['w_names'])
+    # new tree properties: nleafs, nparents, levmax
+    nleafs = sum(forest_new)
+    nparents = len(forest_new) - nleafs
+    levmax = max(lvls_new)
+    assert(len(lvls_new) == nleafs)
 
-        if isinstance(field_indices, int):
-            field_indices = [field_indices]
-        assert lenw > max(field_indices), "Field index is out of range"
-        assert isinstance(field_indices, list), "Field indices must be a list or iterable"
+    # check with new forest and tree
+    check_new_tree(fi, nx, ny, nz)
 
-        tree = get_tree_info(fi)
-        block_indices = tree[1]
-        block_offsets = tree[2]
+    # read some former properties for modification
+    header = get_header(fi)
+    offset_tree = header["offset_tree"]
+    xmin = header['xmin']
+    xmax = header['xmax']
+    block_nx = header['block_nx']
+    domain_nx = header['domain_nx']
+    numblocks = np.array(domain_nx / block_nx, dtype=int)
 
-        fields = np.zeros((*domain_nx, len(field_indices)), dtype=np.float64)
+    tree = get_tree_info(fi)
+    offsets_blocks = tree[2]
 
-        for ileaf in range(nleafs):
-            block_idx = tree[1][ileaf]
-            offset = tree[2][ileaf]
+    # generate some new properties with elder ones
+    xmin_new = xmin + np.array([nx[0], ny[0], nz[0]]) * (block_nx/domain_nx) * (xmax - xmin)
+    xmax_new = xmin + np.array([nx[1], ny[1], nz[1]]) * (block_nx/domain_nx) * (xmax - xmin)
+    domain_nx_new = np.array([nx[1] - nx[0], ny[1] - ny[0], nz[1] - nz[0]]) * block_nx
 
-            x0, y0, z0 = (block_idx-1) * block_nx
-            x1, y1, z1 = block_idx * block_nx
-            for i, field_idx in enumerate(field_indices):
-                field = get_single_block_field_data(fi, offset, block_nx, header['ndim'], field_idx)
-                fields[x0:x1, y0:y1, z0:z1, i] = field
+    # calculate new offsets of all blocks
+    offset_tree_new = offset_tree
+    offset_block_new = offset_tree + (nleafs + nparents) * SIZE_LOGICAL + \
+                        nleafs * (SIZE_INT + header['ndim'] * SIZE_INT + SIZE_DOUBLE)
+
+    relative_offsets = []
+    relative_offset = 0
+    for i in range(nleafs):
+        # the append would run for nleafs times
+        relative_offsets.append(relative_offset)
+        if i == nleafs-1:
+            break
+        ioffset = np.where(offsets_blocks == offsets_new[i])[0][0]
+        relative_offset += (offsets_blocks[ioffset+1] - offsets_blocks[ioffset])
+    offset_blocks_new = np.array(relative_offsets) + offset_block_new
+    assert(len(offset_blocks_new) == nleafs)
+
+    # calculate new lvls for all blocks
+    for i in range(nleafs):
+        indices_new[i] -= np.array([nx[0], ny[0], nz[0]]) * 2**(lvls_new[i]-1)
+
+    with open(path, 'rb+') as fw:
+        write_header(fw, header, offset_tree=offset_tree_new, offset_blocks=offset_block_new,
+                    levmax=levmax, nleafs=nleafs, nparents=nparents, 
+                    xmin=xmin_new, xmax=xmax_new, domain_nx=domain_nx_new)
         
-        return fields
-
-# def write_new_datfile(fi, path, nx, ny, nz):
-
-#     # create new forest and tree with new nx,ny,nz
-#     forest_new = create_new_forest(fi, nx, ny, nz)
-#     lvls_new, indices_new, offsets_new = create_new_tree(fi, nx, ny, nz)
-
-#     # new tree properties: nleafs, nparents, levmax
-#     nleafs = sum(forest_new)
-#     nparents = len(forest_new) - nleafs
-#     levmax = max(lvls_new)
-#     assert(len(lvls_new) == nleafs)
-
-#     # check with new forest and tree
-#     check_new_tree(fi, nx, ny, nz)
-
-#     # read some former properties for modification
-#     header = get_header(fi)
-#     offset_tree = header["offset_tree"]
-#     xmin = header['xmin']
-#     xmax = header['xmax']
-#     block_nx = header['block_nx']
-#     domain_nx = header['domain_nx']
-#     numblocks = np.array(domain_nx / block_nx, dtype=int)
-
-#     tree = get_tree_info(fi)
-#     offsets_blocks = tree[2]
-
-#     # generate some new properties with elder ones
-#     xmin_new = xmin + np.array([nx[0], ny[0], nz[0]]) * (block_nx/domain_nx) * (xmax - xmin)
-#     xmax_new = xmin + np.array([nx[1], ny[1], nz[1]]) * (block_nx/domain_nx) * (xmax - xmin)
-#     domain_nx_new = np.array([nx[1] - nx[0], ny[1] - ny[0], nz[1] - nz[0]]) * block_nx
-
-#     # calculate new offsets of all blocks
-#     offset_tree_new = offset_tree
-#     offset_block_new = offset_tree + (nleafs + nparents) * SIZE_LOGICAL + \
-#                         nleafs * (SIZE_INT + header['ndim'] * SIZE_INT + SIZE_DOUBLE)
-
-#     relative_offsets = []
-#     relative_offset = 0
-#     for i in range(nleafs):
-#         # the append would run for nleafs times
-#         relative_offsets.append(relative_offset)
-#         if i == nleafs-1:
-#             break
-#         ioffset = np.where(offsets_blocks == offsets_new[i])[0][0]
-#         relative_offset += (offsets_blocks[ioffset+1] - offsets_blocks[ioffset])
-#     offset_blocks_new = np.array(relative_offsets) + offset_block_new
-#     assert(len(offset_blocks_new) == nleafs)
-
-#     # calculate new lvls for all blocks
-#     for i in range(nleafs):
-#         indices_new[i] -= np.array([nx[0], ny[0], nz[0]]) * 2**(lvls_new[i]-1)
-
-#     with open(path, 'rb+') as fw:
-#         write_header(fw, header, offset_tree=offset_tree_new, offset_blocks=offset_block_new,
-#                     levmax=levmax, nleafs=nleafs, nparents=nparents, 
-#                     xmin=xmin_new, xmax=xmax_new, domain_nx=domain_nx_new)
-        
-#         write_forest_tree(fw, forest_new, (lvls_new, np.array(indices_new), offset_blocks_new))
-#         write_block_data(fw, fi, offsets_new)
-        
+        write_forest_tree(fw, forest_new, (lvls_new, np.array(indices_new), offset_blocks_new))
+        write_block_data(fw, fi, offsets_new)

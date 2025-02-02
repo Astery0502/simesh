@@ -6,7 +6,7 @@ from simesh.utils.octree import OctreeNode, OctreeNodePointer
 from .morton_order import level1_Morton_order
 
 class AMRForest:
-    """AMR Forest managing all octrees (of level 1 blocks) """
+    """AMR Forest managing all octrees (each as a level 1 block) """
 
     def __init__(self, ng1:int, ng2:int, ng3:int, nleafs:int):
         self.ng1 = ng1
@@ -36,31 +36,35 @@ class AMRForest:
         self.neighbor = np.zeros((3,3,3,nleafs), dtype=int)
         self.neighbor_child = np.zeros((4,4,4,nleafs), dtype=int)
 
+        # save the level 1 block index in the array of all grids
+        self.idx_level1_sfc = np.zeros(self.ngl1, dtype=int)
+
     
     def read_forest(self, forest):
+        """
+        Read the forest from the forest bool list
+        """
 
         def read_node(tree: OctreeNodePointer, ig1:int, ig2:int, ig3:int, level:int):
 
-            nonlocal igrid
-            nonlocal inode
+            nonlocal igrid # sfc index from 1: leafs
+            nonlocal inode # total index from 1: forest index
 
             inode += 1
 
             assert isinstance(tree.node, OctreeNode), "The node is not a valid OctreeNode, please initialize the forest first"
-
             assert inode <= len(forest), "The forest is not large enough"
+
             tree.node.is_leaf = forest[inode-1]
             tree.node.ig1, tree.node.ig2, tree.node.ig3 = ig1, ig2, ig3
             tree.node.level = level
 
             # Clean up all children nodes and neighbors nodes as well as next and prev nodes for update
-            for k in range(2):
-                for j in range(2):
-                    for i in range(2):
-                        tree.node.children[i,j,k].node = None
-            for j in range(3):
-                for i in range(2):
-                    tree.node.neighbors[i,j].node = None
+            for i, j, k in np.ndindex(2,2,2):
+                tree.node.children[i,j,k].node = None
+            for i, j in np.ndindex(2,3):
+                tree.node.neighbors[i,j].node = None
+
             tree.node.next_node.node = None
             tree.node.prev_node.node = None
 
@@ -75,20 +79,21 @@ class AMRForest:
 
                 igrid += 1
                 tree.node.igrid = igrid
-
             
             else:
                 self.nparents += 1
                 tree.node.igrid = -1    # parent node morton number
                 child_level = level + 1
-                for k in range(2):
-                    for j in range(2):
-                        for i in range(2):
-                            child_ig1, child_ig2, child_ig3 = 2*ig1+i, 2*ig2+j, 2*ig3+k
-                            child_node = OctreeNode()
-                            tree.node.children[i,j,k].node = child_node
-                            tree.node.children[i,j,k].node.parent.node = tree.node
-                            read_node(tree.node.children[i,j,k], child_ig1, child_ig2, child_ig3, child_level)
+
+                # Create child nodes in a vectorized way
+                child_indices = np.array(np.meshgrid(range(2), range(2), range(2))).reshape(3,-1).T
+                child_igs = 2 * np.array([ig1, ig2, ig3]) + child_indices
+                
+                for idx, (i,j,k) in enumerate(child_indices):
+                    child_node = OctreeNode()
+                    tree.node.children[i,j,k].node = child_node
+                    tree.node.children[i,j,k].node.parent.node = tree.node
+                    read_node(tree.node.children[i,j,k], child_igs[idx,0], child_igs[idx,1], child_igs[idx,2], child_level)
 
         igrid = 0
         inode = 0
@@ -97,6 +102,10 @@ class AMRForest:
         self.iglevel1_sfc, self.sfc_iglevel1 = level1_Morton_order(self.ng1, self.ng2, self.ng3)
 
         for isfc in range(self.ngl1):
+
+            # save the level 1 block index in the array of all grids
+            self.idx_level1_sfc[isfc] = igrid
+
             ig1, ig2, ig3 = self.sfc_iglevel1[isfc]
             node = OctreeNode()
 
@@ -116,11 +125,11 @@ class AMRForest:
             ileaf += 1
             forest[ileaf-1] = tree.node.is_leaf
             if not tree.node.is_leaf:
-                for k in range(2):
-                    for j in range(2):
-                        for i in range(2):
-                            child_node = tree.node.children[i,j,k]
-                            write_node(child_node)
+                # Process children in Morton order sequence
+                child_indices = np.array(np.meshgrid(range(2), range(2), range(2))).reshape(3,-1).T
+                for i, j, k in child_indices:
+                    child_node = tree.node.children[i,j,k]
+                    write_node(child_node)
 
         forest = np.zeros(self.nparents+self.nleafs, dtype=bool)
         ileaf = 0

@@ -6,7 +6,7 @@ You can install this package using either pip with setup.py or Poetry.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YourUsername/simesh.git
+   git clone https://github.com/Astery0502/simesh.git
    cd simesh
    ```
 

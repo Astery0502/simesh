@@ -14,6 +14,7 @@ VERSION_INFO = tuple(map(int, __version__.split(".")))
 
 # Expose main functionality at package level
 from .frontends.amrvac.io import amr_loader
+from .frontends.amrvac.datio import write_new_datfile
 from .geometry.amr.amr_forest import AMRForest
 from .dataset.data_set import AMRDataSet
 

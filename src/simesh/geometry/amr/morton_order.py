@@ -34,42 +34,72 @@ def encode_Morton(ign:Tuple[int, int, int]) -> np.int32:
 def level1_Morton_order(ng1:int, ng2:int, ng3:int):
     """
     input:
-    ng1, ng2, ng3: int, the index of the grid
+    ng1, ng2, ng3: int, the number of the level 1 blocks
+
+    output:
+    bidirection_map: igindex[Tuple[int, int, int]] <-> index [int]
+
+    iglevel1_sfc: from igindex[Tuple[int, int, int]] to index [int]
+    sfc_iglevel1: from index [int] to igindex[Tuple[int, int, int]]
+
+    Examples
+    --------
+    >>> ng1, ng2, ng3 = 3, 3, 3
+    >>> iglevel1_sfc, sfc_iglevel1 = level1_Morton_order(ng1, ng2, ng3)
+    >>> iglevel1_sfc.shape
+    (3, 3, 3)
+    >>> sfc_iglevel1.shape
+    (27, 3)
+    >>> # Test mapping from coordinates to Morton index
+    >>> iglevel1_sfc[0,0,0] == 0  # First corner
+    np.True_
+    >>> iglevel1_sfc[2,2,2] == 26  # Last corner
+    np.True_
+    >>> # Test mapping from Morton index back to coordinates
+    >>> tuple(sfc_iglevel1[0]) == (0, 0, 0)  # First point coordinates
+    True
+    >>> tuple(sfc_iglevel1[26]) == (2, 2, 2)  # Last point coordinates
+    True
     """
 
+    # Calculate smallest power of 2 that fits each dimension
     ngs = np.array([ng1, ng2, ng3])
-    ngsq = np.array([np.max(2**(np.ceil(np.log(ngs)/np.log(2))))] * 3).astype(int)
-
+    ngsq = 2**np.ceil(np.log2(ngs)).astype(int)
+    
+    # Generate coordinates and Morton codes in sorted order
+    coords = np.stack(np.meshgrid(np.arange(ngsq[0]), 
+                                 np.arange(ngsq[1]), 
+                                 np.arange(ngsq[2]), 
+                                 indexing='ij'), axis=-1).reshape(-1, 3)
+    morton_codes = np.array([encode_Morton(tuple(coord)) for coord in coords])
+    # Sort both arrays based on Morton codes
+    sort_idx = np.argsort(morton_codes)
+    morton_codes = morton_codes[sort_idx]
+    coords = coords[sort_idx]
+    
+    # Create mapping arrays
     total_number = np.prod(ngsq)
-
-    gsq_sfc = np.zeros(ngsq).astype(int)
-    seq_sfc = np.zeros(total_number).astype(int)
-    seq_ig  = np.zeros((total_number, 3)).astype(int)
-    in_domain = np.ones(total_number, dtype=bool)
-
-    # in python, the index starts from 0, so we do not require to minus 1 in the input of encode_Morton 
-    # and the morton order starts from 0
-    for i in range(ngsq[0]):
-        for j in range(ngsq[1]):
-            for k in range(ngsq[2]):
-                gsq_sfc[i, j, k] = encode_Morton((i, j, k))
-                seq_sfc[gsq_sfc[i,j,k]] = gsq_sfc[i,j,k]
-                seq_ig[gsq_sfc[i,j,k]] = [i, j, k]
-
-    # mark the grids out of the domain and shift the morton order
+    seq_sfc = morton_codes.copy()
+    seq_ig = coords
+    
+    # Identify points inside/outside domain
+    in_domain = ~np.any(coords >= ngs.reshape(1,3), axis=1)
+    
+    # Adjust Morton codes for points outside domain
     for isq in range(total_number):
-        if (np.any(seq_ig[isq] >= ngs)): # >= is used for the 0-based index in python
+        if not in_domain[isq]:
             seq_sfc[isq:] -= 1
-            in_domain[isq] = False
-
-    # allocate the modified morton order (scaled to [1,nglev1]) and the index of the grid
-    iglevel1_sfc = np.zeros(ngs).astype(int)
-    sfc_iglevel1 = np.zeros((np.prod(ngs),3)).astype(int)
-
-    for isq in range(total_number):
-        if in_domain[isq]:
-            iglevel1_sfc[tuple(seq_ig[isq])] = seq_sfc[isq]
-            sfc_iglevel1[seq_sfc[isq]] = seq_ig[isq]
-
+    
+    # Create final bidirectional mapping
+    iglevel1_sfc = np.zeros(ngs, dtype=int)
+    sfc_iglevel1 = np.zeros((np.prod(ngs), 3), dtype=int)
+    
+    # Fill mappings only for points inside domain
+    valid_idx = np.where(in_domain)[0]
+    for idx in valid_idx:
+        coord = tuple(seq_ig[idx])
+        iglevel1_sfc[coord] = seq_sfc[idx]
+        sfc_iglevel1[seq_sfc[idx]] = seq_ig[idx]
+    
     return iglevel1_sfc, sfc_iglevel1
 

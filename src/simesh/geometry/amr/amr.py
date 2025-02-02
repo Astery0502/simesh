@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Iterable
-from utils.calculation import spread_32bits
+from utils.morton import mortonEncode
 
 def find_lev1_idx_forest(forest):
     """
