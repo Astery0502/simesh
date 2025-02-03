@@ -4,7 +4,7 @@ import numpy as np
 import math
 from typing import Union, Iterable
 
-from src_old.morton_amr import *
+from .morton_amr import *
 
 # Size of basic types (in bytes)
 SIZE_LOGICAL = 4

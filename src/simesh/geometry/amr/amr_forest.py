@@ -118,6 +118,9 @@ class AMRForest:
             read_node(ptr, ig1,ig2,ig3, level)
 
     def write_forest(self):
+        """
+        Write the forest bool list 
+        """
         def write_node(tree: OctreeNodePointer):
             nonlocal ileaf
 

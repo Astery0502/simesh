@@ -138,3 +138,15 @@ class AMRDataSet(DataSet):
     def update(self):
         # update the mesh with ghostcells
         self.mesh.getbc()
+
+    def update_header(self, **kwargs):
+        """
+        Modify the header of the dataset
+        Note the modifications should be compatible with the header template 
+        and other attributes of the dataset
+        """
+        for key, value in kwargs.items():
+            if key in self.header:
+                self.header[key] = value
+            else:
+                raise ValueError(f"Key '{key}' not found in header")

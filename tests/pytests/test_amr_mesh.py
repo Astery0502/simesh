@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from meshes.amr_mesh import AMRMesh
-from geometry.amr.amr_forest import AMRForest
+from simesh.meshes.amr_mesh import AMRMesh
+from simesh.geometry.amr.amr_forest import AMRForest
 
 @pytest.fixture
 def common_mesh():

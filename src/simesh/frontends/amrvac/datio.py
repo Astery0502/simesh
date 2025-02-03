@@ -274,46 +274,38 @@ def extract_uniform_fields(file:str, field_indices:Union[int, Iterable[int]]):
         
         return fields
 
-def check_tree(fi):
-    """
-    Check if the tree is consistent with the header information.
-    From 1. The nparents and nleafs derived from the amr levels tree is consistent with the header [From the leaf levels]
-         2. The forest derived nparents and nleafs are consistent with the header [From counting the bool list]
-    """
+def get_tree_size(header):
 
-    header = get_header(fi)
-    forest = get_forest(fi)
-    tree   = get_tree_info(fi)
+    if header['datfile_version'] < 3:
+        raise OSError("Unsupported AMRVAC .dat file version: %d", header["datfile_version"])
 
-    nparents_header = header['nparents']
-    nleafs_header = header['nleafs']
-
-    tlevels = tree[0]
-    level_stat = {}
-    for level in tlevels:
-        level_stat[level] = level_stat.get(level, 0) + 1
-
-    nparent = 0
-    nparents = 0
-    nleafs_tree = len(tree[0])
-    for i in range(max(tlevels), 0, -1):
-        if i == 1:
-            break
-        nparent = (nparent + level_stat[i]) / 8
-        nparents += nparent
-    nparents_tree = nparents
+    tree_size = 0
+    tree_size += 10 * SIZE_INT # first 10 integers fixed
+    tree_size += SIZE_DOUBLE # time
     
-    assert(nparents_tree == nparents_header)
-    assert(nleafs_tree == nleafs_header)
+    for key, value in header.items():
+        if key in ['w_names', 'param_names']:
+            tree_size += len(value) * NAME_LEN
+        elif key in ['xmin', 'xmax', 'periodic', 'params']:
+            tree_size += len(value) * SIZE_DOUBLE
+        elif key in ['domain_nx', 'block_nx']:
+            tree_size += len(value) * SIZE_INT
 
-    nleafs_forest = len(forest[forest == True])
-    nparents_forest = len(forest[forest == False])
+    if header['datfile_version'] >= 4:
+        tree_size += SIZE_INT * header['ndim'] # periodic conditions
+        tree_size += NAME_LEN # geometry name
+        tree_size += SIZE_INT # staggered flag
 
-    assert(nparents_forest == nparents_header)
-    assert(nleafs_forest == nleafs_header)
+    tree_size += NAME_LEN # physics type
+    tree_size += SIZE_INT # number of physics-defined parameters: n_par
+    tree_size += 3 * SIZE_INT # snapshotnext, slicenext, collapsenext
 
-    return nparents_header, nleafs_header
-
+    offset_size = tree_size + SIZE_INT*(header['nleafs'] + header['nparents']) # the forest
+    offset_size += SIZE_INT*header['nleafs'] # the block levels
+    offset_size += SIZE_INT*header['nleafs']*header['ndim'] # the block indices
+    offset_size += SIZE_INT*header['nleafs'] # the block offsets
+    
+    return tree_size, offset_size
 
 def write_header(fi, header, **kwargs):
 
@@ -616,3 +608,43 @@ def write_new_datfile(fi, path, nx, ny, nz):
         
         write_forest_tree(fw, forest_new, (lvls_new, np.array(indices_new), offset_blocks_new))
         write_block_data(fw, fi, offsets_new)
+
+def check_tree(fi):
+    """
+    Check if the tree is consistent with the header information.
+    From 1. The nparents and nleafs derived from the amr levels tree is consistent with the header [From the leaf levels]
+         2. The forest derived nparents and nleafs are consistent with the header [From counting the bool list]
+    """
+
+    header = get_header(fi)
+    forest = get_forest(fi)
+    tree   = get_tree_info(fi)
+
+    nparents_header = header['nparents']
+    nleafs_header = header['nleafs']
+
+    tlevels = tree[0]
+    level_stat = {}
+    for level in tlevels:
+        level_stat[level] = level_stat.get(level, 0) + 1
+
+    nparent = 0
+    nparents = 0
+    nleafs_tree = len(tree[0])
+    for i in range(max(tlevels), 0, -1):
+        if i == 1:
+            break
+        nparent = (nparent + level_stat[i]) / 8
+        nparents += nparent
+    nparents_tree = nparents
+    
+    assert(nparents_tree == nparents_header)
+    assert(nleafs_tree == nleafs_header)
+
+    nleafs_forest = len(forest[forest == True])
+    nparents_forest = len(forest[forest == False])
+
+    assert(nparents_forest == nparents_header)
+    assert(nleafs_forest == nleafs_header)
+
+    return nparents_header, nleafs_header

@@ -857,8 +857,8 @@ def amrmesh_from_uniform(nw_arrays:np.ndarray, w_names, xmin, xmax, block_nx):
 
     assert isinstance(nw_arrays, np.ndarray), "nw_arrays must be a numpy array"
     assert len(nw_arrays.shape) == 4, "nw_arrays must be a 4D array"
-    domain_nx = np.array(nw_arrays.shape[:3])
-    block_nx = np.array(block_nx)
+    domain_nx = np.array(nw_arrays.shape[:3]).astype(int)
+    block_nx = np.array(block_nx).astype(int)
 
     assert nw_arrays.shape[3] == len(w_names), "nw_arrays and w_names must have the same length"
 

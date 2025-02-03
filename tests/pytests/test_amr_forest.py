@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from geometry.amr.amr_forest import AMRForest
-from utils.octree import OctreeNodePointer
+from simesh.geometry.amr.amr_forest import AMRForest
+from simesh.utils.octree import OctreeNodePointer
 
 @pytest.fixture
 def common_forest():

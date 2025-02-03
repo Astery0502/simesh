@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from morton_order import encode_Morton, level1_Morton_order
+from simesh.geometry.amr.morton_order import encode_Morton, level1_Morton_order
 
 def test_encode_Morton():
     # Test case 1: Origin point
