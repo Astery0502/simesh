@@ -87,6 +87,21 @@ class AMRDataSet(DataSet):
                 # load the slab uniform grid into a uniform grid
                 self.mesh.udata = find_uniform_fields(fb, self.header, self.tree)
 
+                block_nx = self.header['block_nx']
+                domain_nx = self.header['domain_nx']
+
+                for ileaf in range(self.header['nleafs']):
+
+                    block_idx = self.tree[1][ileaf]
+                    x0, y0, z0 = (block_idx-1) * block_nx
+                    x1, y1, z1 = block_idx * block_nx
+
+                    self.data[i][self.mesh.ixMmin[0]:self.mesh.ixMmax[0]+1, 
+                                 self.mesh.ixMmin[1]:self.mesh.ixMmax[1]+1, 
+                                 self.mesh.ixMmin[2]:self.mesh.ixMmax[2]+1] = \
+                        self.mesh.udata[x0:x1, y0:y1, z0:z1]
+                return 
+
             for i in range(self.header['nleafs']):
                 offset = offsets[i]
                 ghostcells, block_data = get_single_block_data(fb, offset)

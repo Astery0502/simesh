@@ -26,8 +26,8 @@ def amr_loader(file_path: str, nghostcells: int = 2, load_ghost: bool = True):
 
         assert isinstance(nblev1, np.ndarray), "nblev1 must be a numpy array"
         assert len(nblev1) == 3 , f"nblev1 should be a 3-element array, {nblev1}"
-        forest_amr = AMRForest(nblev1[0], nblev1[1], nblev1[2], nleafs)
 
+        forest_amr = AMRForest(nblev1[0], nblev1[1], nblev1[2], nleafs)
         forest_amr.read_forest(forest)
         forest_amr.build_connectivity()
 
@@ -36,8 +36,3 @@ def amr_loader(file_path: str, nghostcells: int = 2, load_ghost: bool = True):
         ds.load_data(load_ghost=load_ghost)
 
         return ds
-
-def amr_from_uniform(nw_arrays, nw_names, xmin, xmax, block_nx, **kwargs):
-    if len(nw_arrays.shape) != 4:
-        pass
-    pass

@@ -64,7 +64,7 @@ def level1_Morton_order(ng1:int, ng2:int, ng3:int):
 
     # Calculate smallest power of 2 that fits each dimension
     ngs = np.array([ng1, ng2, ng3])
-    ngsq = 2**np.ceil(np.log2(ngs)).astype(int)
+    ngsq = (np.ones(3) * np.max(2**np.ceil(np.log2(ngs)))).astype(int)
     
     # Generate coordinates and Morton codes in sorted order
     coords = np.stack(np.meshgrid(np.arange(ngsq[0]), 

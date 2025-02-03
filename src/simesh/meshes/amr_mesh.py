@@ -1,6 +1,7 @@
 import numpy as np
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
+from simesh.geometry.amr.morton_order import level1_Morton_order
 from simesh.geometry.amr.amr_forest import AMRForest
 from simesh.frontends.amrvac.datio import get_header, get_forest, get_tree_info
 from simesh.utils.octree import OctreeNode, OctreeNodePointer
@@ -836,3 +837,66 @@ class AMRMesh(Mesh):
             slab_uniform[x_idx[:,None,None], y_idx[None,:,None], z_idx[None,None,:]] = result
 
         return slab_uniform
+
+def amrmesh_from_uniform(nw_arrays:np.ndarray, w_names, xmin, xmax, block_nx):
+
+    """
+    Create an AMR mesh from uniform data
+
+    input:
+    nw_arrays: 4D numpy arrays, each 3D array is a uniform grid of the same field, shape (nx, ny, nz, nw)
+    w_names: list of strings, the names of the fields, shape (nw,)
+    xmin: list of floats, the minimum coordinates of the uniform grid, shape (3,)
+    xmax: list of floats, the maximum coordinates of the uniform grid, shape (3,)
+    block_nx: list of ints, the number of cells in each direction for the block, shape (3,)
+    **kwargs: keyword arguments, passed to the AMRForest constructor
+
+    output:
+    AMRMesh object
+    """
+
+    assert isinstance(nw_arrays, np.ndarray), "nw_arrays must be a numpy array"
+    assert len(nw_arrays.shape) == 4, "nw_arrays must be a 4D array"
+    domain_nx = np.array(nw_arrays.shape[:3])
+    block_nx = np.array(block_nx)
+
+    assert nw_arrays.shape[3] == len(w_names), "nw_arrays and w_names must have the same length"
+
+    assert len(xmin) == 3, "xmin must be a 3-element array"
+    assert len(xmax) == 3, "xmax must be a 3-element array"
+    assert len(block_nx) == 3, "block_nx must be a 3-element array"
+
+    assert np.all(np.array(xmin) < np.array(xmax)), "xmin must be less than xmax"
+
+    nglev1 = domain_nx // block_nx
+    assert np.all(nglev1 * block_nx == domain_nx), "domain_nx must be divisible by block_nx"
+    nglev1 = nglev1.astype(int)
+
+    nleafs = np.prod(nglev1)
+    print(nleafs)
+
+    # create the forest for all level1 1 blocks (all leaf nodes)
+    forest = np.ones(nleafs).astype(np.bool_)
+    uamr_forest = AMRForest(ng1=nglev1[0], ng2=nglev1[1], ng3=nglev1[2], nleafs=nleafs)
+    uamr_forest.read_forest(forest)
+    uamr_forest.build_connectivity() # not required maybe for the created uniform mesh
+
+    # create the uniform amr mesh
+    xrange = (xmin[0], xmax[0])
+    yrange = (xmin[1], xmax[1])
+    zrange = (xmin[2], xmax[2])
+    umesh = AMRMesh(xrange, yrange, zrange, w_names, block_nx, domain_nx, uamr_forest, nghostcells=2)
+    umesh.udata = nw_arrays
+
+    iglevel1_sfc, sfc_iglevel1 = level1_Morton_order(*nglev1)
+
+    for igrid in range(nleafs):
+        igs = sfc_iglevel1[igrid]
+        x0, y0, z0 = igs * block_nx
+        x1, y1, z1 = (igs+1) * block_nx
+        umesh.data[igrid][umesh.ixMmin[0]:umesh.ixMmax[0]+1, 
+                          umesh.ixMmin[1]:umesh.ixMmax[1]+1, 
+                          umesh.ixMmin[2]:umesh.ixMmax[2]+1] = \
+            umesh.udata[x0:x1, y0:y1, z0:z1]
+
+    return umesh
