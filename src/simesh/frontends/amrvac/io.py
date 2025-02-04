@@ -61,19 +61,19 @@ def amr_loader(file_path: str, nghostcells: int = 2, load_ghost: bool = True):
         forest_amr.build_connectivity()
 
         mesh = AMRMesh(xrange, yrange, zrange, field_names, block_nx, domain_nx, forest_amr, nghostcells)
-        ds = AMRDataSet(mesh, file_path, header, forest, tree, field_names)
+        ds = AMRDataSet(mesh, header, forest, tree, file_path)
         ds.load_data(load_ghost=load_ghost)
 
         return ds
 
-def load_from_uarrays(nw_arrays, w_names, xmin, xmax, block_nx, file_path:str, **kwargs):
+def load_from_uarrays(nw_arrays, w_names, xmin, xmax, block_nx, file_path:str='datfile', **kwargs):
 
     mesh = amrmesh_from_uniform(nw_arrays, w_names, xmin, xmax, block_nx)
 
     header = header_template.copy()
     header['nw'] = len(w_names)
     header['w_names'] = list(w_names)
-    header['nleafs'] = mesh.nleafs
+    header['nleafs'] = int(mesh.nleafs)
     header['xmin'] = np.array(xmin)
     header['xmax'] = np.array(xmax)
     header['domain_nx'] = np.array(mesh.domain_nx)
@@ -84,12 +84,10 @@ def load_from_uarrays(nw_arrays, w_names, xmin, xmax, block_nx, file_path:str, *
     header['offset_blocks'] = offset_size
 
     forest = mesh.forest.write_forest()
+    tree = mesh.write_tree()
+    tree[2] += offset_size
 
-    tree_lvls = 0
-    tree_indices = 0
-    tree_offsets = 0
-    tree = (tree_lvls, tree_indices, tree_offsets)
-
-    ds = AMRDataSet(mesh, file_path, header, forest, tree, w_names)
+    ds = AMRDataSet(mesh, header, forest, tuple(tree), file_path)
+    ds.update_header(**kwargs)
 
     return ds

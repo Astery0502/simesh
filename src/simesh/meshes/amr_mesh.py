@@ -3,9 +3,11 @@ from typing import List, Tuple, Optional
 from dataclasses import dataclass
 from simesh.geometry.amr.morton_order import level1_Morton_order
 from simesh.geometry.amr.amr_forest import AMRForest
-from simesh.frontends.amrvac.datio import get_header, get_forest, get_tree_info
+from simesh.frontends.amrvac.datio import SIZE_INT, SIZE_DOUBLE
 from simesh.utils.octree import OctreeNode, OctreeNodePointer
 from .mesh import Mesh
+
+NDIM = 3 # to implement the NDIM=2 case
 
 class AMRMesh(Mesh):
     """Adaptive Mesh Refinement (AMR) implementation that supports octree-based refinement."""
@@ -838,6 +840,31 @@ class AMRMesh(Mesh):
 
         return slab_uniform
 
+    def write_tree(self):
+        """
+        Write the tree arrays in one tuple
+        """
+
+        lvls = np.zeros(self.nleafs, dtype=int)
+        indices = np.zeros((self.nleafs, 3), dtype=int)
+        offsets = np.zeros(self.nleafs, dtype=int)
+
+        offset = 0
+
+        for ileaf in range(self.nleafs):
+            leaf_ptr = self.forest.sfc_to_node[ileaf]
+
+            lvls[ileaf] = leaf_ptr.node.level
+            indices[ileaf] = np.array([leaf_ptr.node.ig1+1, leaf_ptr.node.ig2+1, leaf_ptr.node.ig3+1])
+
+            # calculate the offset of the current block 
+            # no ghostcells combined, no staggered grid stored here
+            offsets[ileaf] = offset
+            offset += 2 * NDIM * SIZE_INT # ghostcells
+            offset += np.prod(self.block_nx) * len(self.field_names) * SIZE_DOUBLE # field data
+
+        return [lvls, indices, offsets]
+
 def amrmesh_from_uniform(nw_arrays:np.ndarray, w_names, xmin, xmax, block_nx):
 
     """
@@ -873,7 +900,6 @@ def amrmesh_from_uniform(nw_arrays:np.ndarray, w_names, xmin, xmax, block_nx):
     nglev1 = nglev1.astype(int)
 
     nleafs = np.prod(nglev1)
-    print(nleafs)
 
     # create the forest for all level1 1 blocks (all leaf nodes)
     forest = np.ones(nleafs).astype(np.bool_)

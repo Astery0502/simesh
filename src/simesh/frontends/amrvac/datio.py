@@ -220,10 +220,13 @@ def get_single_block_field_data(istream, offset, block_shape, field_idx:int, ndi
 
 def find_uniform_fields(fb, header, tree):
 
+    if header['levmax'] != 1:
+        raise ValueError("The mesh is not uniform")
+
     domain_nx = header['domain_nx']
     block_nx = header['block_nx']
     nleafs = header['nleafs']
-    lenw = len(header['w_names'])
+    lenw = header['nw']
 
     fields = np.zeros((*domain_nx, lenw), dtype=np.float64)
 
@@ -233,9 +236,15 @@ def find_uniform_fields(fb, header, tree):
 
         x0, y0, z0 = (block_idx-1) * block_nx
         x1, y1, z1 = block_idx * block_nx
-        for i, field_idx in enumerate(field_indices):
-            field = get_single_block_field_data(fi, offset, block_nx, header['ndim'], field_idx)
-            fields[x0:x1, y0:y1, z0:z1, i] = field
+
+        _ghostcells, block_data = get_single_block_data(fb, offset)
+
+        if header['staggered']:
+            field_data, staggered_data = block_data
+        else:
+            field_data = block_data
+
+        fields[x0:x1, y0:y1, z0:z1, :] = np.transpose(np.array(field_data).reshape(lenw, *block_nx), (3,2,1,0))
     
     return fields
 
@@ -286,7 +295,7 @@ def get_tree_size(header):
     for key, value in header.items():
         if key in ['w_names', 'param_names']:
             tree_size += len(value) * NAME_LEN
-        elif key in ['xmin', 'xmax', 'periodic', 'params']:
+        elif key in ['xmin', 'xmax', 'params']:
             tree_size += len(value) * SIZE_DOUBLE
         elif key in ['domain_nx', 'block_nx']:
             tree_size += len(value) * SIZE_INT
@@ -303,11 +312,159 @@ def get_tree_size(header):
     offset_size = tree_size + SIZE_INT*(header['nleafs'] + header['nparents']) # the forest
     offset_size += SIZE_INT*header['nleafs'] # the block levels
     offset_size += SIZE_INT*header['nleafs']*header['ndim'] # the block indices
-    offset_size += SIZE_INT*header['nleafs'] # the block offsets
+    offset_size += SIZE_DOUBLE*header['nleafs'] # the block offsets with long long int
     
     return tree_size, offset_size
 
-def write_header(fi, header, **kwargs):
+def write_header(fi, header):
+    """
+    write the amrvac header to the .dat file
+    """
+    fi.seek(0)
+
+    fmt = ALIGN + "i"
+    size = struct.calcsize(fmt)
+    packed_data = struct.pack(fmt, header['datfile_version'])
+    fi.write(packed_data)
+
+    fmt = ALIGN + 9 * "i"  + "d"
+    packed_data = struct.pack(fmt,
+        header["offset_tree"],
+        header["offset_blocks"],
+        header["nw"],
+        header["ndir"],
+        header["ndim"],
+        header["levmax"],
+        header["nleafs"],
+        header["nparents"],
+        header["it"],
+        header["time"],
+     )
+    fi.write(packed_data)
+
+    # 
+    fmt = ALIGN + header['ndim'] * "d"
+    packed_data = struct.pack(fmt, *header['xmin'])
+    fi.write(packed_data)
+    packed_data = struct.pack(fmt, *header['xmax'])
+    fi.write(packed_data)
+
+    # 
+    fmt = ALIGN + header["ndim"] * "i"
+    packed_data = struct.pack(fmt, *header["domain_nx"])
+    fi.write(packed_data)
+    packed_data = struct.pack(fmt, *header["block_nx"])
+    fi.write(packed_data)
+
+    # 
+    if header["datfile_version"] >= 5:
+        fmt = ALIGN + header["ndim"] * "i"
+        packed_data = struct.pack(fmt, *header["periodic"])
+        fi.write(packed_data)
+
+        decoded_data = header["geometry"].encode().ljust(NAME_LEN)
+        fi.write(decoded_data) 
+
+        fmt = ALIGN + "i"
+        packed_data = struct.pack(fmt, header["staggered"])
+        fi.write(packed_data)
+
+    # Write w_names
+    for i in range(header['nw']):
+        decoded_data = header['w_names'][i].encode().ljust(NAME_LEN)
+        fi.write(decoded_data)
+    
+    # Write physics_type
+    decoded_data = header["physics_type"].encode().ljust(NAME_LEN)
+    fi.write(decoded_data)
+
+    # Write number of physics-defined parameters
+    fmt  = ALIGN + "i"
+    packed_data = struct.pack(fmt, header["n_par"]) # n_pars = 1
+    fi.write(packed_data)
+
+    # Write physics-parameter values
+    fmt = ALIGN + header["n_par"] * "d"
+    packed_data = struct.pack(fmt, *header['params'])
+    fi.write(packed_data)
+
+    # Write physics-parameter names
+    for i in range(header['n_par']):
+        decoded_data = header["param_names"][i].encode().ljust(NAME_LEN)
+        fi.write(decoded_data)
+
+    # Write snapshotnext, slicenext, and collapsenext
+    fmt = ALIGN + 1 * "i"
+    packed_data = struct.pack(fmt, header["snapshotnext"])
+    fi.write(packed_data)
+
+    packed_data = struct.pack(fmt, header["slicenext"])
+    fi.write(packed_data)
+
+    packed_data = struct.pack(fmt, header["collapsenext"])
+    fi.write(packed_data)
+
+    assert(fi.tell()) == header['offset_tree'], f"Header is not written correctly, {fi.tell()} != {header['offset_tree']}"
+    return fi.tell()
+
+def write_forest_tree(fi, header, forest, tree):
+
+    fi.seek(header['offset_tree'])
+    len_forest = len(forest)
+    assert(len_forest == (header['nleafs'] + header['nparents'])), f"Forest data is not written correctly, {len_forest} != {header['nleafs'] + header['nparents']}"
+
+    fmt = ALIGN + len_forest * "i"
+    packed_data = struct.pack(fmt, *forest)
+    fi.write(packed_data)
+
+    block_lvls, block_ixs, block_offsets = tree
+    assert(len(block_lvls) == len(block_ixs) == len(block_offsets))
+    assert(len(block_lvls) == header['nleafs'])
+    
+    fmt = ALIGN + len(block_lvls) * "i"
+    packed_data = struct.pack(fmt, *block_lvls)
+    fi.write(packed_data)
+
+    fmt = ALIGN + len(block_ixs) * header['ndim'] * "i"
+    packed_data = struct.pack(fmt, *(block_ixs.flatten()))
+    fi.write(packed_data)
+
+    fmt = ALIGN + len(block_offsets) * "q"
+    packed_data = struct.pack(fmt, *block_offsets)
+    fi.write(packed_data)
+
+    assert(fi.tell() == header['offset_blocks']), f"Tree data is not written correctly, {fi.tell()} != {header['offset_blocks']}"
+    return fi.tell()
+
+def write_blocks(fi, data, ndim, offsets):
+
+    """
+    fi: file buffer for input
+    data: blocks of data in the morton order
+    offsets: list of offsets for each block in fi
+    """
+
+    fi.seek(offsets[0])
+
+    for i in range(len(offsets)):
+
+        offset = offsets[i]
+        block_array = data[i]
+
+        fmt = ALIGN + 2 * ndim * "i"
+        ghostcells = np.zeros(2 * ndim, dtype=np.int32) # no ghostcells written into
+        packed_data = struct.pack(fmt, *ghostcells.flatten())
+        fi.write(packed_data)
+
+        fmt = ALIGN + np.prod(block_array.shape) * "d"
+        block_data = np.transpose(block_array, (3,2,1,0)).flatten(order='F')
+        packed_data = struct.pack(fmt, *block_data)
+        fi.write(packed_data)
+
+        if (i < len(offsets)-1):
+            assert(fi.tell() == offsets[i+1]), f"Block data is not written correctly, {fi.tell()} != {offsets[i+1]}"
+
+def write_new_header(fi, header, **kwargs):
 
     header_old = copy.deepcopy(header)
 
@@ -401,36 +558,6 @@ def write_header(fi, header, **kwargs):
     fi.write(packed_data)
 
     assert(fi.tell()) == header_old['offset_tree']
-    return fi.tell()
-
-def write_forest_tree(fi, forest, tree):
-
-    header = get_header(fi)
-    fi.seek(header['offset_tree'])
-    len_forest = len(forest)
-    assert(len_forest == (header['nleafs'] + header['nparents'])), f"Forest data is not written correctly, {len_forest} != {header['nleafs'] + header['nparents']}"
-
-    fmt = ALIGN + len_forest * "i"
-    packed_data = struct.pack(fmt, *forest)
-    fi.write(packed_data)
-
-    block_lvls, block_ixs, block_offsets = tree
-    assert(len(block_lvls) == len(block_ixs) == len(block_offsets))
-    assert(len(block_lvls) == header['nleafs'])
-    
-    fmt = ALIGN + len(block_lvls) * "i"
-    packed_data = struct.pack(fmt, *block_lvls)
-    fi.write(packed_data)
-
-    fmt = ALIGN + len(block_ixs) * header['ndim'] * "i"
-    packed_data = struct.pack(fmt, *(block_ixs.flatten()))
-    fi.write(packed_data)
-
-    fmt = ALIGN + len(block_offsets) * "q"
-    packed_data = struct.pack(fmt, *block_offsets)
-    fi.write(packed_data)
-
-    assert(fi.tell() == header['offset_blocks']), f"Tree data is not written correctly, {fi.tell()} != {header['offset_blocks']}"
     return fi.tell()
 
 def write_block_data(fi, fr, offsets):

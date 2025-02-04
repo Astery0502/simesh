@@ -143,7 +143,7 @@ class AMRForest:
             write_node(node)
 
         return forest 
-        
+
     def find_root_neighbor(self, neighbor_ptr: OctreeNodePointer, tree: OctreeNodePointer, ig1:int, ig2:int, ig3:int, 
                             periodB:List[bool]=[False, False, False]) -> None:
         

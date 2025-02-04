@@ -2,7 +2,7 @@ import abc
 import numpy as np
 from simesh.meshes.mesh import Mesh
 from simesh.meshes.amr_mesh import AMRMesh
-from simesh.frontends.amrvac.datio import get_single_block_data, find_uniform_fields
+from simesh.frontends.amrvac.datio import get_single_block_data, find_uniform_fields, write_header, write_forest_tree, write_blocks
 from typing import Tuple
 
 class DataSet(abc.ABC):
@@ -21,48 +21,25 @@ class DataSet(abc.ABC):
         self.sfile = sfile
         self.fieldnames = fieldnames if fieldnames is not None else []
 
-    @property
-    def sfile(self):
-        """Getter for sfile attribute"""
-        return self._sfile
-
-    @sfile.setter
-    def sfile(self, value):
-        """Setter for sfile attribute with type checking"""
-        if not isinstance(value, str):
-            raise TypeError("sfile must be a string")
-        self._sfile = value
-
-    @property
-    def fieldnames(self):
-        """Getter for fieldnames attribute"""
-        return self._fieldnames
-
-    @fieldnames.setter
-    def fieldnames(self, value):
-        """Setter for fieldnames attribute with type checking"""
-        if not isinstance(value, list):
-            raise TypeError("fieldnames must be a list")
-        self._fieldnames = value
 
 class AMRDataSet(DataSet):
     """
     AMR (Adaptive Mesh Refinement) specific implementation of DataSet.
     """
-    def __init__(self, amr_mesh: AMRMesh, sfile: str, header: dict, forest: np.ndarray, 
-                 tree: Tuple, fieldnames: list[str] | None = None):
+    def __init__(self, amr_mesh: AMRMesh, header: dict, forest: np.ndarray, 
+                 tree: Tuple, sfile: str="datfile", ):
         """
         Initialize the AMRDataSet with required mesh and file location.
         
         Args:
             mesh (AMRMesh): Instance of AMRMesh class
-            sfile (str): Path to data files
             header (dict): Header information
             forest (np.ndarray): Forest data
             tree (Tuple): Tree structure
+            sfile: Path to data files, defaults to "datfile", "load_data" will load the data from the file
             fieldnames (list[str] | None, optional): List of field names. Defaults to None
         """
-        super().__init__(sfile, fieldnames)
+        super().__init__(sfile, header['w_names'])
 
         # assert isinstance(self.mesh, AMRMesh), "mesh must be an instance of AMRMesh class"
         self.mesh = amr_mesh
@@ -84,7 +61,7 @@ class AMRDataSet(DataSet):
             nw = len(self.fieldnames)
 
             if self.header['levmax'] == 1:
-                # load the slab uniform grid into a uniform grid
+                # load the slab uniform grid into a uniform grid, no incorporation of ghostcells here
                 self.mesh.udata = find_uniform_fields(fb, self.header, self.tree)
 
                 block_nx = self.header['block_nx']
@@ -96,7 +73,7 @@ class AMRDataSet(DataSet):
                     x0, y0, z0 = (block_idx-1) * block_nx
                     x1, y1, z1 = block_idx * block_nx
 
-                    self.data[i][self.mesh.ixMmin[0]:self.mesh.ixMmax[0]+1, 
+                    self.mesh.data[ileaf][self.mesh.ixMmin[0]:self.mesh.ixMmax[0]+1, 
                                  self.mesh.ixMmin[1]:self.mesh.ixMmax[1]+1, 
                                  self.mesh.ixMmin[2]:self.mesh.ixMmax[2]+1] = \
                         self.mesh.udata[x0:x1, y0:y1, z0:z1]
@@ -134,6 +111,17 @@ class AMRDataSet(DataSet):
                     field_data[ixOmin[0]:ixOmax[0]+1, ixOmin[1]:ixOmax[1]+1, ixOmin[2]:ixOmax[2]+1]
 
         print("Load Clear")
+
+    def write_datfile(self, file_path: str):
+
+        with open(file_path, 'wb') as fb:
+            write_header(fb, self.header) 
+            write_forest_tree(fb, self.header, self.forest, self.tree)
+            # the non-ghostcells data0
+            data0 = self.mesh.data[:,self.mesh.ixMmin[0]:self.mesh.ixMmax[0]+1,self.mesh.ixMmin[1]:self.mesh.ixMmax[1]+1,self.mesh.ixMmin[2]:self.mesh.ixMmax[2]+1,:]
+            write_blocks(fb, data0, self.header['ndim'], self.tree[2])
+
+        print("Write the dataset to the file successfully: ", file_path)
 
     def update(self):
         # update the mesh with ghostcells
