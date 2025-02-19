@@ -9,7 +9,7 @@ class OctreeNodePointer:
         self.node = node
 
     # def __repr__(self) -> str:
-    #     return f"OctreeNodePointer(node={self.node})"
+    #     return f"OctreeNodePointer(node={self.node})""
 
 @dataclass
 class OctreeNode:

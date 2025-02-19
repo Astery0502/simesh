@@ -1,4 +1,5 @@
 import abc
+import os
 import numpy as np
 from simesh.meshes.mesh import Mesh
 from simesh.meshes.amr_mesh import AMRMesh
@@ -112,16 +113,16 @@ class AMRDataSet(DataSet):
 
         print("Load Clear")
 
-    def write_datfile(self, file_path: str):
+    def write_datfile(self):
 
-        with open(file_path, 'wb') as fb:
+        if os.path.exists(self.sfile):
+            raise FileExistsError(f"File {self.sfile} already exists")
+        with open(self.sfile, 'wb') as fb:
             write_header(fb, self.header) 
             write_forest_tree(fb, self.header, self.forest, self.tree)
             # the non-ghostcells data0
             data0 = self.mesh.data[:,self.mesh.ixMmin[0]:self.mesh.ixMmax[0]+1,self.mesh.ixMmin[1]:self.mesh.ixMmax[1]+1,self.mesh.ixMmin[2]:self.mesh.ixMmax[2]+1,:]
             write_blocks(fb, data0, self.header['ndim'], self.tree[2])
-
-        print("Write the dataset to the file successfully: ", file_path)
 
     def update(self):
         # update the mesh with ghostcells

@@ -457,7 +457,7 @@ def write_blocks(fi, data, ndim, offsets):
         fi.write(packed_data)
 
         fmt = ALIGN + np.prod(block_array.shape) * "d"
-        block_data = np.transpose(block_array, (3,2,1,0)).flatten(order='F')
+        block_data = np.transpose(block_array, (3,2,1,0)).flatten()
         packed_data = struct.pack(fmt, *block_data)
         fi.write(packed_data)
 
