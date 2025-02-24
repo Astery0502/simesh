@@ -5,6 +5,9 @@ from typing import Optional, List, Tuple
 from functools import cached_property
 
 class OctreeNodePointer:
+
+    __slots__ = ['node']
+
     def __init__(self, node: Optional['OctreeNode'] = None):
         self.node = node
 
@@ -16,6 +19,9 @@ class OctreeNode:
     """
     Octree node class referred to the amrvac/src/amr/mod_forest.t
     """
+
+    __slots__ = ['ig1', 'ig2', 'ig3', 'level', 'igrid', 'is_leaf', 
+                 'parent', 'children', 'neighbors', 'next_node', 'prev_node']
 
     # spatial indices of the grid block, ranges from 1 to ngl1, ngl2, ngl3
     ig1: int = 0

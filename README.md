@@ -66,15 +66,6 @@ from simesh import amr_loader
 ds = amr_loader(datfile)
 ```
 
-or we can load the data from the uarray directly:
-
-```python
-from simesh import load_from_uarrays
-
-ds = load_from_uarrays(uarrays)
-```
-
 #### Manipulation of the AMR structured data
 
 See details in the [demo.ipynb](demo.ipynb) for now.
-
