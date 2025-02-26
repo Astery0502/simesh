@@ -69,3 +69,7 @@ ds = amr_loader(datfile)
 #### Manipulation of the AMR structured data
 
 See details in the [demo.ipynb](demo.ipynb) for now.
+
+## Limitations
+
+Note that the package for now can only work on ***Cartesian, 3D AMR Mesh with constant boundary condition***. For further specific implementation, please contact with the author.
