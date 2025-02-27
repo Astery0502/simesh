@@ -61,8 +61,10 @@ class AMRForest:
             node.level = level
 
             # Clean up all children nodes and neighbors nodes as well as next and prev nodes for update
-            node.children.fill(None)
-            node.neighbors.fill(None)
+            for i, j, k in np.ndindex(2, 2, 2):
+                node.children[i,j,k].node = None
+            for i, j in np.ndindex(2, 3):
+                node.neighbors[i,j].node = None
             node.next_node.node = None
             node.prev_node.node = None
 

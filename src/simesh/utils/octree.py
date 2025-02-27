@@ -19,32 +19,29 @@ class OctreeNode:
     """
     Octree node class referred to the amrvac/src/amr/mod_forest.t
     """
-
     __slots__ = ['ig1', 'ig2', 'ig3', 'level', 'igrid', 'is_leaf', 
                  'parent', 'children', 'neighbors', 'next_node', 'prev_node']
 
-    # spatial indices of the grid block, ranges from 1 to ngl1, ngl2, ngl3
-    ig1: int = 0
-    ig2: int = 0
-    ig3: int = 0
-    # refinement level
-    level: int = 0
-    # sfc index starting from 1, leave 0 for illegal node in neighbor search
-    igrid: int = 0
-    # if the node is a leaf node
-    is_leaf: bool = True
-
-    # parent node
-    parent: 'OctreeNodePointer' = field(default_factory=lambda: OctreeNodePointer())
-    # children nodes
-    children: np.ndarray = field(default_factory=lambda: np.array([[[OctreeNodePointer() for _ in range(2)] for _ in range(2)] for _ in range(2)]))
-    # neighbor nodes 
-    neighbors: np.ndarray = field(default_factory=lambda: np.array([[OctreeNodePointer() for _ in range(3)] for _ in range(2)]))
-    # next node at refinement level
-    next_node: 'OctreeNodePointer' = field(default_factory=lambda: OctreeNodePointer())
-    # previous node at refinement level
-    prev_node: 'OctreeNodePointer' = field(default_factory=lambda: OctreeNodePointer())
-
+    def __init__(self):
+        # spatial indices of the grid block, ranges from 1 to ngl1, ngl2, ngl3
+        self.ig1: int = 0
+        self.ig2: int = 0
+        self.ig3: int = 0
+        # refinement level
+        self.level: int = 0
+        # sfc index starting from 1, leave 0 for illegal node in neighbor search
+        self.igrid: int = 0
+        # if the node is a leaf node
+        self.is_leaf: bool = True
+        
+        # Just create new instances directly
+        self.parent: 'OctreeNodePointer' = OctreeNodePointer()
+        self.children: np.ndarray = np.array([[[OctreeNodePointer() for _ in range(2)] 
+                                             for _ in range(2)] for _ in range(2)])
+        self.neighbors: np.ndarray = np.array([[OctreeNodePointer() for _ in range(3)] 
+                                            for _ in range(2)])
+        self.next_node: 'OctreeNodePointer' = OctreeNodePointer()
+        self.prev_node: 'OctreeNodePointer' = OctreeNodePointer()
 
     def __repr__(self) -> str:
         return f"OctreeNode(ig=({self.ig1},{self.ig2},{self.ig3}), level={self.level}, morton={self.igrid}, leaf={self.is_leaf})"
