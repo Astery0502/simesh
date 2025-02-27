@@ -20,7 +20,7 @@ You can install this package using either pip with setup.py or Poetry.
    pip install .[test]
    ```
 
-#### Using Poetry (Recommended)
+#### Using Poetry (pyproject.toml)
 
 1. First, install Poetry if you haven't already:
    ```bash
@@ -50,7 +50,6 @@ You can install this package using either pip with setup.py or Poetry.
 
 Optional test dependencies:
 - pytest ≥ 8.3.4
-- f90nml ≥ 1.4.4
 - JupyterLab ≥ 4.3.4
 - ipykernel ≥ 6.29.5
 
