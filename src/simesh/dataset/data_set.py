@@ -53,7 +53,7 @@ class AMRDataSet(DataSet):
         assert self.fieldnames == self.header['w_names'], "fieldnames must match the number of fields in the header"
         assert self.header['nleafs'] == self.mesh.nleafs, "nleafs must match the number of leafs in the forest"
 
-    def load_data(self, load_ghost: bool = True):
+    def load_data(self, load_ghost: bool = False):
 
         # if the mesh is uniform, load the uniform grid into the mesh in the mesh.udata
 
@@ -61,7 +61,7 @@ class AMRDataSet(DataSet):
         with open(self.sfile, 'rb') as fb:
             nw = len(self.fieldnames)
 
-            if self.header['levmax'] == 1:
+            if self.header['levmax'] == 1 and not load_ghost:
                 # load the slab uniform grid into a uniform grid, no incorporation of ghostcells here
                 self.mesh.udata = find_uniform_fields(fb, self.header, self.tree)
 
@@ -96,7 +96,7 @@ class AMRDataSet(DataSet):
                 ixOmax = self.mesh.ixMmax-self.mesh.ixMmin+ghostcells[1]+ghostcells[0]
                 lixO = ixOmax-ixOmin+1
 
-                field_data = np.array(field_data).reshape(nw, *lixO)
+                field_data = np.array(field_data).reshape(nw, *lixO[::-1])
                 field_data = np.transpose(field_data, (3,2,1,0))
 
                 if not load_ghost:

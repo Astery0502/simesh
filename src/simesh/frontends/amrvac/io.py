@@ -33,7 +33,7 @@ header_template = {
     'collapsenext': 0
 }
 
-def amr_loader(file_path: str, nghostcells: int = 2, load_ghost: bool = True):
+def amr_loader(file_path: str, nghostcells: int = 2, load_ghost: bool = False):
 
     with open(file_path, 'rb') as fb:
         header = get_header(fb)
