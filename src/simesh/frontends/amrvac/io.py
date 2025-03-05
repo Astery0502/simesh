@@ -78,6 +78,7 @@ def load_from_uarrays(nw_arrays, w_names, xmin, xmax, block_nx, file_path:str='d
     header['xmax'] = np.array(xmax)
     header['domain_nx'] = np.array(mesh.domain_nx)
     header['block_nx'] = np.array(block_nx).astype(int)
+    header['levmax'] = mesh.forest.max_level
 
     tree_size, offset_size = get_tree_size(header)
     header['offset_tree'] = tree_size

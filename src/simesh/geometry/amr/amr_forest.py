@@ -73,6 +73,10 @@ class AMRForest:
 
             if node.is_leaf:
 
+                # update the max level
+                if level > self.max_level:
+                    self.max_level = level
+
                 # self.add_to_linked_list(tree, level)
                 self.nleafs_level[level-1] += 1
                 self.sfc_to_node[igrid] = tree

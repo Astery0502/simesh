@@ -5,6 +5,8 @@ from simesh.meshes.mesh import Mesh
 from simesh.meshes.amr_mesh import AMRMesh
 from simesh.frontends.amrvac.datio import get_single_block_data, find_uniform_fields, write_header, write_forest_tree, write_blocks
 from typing import Tuple
+# temporary import, later will create a individual part for vtk output
+from vtk import vtkNonOverlappingAMR, vtkUniformGrid, vtkDoubleArray, vtkXMLHierarchicalBoxDataWriter
 
 class DataSet(abc.ABC):
     """
@@ -139,3 +141,65 @@ class AMRDataSet(DataSet):
                 self.header[key] = value
             else:
                 raise ValueError(f"Key '{key}' not found in header")
+
+    # the vthb only supports the slab Cartesian mesh for now
+    def write_vthb(self, filename: str):
+
+        max_level = self.header['levmax']
+        block_nx = self.header['block_nx']
+        rnode = self.mesh.rnode
+        ixMmin = self.mesh.ixMmin
+        ixMmax = self.mesh.ixMmax
+
+        field_names = self.fieldnames
+
+        amr_vtk = vtkNonOverlappingAMR()
+        amr_vtk.Initialize(max_level, self.mesh.forest.nleafs_level)
+
+        block_levels = np.zeros(max_level, dtype=int)
+
+        # Move data_references outside the leaf loop to maintain the references
+        all_data_references = []
+
+        for ileaf in range(self.header['nleafs']):
+            level = self.mesh.forest.nodes[ileaf].node.level-1
+
+            idx = block_levels[level-1].astype(int)
+            block_levels[level-1] += 1
+
+            grid = vtkUniformGrid()
+            grid.SetExtent(0,block_nx[0],0,block_nx[1],0,block_nx[2])
+
+            # Calculate spacing for uniform grid
+            dx = rnode[6,ileaf]  # spacing in x direction
+            dy = rnode[7,ileaf]  # spacing in y direction
+            dz = rnode[8,ileaf]  # spacing in z direction
+            
+            # Set origin and spacing
+            grid.SetOrigin(rnode[0,ileaf], rnode[1,ileaf], rnode[2,ileaf])
+            grid.SetSpacing(dx, dy, dz)
+
+            # add cell data arrays
+            for iw in range(len(field_names)):
+                vtk_array = vtkDoubleArray()
+                vtk_array.SetName(field_names[iw])
+                vtk_array.SetNumberOfComponents(1)
+                vtk_array.SetNumberOfTuples(block_nx[0]*block_nx[1]*block_nx[2])
+
+                data = self.mesh.data[ileaf,ixMmin[0]:ixMmax[0]+1,ixMmin[1]:ixMmax[1]+1,ixMmin[2]:ixMmax[2]+1,iw]
+                data_flat = data.flatten(order='F')
+                data_flat = np.array(data_flat, dtype=np.float64, copy=True)
+
+                # store the temporary data_flat for permanent reference
+                all_data_references.append(data_flat)
+                vtk_array.SetArray(data_flat, len(data_flat), 1)
+        
+                grid.GetCellData().AddArray(vtk_array)
+
+            amr_vtk.SetDataSet(int(level), int(idx), grid)
+
+        # Write the AMR dataset to a file
+        writer = vtkXMLHierarchicalBoxDataWriter()
+        writer.SetFileName(filename)
+        writer.SetInputData(amr_vtk)
+        writer.Write()
