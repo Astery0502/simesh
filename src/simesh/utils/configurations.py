@@ -182,3 +182,40 @@ def TDm_slab(xmin, xmax, domain_nx, r0:float, a0:float, ispositive:bool,
     Bvec_bipolar = bipolar_Bvec(coordinates, q0, L0, d0).reshape(3, *domain_nx)
 
     return (Bvec_rbsl + Bvec_bipolar)
+
+def dipolez_Avec(coordinates:np.ndarray, mz:float, posi:np.ndarray):
+    """
+    Calculate the vector potential of a dipole in the z-direction.
+
+    input:
+    coordinates: np.ndarray, shape (3, ...)
+    posi: np.ndarray, shape (3,)
+    """
+
+    x, y, z = coordinates[0], coordinates[1], coordinates[2]
+    xi, yi, zi = posi[0], posi[1], posi[2]
+    r = np.sqrt((x-xi)**2 + (y-yi)**2 + (z-zi)**2)
+
+    Avec = np.zeros((3, *x.shape))
+    Avec[0] = -mz * (y-yi) / r**3
+    Avec[1] = mz * (x-xi) / r**3
+    Avec[2] = 0.0
+
+    return Avec
+
+def fan_Avec(coordinates:np.ndarray, poses:np.ndarray, mz):
+    """
+    Calculate the vector potential of a fan.
+
+    coordinates: np.ndarray, shape (3, ...)
+    poses: np.ndarray, shape (M, 3), M set the first dim for memory efficiency in loop
+    """
+
+    x, y, z = coordinates[0], coordinates[1], coordinates[2]
+
+    Avec = np.zeros((3, *x.shape))
+
+    for i in range(poses.shape[0]):
+        Avec += dipolez_Avec(coordinates, mz, poses[i])
+
+    return Avec

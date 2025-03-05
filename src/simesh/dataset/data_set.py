@@ -148,6 +148,8 @@ class AMRDataSet(DataSet):
         max_level = self.header['levmax']
         block_nx = self.header['block_nx']
         rnode = self.mesh.rnode
+        nodes = self.mesh.forest.sfc_to_node
+
         ixMmin = self.mesh.ixMmin
         ixMmax = self.mesh.ixMmax
 
@@ -162,7 +164,7 @@ class AMRDataSet(DataSet):
         all_data_references = []
 
         for ileaf in range(self.header['nleafs']):
-            level = self.mesh.forest.nodes[ileaf].node.level-1
+            level = nodes[ileaf].node.level-1
 
             idx = block_levels[level-1].astype(int)
             block_levels[level-1] += 1
