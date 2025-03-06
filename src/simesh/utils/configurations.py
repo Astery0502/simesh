@@ -203,6 +203,37 @@ def dipolez_Avec(coordinates:np.ndarray, mz:float, posi:np.ndarray):
 
     return Avec
 
+def dipole_Bvec(coordinates:np.ndarray, m:np.ndarray, posi:np.ndarray):
+    """
+    Calculate the magnetic field of a dipole.
+    """
+    x, y, z = coordinates[0], coordinates[1], coordinates[2]
+    xi, yi, zi = posi[0], posi[1], posi[2]
+    r = np.sqrt((x-xi)**2 + (y-yi)**2 + (z-zi)**2)
+
+    Bvec = np.zeros((3, *x.shape))
+    Bvec[0] = 3 * (x-xi) * np.dot(m, coordinates-posi) / r**5 - m[0] / r**3
+    Bvec[1] = 3 * (y-yi) * np.dot(m, coordinates-posi) / r**5 - m[1] / r**3
+    Bvec[2] = 3 * (z-zi) * np.dot(m, coordinates-posi) / r**5 - m[2] / r**3
+
+    return Bvec
+
+
+def monopole_Bvec(coordinates:np.ndarray, q:float, posi:np.ndarray):
+    """
+    Calculate the magnetic field of a monopole.
+    """
+    x, y, z = coordinates[0], coordinates[1], coordinates[2]
+    xi, yi, zi = posi[0], posi[1], posi[2]
+    r = np.sqrt((x-xi)**2 + (y-yi)**2 + (z-zi)**2)
+
+    Bvec = np.zeros((3, *x.shape))
+    Bvec[0] = q*(x-xi) / r**3
+    Bvec[1] = q*(y-yi) / r**3
+    Bvec[2] = q*(z-zi) / r**3
+
+    return Bvec
+
 def fan_Avec(coordinates:np.ndarray, poses:np.ndarray, mz):
     """
     Calculate the vector potential of a fan.
@@ -216,6 +247,39 @@ def fan_Avec(coordinates:np.ndarray, poses:np.ndarray, mz):
     Avec = np.zeros((3, *x.shape))
 
     for i in range(poses.shape[0]):
-        Avec += dipolez_Avec(coordinates, mz, poses[i])
+        Avec += dipolez_Avec(coordinates, mz[i], poses[i])
 
     return Avec
+
+def fan_slab(xmin:np.ndarray, xmax:np.ndarray, domain_nx:np.ndarray, poses:np.ndarray, mz:float):
+
+    # Ensure inputs are numpy arrays
+    xmin = np.asarray(xmin)
+    xmax = np.asarray(xmax) 
+    domain_nx = np.asarray(domain_nx)
+
+    # Verify shapes
+    assert xmin.shape == (3,), f"xmin must be array of shape (3,), got {xmin.shape}"
+    assert xmax.shape == (3,), f"xmax must be array of shape (3,), got {xmax.shape}"
+    assert domain_nx.shape == (3,), f"domain_nx must be array of shape (3,), got {domain_nx.shape}"
+
+    # Define the grid
+    xrange = np.linspace(xmin[0], xmax[0], domain_nx[0]+1)[:-1] + 0.5 * (xmax[0] - xmin[0]) / domain_nx[0]
+    yrange = np.linspace(xmin[1], xmax[1], domain_nx[1]+1)[:-1] + 0.5 * (xmax[1] - xmin[1]) / domain_nx[1]
+    zrange = np.linspace(xmin[2], xmax[2], domain_nx[2]+1)[:-1] + 0.5 * (xmax[2] - xmin[2]) / domain_nx[2]
+    x_mesh, y_mesh, z_mesh = np.meshgrid(xrange, yrange, zrange, indexing='ij')
+    coordinates = np.stack([x_mesh.flatten(), y_mesh.flatten(), z_mesh.flatten()])
+
+    dxyz = (xmax-xmin) / domain_nx
+
+    # Define the grid for the extended domain for derivatives
+    xrange1 = np.concatenate([xrange[0:1]-dxyz[0], xrange, xrange[-1:]+dxyz[0]])
+    yrange1 = np.concatenate([yrange[0:1]-dxyz[1], yrange, yrange[-1:]+dxyz[1]])
+    zrange1 = np.concatenate([zrange[0:1]-dxyz[2], zrange, zrange[-1:]+dxyz[2]])
+    x_mesh1, y_mesh1, z_mesh1 = np.meshgrid(xrange1, yrange1, zrange1, indexing='ij')
+    coordinates1 = np.stack([x_mesh1.flatten(), y_mesh1.flatten(), z_mesh1.flatten()])
+
+    fanA = fan_Avec(coordinates1, poses, mz).reshape(3, *(domain_nx+2))
+    fanB = curl_slab(fanA, dxyz)
+
+    return fanB
