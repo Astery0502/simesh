@@ -218,6 +218,30 @@ def get_single_block_field_data(istream, offset, block_shape, field_idx:int, ndi
         data = data[..., np.newaxis]
     return data
 
+def write_single_block_field_data(fb, offset: int, block_shape, field_idx: int, ndim: int, data):
+    """
+    Write a single field to a dat file
+    for now ct surface variables are not supported
+
+    Parameters
+    ----------
+    fb: file buffer
+    offset: int
+    block_shape: tuple
+    field_idx: int
+    ndim: int
+    data: np.ndarray
+    """
+
+    count = np.prod(block_shape)
+    byte_size_field = count * SIZE_DOUBLE
+    fb.seek(offset + byte_size_field * field_idx + 2*ndim*SIZE_INT)
+    block_data = (np.asarray(data).T).flatten()
+
+    fmt = ALIGN + np.prod(block_shape) * "d"
+    packed_data = struct.pack(fmt, *block_data)
+    fb.write(packed_data)
+
 def find_uniform_fields(fb, header, tree):
 
     if header['levmax'] != 1:

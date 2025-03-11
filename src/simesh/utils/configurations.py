@@ -212,9 +212,13 @@ def dipole_Bvec(coordinates:np.ndarray, m:np.ndarray, posi:np.ndarray):
     r = np.sqrt((x-xi)**2 + (y-yi)**2 + (z-zi)**2)
 
     Bvec = np.zeros((3, *x.shape))
-    Bvec[0] = 3 * (x-xi) * np.dot(m, coordinates-posi) / r**5 - m[0] / r**3
-    Bvec[1] = 3 * (y-yi) * np.dot(m, coordinates-posi) / r**5 - m[1] / r**3
-    Bvec[2] = 3 * (z-zi) * np.dot(m, coordinates-posi) / r**5 - m[2] / r**3
+
+    # Calculate dot product components explicitly
+    dot_product = (m[0]*(x-xi) + m[1]*(y-yi) + m[2]*(z-zi))
+
+    Bvec[0] = 3 * (x-xi) * dot_product / r**5 - m[0] / r**3
+    Bvec[1] = 3 * (y-yi) * dot_product / r**5 - m[1] / r**3
+    Bvec[2] = 3 * (z-zi) * dot_product / r**5 - m[2] / r**3
 
     return Bvec
 
@@ -251,7 +255,18 @@ def fan_Avec(coordinates:np.ndarray, poses:np.ndarray, mz):
 
     return Avec
 
-def fan_slab(xmin:np.ndarray, xmax:np.ndarray, domain_nx:np.ndarray, poses:np.ndarray, mz:float):
+def fan_Bvec(coordinates:np.ndarray, poses:np.ndarray, m:np.ndarray):
+    """
+    Calculate the magnetic field of a fan.
+
+    """
+    Bvec = np.zeros(coordinates.shape)
+    for i in range(poses.shape[0]):
+        Bvec += dipole_Bvec(coordinates, m[i], poses[i])
+
+    return Bvec
+
+def fan_slab(xmin:np.ndarray, xmax:np.ndarray, domain_nx:np.ndarray, poses:np.ndarray, m:np.ndarray):
 
     # Ensure inputs are numpy arrays
     xmin = np.asarray(xmin)
@@ -279,7 +294,6 @@ def fan_slab(xmin:np.ndarray, xmax:np.ndarray, domain_nx:np.ndarray, poses:np.nd
     x_mesh1, y_mesh1, z_mesh1 = np.meshgrid(xrange1, yrange1, zrange1, indexing='ij')
     coordinates1 = np.stack([x_mesh1.flatten(), y_mesh1.flatten(), z_mesh1.flatten()])
 
-    fanA = fan_Avec(coordinates1, poses, mz).reshape(3, *(domain_nx+2))
-    fanB = curl_slab(fanA, dxyz)
+    fanB = fan_Bvec(coordinates, poses, m).reshape(3, *(domain_nx))
 
     return fanB

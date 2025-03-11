@@ -174,19 +174,29 @@ class AMRMesh(Mesh):
     def _init_coordinates(self):
 
         self.rnode = np.zeros((9,self.nleafs))
+        max_level = self.forest.max_level
+        dlevel = 1/2**(max_level-1)
+
+        dxc = (self.xrange[1] - self.xrange[0])/self.domain_nx[0]*dlevel
+        dyc = (self.yrange[1] - self.yrange[0])/self.domain_nx[1]*dlevel
+        dzc = (self.zrange[1] - self.zrange[0])/self.domain_nx[2]*dlevel
+
+        dxb = (self.xrange[1] - self.xrange[0])/self.nblock[0]*dlevel
+        dyb = (self.yrange[1] - self.yrange[0])/self.nblock[1]*dlevel
+        dzb = (self.zrange[1] - self.zrange[0])/self.nblock[2]*dlevel
 
         for igrid in range(self.nleafs):
             node = self.forest.sfc_to_node[igrid].node
             level = node.level
-            self.rnode[0,igrid] = node.ig1*(self.xrange[1]-self.xrange[0])/self.nblock[0]/2**(level-1)+self.xrange[0]
-            self.rnode[1,igrid] = node.ig2*(self.yrange[1]-self.yrange[0])/self.nblock[1]/2**(level-1)+self.yrange[0]
-            self.rnode[2,igrid] = node.ig3*(self.zrange[1]-self.zrange[0])/self.nblock[2]/2**(level-1)+self.zrange[0]
-            self.rnode[3,igrid] = (node.ig1+1)*(self.xrange[1]-self.xrange[0])/self.nblock[0]/2**(level-1)+self.xrange[0]
-            self.rnode[4,igrid] = (node.ig2+1)*(self.yrange[1]-self.yrange[0])/self.nblock[1]/2**(level-1)+self.yrange[0]
-            self.rnode[5,igrid] = (node.ig3+1)*(self.zrange[1]-self.zrange[0])/self.nblock[2]/2**(level-1)+self.zrange[0]
-            self.rnode[6,igrid] = (self.xrange[1]-self.xrange[0])/self.domain_nx[0]/2**(level-1)
-            self.rnode[7,igrid] = (self.yrange[1]-self.yrange[0])/self.domain_nx[1]/2**(level-1)
-            self.rnode[8,igrid] = (self.zrange[1]-self.zrange[0])/self.domain_nx[2]/2**(level-1)
+            self.rnode[0,igrid] = node.ig1*dxb*2**(max_level-level)+self.xrange[0]
+            self.rnode[1,igrid] = node.ig2*dyb*2**(max_level-level)+self.yrange[0]
+            self.rnode[2,igrid] = node.ig3*dzb*2**(max_level-level)+self.zrange[0]
+            self.rnode[3,igrid] = (node.ig1+1)*dxb*2**(max_level-level)+self.xrange[0]
+            self.rnode[4,igrid] = (node.ig2+1)*dyb*2**(max_level-level)+self.yrange[0]
+            self.rnode[5,igrid] = (node.ig3+1)*dzb*2**(max_level-level)+self.zrange[0]
+            self.rnode[6,igrid] = dxc*2**(max_level-level)
+            self.rnode[7,igrid] = dyc*2**(max_level-level)
+            self.rnode[8,igrid] = dzc*2**(max_level-level)
     
     def _init_field_idx(self):
 
@@ -864,6 +874,68 @@ class AMRMesh(Mesh):
             offset += np.prod(self.block_nx) * len(self.field_names) * SIZE_DOUBLE # field data
 
         return [lvls, indices, offsets]
+
+def create_empty_amrmesh(domain_nx, block_nx, xmin, xmax, w_names, forest) -> AMRMesh:
+    """
+    Create an empty AMR mesh without loading data.
+    
+    Parameters:
+        xmin: Array-like of shape (3,) specifying minimum coordinates [xmin, ymin, zmin]
+        xmax: Array-like of shape (3,) specifying maximum coordinates [xmax, ymax, zmax]
+        w_names: List of field names
+        block_nx: Number of cells per block in each direction
+        domain_nx: Number of cells in domain in each direction
+        forest: Array-like of shape (nleafs+nparents,) boolean, True for leaf nodes
+    
+    Returns:
+        AMRMesh: Empty AMR mesh object
+    """
+    xmin = np.asarray(xmin)
+    xmax = np.asarray(xmax)
+    block_nx = np.asarray(block_nx)
+    domain_nx = np.asarray(domain_nx)
+    
+    assert xmin.shape == (3,), "xmin must have shape (3,)"
+    assert xmax.shape == (3,), "xmax must have shape (3,)"
+    assert np.all(xmin < xmax), "xmin must be less than xmax"
+    
+    nglev1 = domain_nx // block_nx
+    assert np.all(nglev1 * block_nx == domain_nx), "domain_nx must be divisible by block_nx"
+    nglev1 = nglev1.astype(int)
+
+    # Create forest for level 1 blocks
+    nleafs = np.where(forest)[0].size
+    amr_forest = AMRForest(ng1=nglev1[0], ng2=nglev1[1], ng3=nglev1[2], 
+                          nleafs=nleafs)
+    amr_forest.read_forest(forest)
+    amr_forest.build_connectivity()
+
+    # Create empty AMR mesh
+    xrange = (xmin[0], xmax[0])
+    yrange = (xmin[1], xmax[1])
+    zrange = (xmin[2], xmax[2])
+    
+    mesh = AMRMesh(xrange, yrange, zrange, w_names, block_nx, domain_nx, 
+                  amr_forest, nghostcells=2)
+    
+    return mesh
+
+def create_empty_uniform_amrmesh(domain_nx, block_nx, xmin, xmax, w_names) -> AMRMesh:
+    """
+    Create an empty AMR slab mesh without loading data.
+    """
+
+    block_nx = np.asarray(block_nx)
+    domain_nx = np.asarray(domain_nx)
+
+    nglev1 = domain_nx // block_nx
+    assert np.all(nglev1 * block_nx == domain_nx), "domain_nx must be divisible by block_nx"
+    nglev1 = nglev1.astype(int)
+
+    nleafs = np.prod(nglev1)
+    forest = np.ones(nleafs).astype(np.bool_)
+
+    return create_empty_amrmesh(domain_nx, block_nx, xmin, xmax, w_names, forest)
 
 def amrmesh_from_uniform(nw_arrays:np.ndarray, w_names, xmin, xmax, block_nx):
 

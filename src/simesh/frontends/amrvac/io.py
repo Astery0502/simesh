@@ -1,5 +1,6 @@
+import os
 import numpy as np
-from .datio import get_header, get_forest, get_tree_info, get_tree_size
+from .datio import get_header, get_forest, get_tree_info, get_tree_size, write_header, write_forest_tree, write_single_block_field_data
 from simesh.meshes.amr_mesh import AMRMesh, amrmesh_from_uniform
 from simesh.geometry.amr.amr_forest import AMRForest
 from simesh.dataset.data_set import AMRDataSet
@@ -92,3 +93,67 @@ def load_from_uarrays(nw_arrays, w_names, xmin, xmax, block_nx, file_path:str='d
     ds.update_header(**kwargs)
 
     return ds
+
+def write_dat_metadata(file_path: str, amr_mesh: AMRMesh, **kwargs):
+    """
+    Write the metadata of an AMR mesh to a dat file.
+    """
+    # Check if file already exists
+    if os.path.exists(file_path):
+        raise FileExistsError(f"File {file_path} already exists")
+
+    header = header_template.copy()
+    header['nw'] = len(amr_mesh.field_names)
+    header['w_names'] = list(amr_mesh.field_names)
+    header['nleafs'] = int(amr_mesh.nleafs)
+    header['xmin'] = np.array([amr_mesh.xrange[0], amr_mesh.yrange[0], amr_mesh.zrange[0]])
+    header['xmax'] = np.array([amr_mesh.xrange[1], amr_mesh.yrange[1], amr_mesh.zrange[1]])
+    header['domain_nx'] = np.array(amr_mesh.domain_nx).astype(int)
+    header['block_nx'] = np.array(amr_mesh.block_nx).astype(int)
+    header['levmax'] = amr_mesh.forest.max_level
+
+    tree_size, offset_size = get_tree_size(header)
+    header['offset_tree'] = tree_size
+    header['offset_blocks'] = offset_size
+
+    for key, value in kwargs.items():
+        if key in header:
+            header[key] = value
+        else:
+            raise ValueError(f"Key '{key}' not found in header")
+
+    forest = amr_mesh.forest.write_forest()
+    tree = amr_mesh.write_tree()
+    tree[2] += offset_size
+
+    with open(file_path, 'wb') as fb:
+        write_header(fb, header)
+        write_forest_tree(fb, header, forest, tree)
+
+    return header, forest, tree
+
+def write_dat_field(fb, field_idx: int, data: np.ndarray, isuniform: bool = False):
+    """
+    Write a single field to a dat file, already write_dat_metadata must be called first.
+    """
+    header = get_header(fb)
+    tree = get_tree_info(fb)
+
+    data = np.asarray(data)
+
+    assert field_idx < header['nw']
+    assert np.all(data.shape == header['domain_nx']), f"data shape {data.shape} must match domain_nx {header['domain_nx']}"
+
+    if isuniform:
+        assert header['levmax'] == 1
+
+    for ileaf, ioffset in enumerate(tree[2]):
+        if isuniform:
+            idx = tree[1][ileaf]-1
+            x0, y0, z0 = idx * header['block_nx']
+            x1, y1, z1 = (idx+1) * header['block_nx']
+            datai = data[x0:x1, y0:y1, z0:z1]
+        else:
+            datai = data[ileaf]
+
+        write_single_block_field_data(fb, ioffset, header['block_nx'], field_idx, 3, datai)

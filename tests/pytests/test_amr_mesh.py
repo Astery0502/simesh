@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from simesh.meshes.amr_mesh import AMRMesh
+from simesh.meshes.amr_mesh import AMRMesh, create_empty_amrmesh, create_empty_uniform_amrmesh
 from simesh.geometry.amr.amr_forest import AMRForest
 
 @pytest.fixture
@@ -116,7 +116,7 @@ def test_coarsen_grid(common_mesh):
     coarse_region = tuple(slice(ixComin[i], ixComax[i]+1) for i in range(3))
     assert np.allclose(common_mesh.datac[igrid][coarse_region], 1.0)
 
-def test_fill_coarse_boundary():
+def test_fill_coarse_boundary(common_mesh):
 
     mesh = common_mesh()
     mesh.coarsen_grid(1, np.array([2,2,2]), np.array([5,5,5]), np.array([2,2,2]), np.array([3,3,3]))
@@ -128,15 +128,33 @@ def test_fill_coarse_boundary():
     assert np.allclose(mesh.datac[1, 2:4, 0:2, 0:2, :], 1.0)
 
 
-def test_fill_boundary_before_gc():
+def test_fill_boundary_before_gc(common_mesh):
 
     mesh = common_mesh()
     mesh.fill_boundary_before_gc(0)
 
     assert np.allclose(mesh.data[0][:,:,:,0][0:6,0:6,0:6], 1.0)
 
-def test_getbc():
+def test_getbc(common_mesh):
     mesh = common_mesh()
     mesh.getbc()
 
     assert np.all(mesh.data)
+
+def test_create_empty_amrmesh():
+
+    domain_nx = np.array([16, 16, 16])
+    block_nx = np.array([8, 8, 8])
+    xmin = np.array([0., 0., 0.])
+    xmax = np.array([1., 1., 1.])
+    w_names = ['density', 'magnetic_field']
+    forest = np.ones(np.prod(domain_nx // block_nx)).astype(np.bool_)
+
+    mesh = create_empty_amrmesh(domain_nx, block_nx, xmin, xmax, w_names, forest)
+
+    assert np.all(mesh.domain_nx == domain_nx)
+    assert np.all(mesh.block_nx == block_nx)
+    assert np.all(mesh.xrange == (xmin[0], xmax[0]))
+    assert np.all(mesh.yrange == (xmin[1], xmax[1]))
+    assert np.all(mesh.zrange == (xmin[2], xmax[2]))
+    assert np.all(mesh.forest.write_forest() == forest)
