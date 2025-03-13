@@ -88,15 +88,16 @@ class AMRForest:
                 self.nparents += 1
                 node.igrid = -1    # parent node morton number
 
-                # Create child nodes in a vectorized way
-                child_indices = np.array(np.meshgrid(range(2), range(2), range(2))).reshape(3,-1).T
-                child_igs = 2 * np.array([ig1, ig2, ig3]) + child_indices
-                
-                for idx, (i,j,k) in enumerate(child_indices):
-                    child_node = OctreeNode()
-                    tree.node.children[i,j,k].node = child_node
-                    child_node.parent.node = tree.node
-                    read_node(tree.node.children[i,j,k], *child_igs[idx], level+1)
+                # Create child nodes 
+                child_level = level + 1 
+                for k in range(2):
+                     for j in range(2):
+                         for i in range(2):
+                             child_ig1, child_ig2, child_ig3 = 2*ig1+i, 2*ig2+j, 2*ig3+k
+                             child_node = OctreeNode()
+                             tree.node.children[i,j,k].node = child_node
+                             tree.node.children[i,j,k].node.parent.node = tree.node
+                             read_node(tree.node.children[i,j,k], child_ig1, child_ig2, child_ig3, child_level)
 
         igrid = 0
         inode = 0
@@ -132,10 +133,11 @@ class AMRForest:
             forest[ileaf-1] = tree.node.is_leaf
             if not tree.node.is_leaf:
                 # Process children in Morton order sequence
-                child_indices = np.array(np.meshgrid(range(2), range(2), range(2))).reshape(3,-1).T
-                for i, j, k in child_indices:
-                    child_node = tree.node.children[i,j,k]
-                    write_node(child_node)
+                for k in range(2):
+                    for j in range(2):
+                        for i in range(2):
+                            child_node = tree.node.children[i,j,k]
+                            write_node(child_node)
 
         forest = np.zeros(self.nparents+self.nleafs, dtype=bool)
         ileaf = 0
@@ -287,37 +289,39 @@ class AMRForest:
             node = nodeptr.node
             assert isinstance(node, OctreeNode), "Node is not a valid OctreeNode"
 
-            for zi, yi, xi in np.ndindex(3,3,3):
-                if (xi == 1 and yi == 1 and zi == 1):
-                    self.neighbor_type[xi,yi,zi,igrid] = 0
-                    self.neighbor[xi,yi,zi,igrid] = igrid+1
-                else:
-                    neighbor_ptr = OctreeNodePointer()
-                    neighbor_type = self.find_neighbor(neighbor_ptr, nodeptr, xi-1, yi-1, zi-1)
-                    if neighbor_type == 1:
-                        self.neighbor[xi,yi,zi,igrid] = 0
-                    elif neighbor_type == 4:
-                        self.neighbor[xi,yi,zi,igrid] = 0
-                        self._process_fine_neighbor(igrid, xi, yi, zi, neighbor_ptr)
-                    else: 
-                        assert isinstance(neighbor_ptr.node, OctreeNode), "Neighbor node is not a valid OctreeNode"
-                        self.neighbor[xi,yi,zi,igrid] = neighbor_ptr.node.igrid
-                    self.neighbor_type[xi,yi,zi,igrid] = neighbor_type
-    
-    def _process_fine_neighbor(self, igrid:int, xi:int, yi:int, zi:int, neighbor_ptr: OctreeNodePointer):
-        # loop over the local indices of children ic^D
-        # calculate the child neighbor indices in the 4x4x4 box
-        for ic3 in range(1+int((2-zi)/2), 2-int(zi/2)+1):
-            inc3 = 2*(zi-1)+ic3
-            ih3 = ic3 # ignore the pole
-            for ic2 in range(1+int((2-yi)/2), 2-int(yi/2)+1):
-                inc2 = 2*(yi-1)+ic2
-                ih2 = ic2 # ignore the 
-                for ic1 in range(1+int((2-xi)/2), 2-int(xi/2)+1):
-                    inc1 = 2*(xi-1)+ic1
-                    ih1 = ic1 # ignore the pole
-                    child_node = neighbor_ptr.node.children[ih1-1,ih2-1,ih3-1].node
-                    self.neighbor_child[inc1,inc2,inc3,igrid] = child_node.igrid
+            for zi in range(3):
+                 for yi in range(3):
+                     for xi in range(3):
+                         if (xi == 1 and yi == 1 and zi == 1):
+                             self.neighbor_type[xi,yi,zi,igrid] = 0
+                             self.neighbor[xi,yi,zi,igrid] = igrid+1
+                         else:
+                             neighbor_ptr = OctreeNodePointer()
+                             neighbor_type = self.find_neighbor(neighbor_ptr, nodeptr, xi-1, yi-1, zi-1)
+                             if neighbor_type == 1:
+                                 self.neighbor[xi,yi,zi,igrid] = 0
+                             elif neighbor_type == 4:
+                                 self.neighbor[xi,yi,zi,igrid] = 0
+                                 # loop over the local indices of children ic^D
+                                 # calculate the child neighbor indices in the 4x4x4 box
+                                 for ic3 in range(1+int((2-zi)/2), 2-int(zi/2)+1):
+                                     inc3 = 2*(zi-1)+ic3
+                                     ih3 = ic3 # ignore the pole
+                                     for ic2 in range(1+int((2-yi)/2), 2-int(yi/2)+1):
+                                         inc2 = 2*(yi-1)+ic2
+                                         ih2 = ic2 # ignore the 
+                                         for ic1 in range(1+int((2-xi)/2), 2-int(xi/2)+1):
+                                             inc1 = 2*(xi-1)+ic1
+                                             ih1 = ic1 # ignore the pole
+                                             child_ptr = OctreeNodePointer()
+                                             assert isinstance(neighbor_ptr.node, OctreeNode), "Neighbor node is not a valid OctreeNode"
+                                             child_ptr.node = neighbor_ptr.node.children[ih1-1,ih2-1,ih3-1].node
+                                             self.neighbor_child[inc1,inc2,inc3,igrid] = child_ptr.node.igrid
+                             else: 
+                                 assert isinstance(neighbor_ptr.node, OctreeNode), "Neighbor node is not a valid OctreeNode"
+                                 self.neighbor[xi,yi,zi,igrid] = neighbor_ptr.node.igrid
+                             self.neighbor_type[xi,yi,zi,igrid] = neighbor_type
+ 
 
     @classmethod
     def add_to_linked_list(cls, tree: OctreeNodePointer, level: int):
