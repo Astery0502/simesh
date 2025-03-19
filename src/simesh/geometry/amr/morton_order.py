@@ -102,4 +102,3 @@ def level1_Morton_order(ng1:int, ng2:int, ng3:int):
         sfc_iglevel1[seq_sfc[idx]] = seq_ig[idx]
     
     return iglevel1_sfc, sfc_iglevel1
-

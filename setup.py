@@ -26,8 +26,6 @@ setup(
     extras_require={
         "test": [
             "pytest>=8.3.4",
-            "f90nml>=1.4.4",
-            "jupyterlab>=4.3.4"
         ],
     },
 ) 
