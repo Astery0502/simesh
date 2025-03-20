@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 from simesh import amr_loader
 from simesh.utils.configurations import TDm_slab
-from simesh.meshes.amr_mesh import create_empty_amrmesh
+from simesh.mesh.amr_mesh import create_empty_amrmesh
 from simesh.frontends.amrvac.io import write_dat_metadata, load_from_uarrays, write_dat_field
 from simesh.frontends.amrvac.datio import get_header, get_forest, get_tree_info
 
@@ -67,7 +67,7 @@ def test_write_dat_field(common_tdmds):
     """
     Here the mesh parameter into write_dat_metadata can be constructed by:
 
-    from simesh.meshes.amr_mesh import create_empty_uniform_amrmesh
+    from simesh.mesh.amr_mesh import create_empty_uniform_amrmesh
     mesh = create_empty_uniform_amrmesh(domain_nx, block_nx, xmin, xmax, w_names)
 
     domain_nx: [int, int, int]

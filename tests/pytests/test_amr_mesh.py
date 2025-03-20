@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from simesh.meshes.amr_mesh import AMRMesh, create_empty_amrmesh, create_empty_uniform_amrmesh
+from simesh.mesh.amr_mesh import AMRMesh, create_empty_amrmesh, create_empty_uniform_amrmesh
 from simesh.geometry.amr.amr_forest import AMRForest
 
 @pytest.fixture

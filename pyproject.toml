@@ -13,6 +13,7 @@ readme = "README.md"
 python = "^3.11"
 numpy = "^2.2.1"
 vtk = "^9.4.1"
+cython = "^3.0.12"
 
 
 [tool.poetry.group.test.dependencies]
@@ -28,5 +29,8 @@ pandas = "^2.2.3"
 scipy = "^1.15.0"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.0", "setuptools>=42", "wheel", "Cython>=3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.build]
+script = "build.py"

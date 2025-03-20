@@ -1,4 +1,17 @@
 from setuptools import setup, find_packages
+from setuptools.extension import Extension
+from Cython.Build import cythonize
+import glob
+import os
+
+# Find all .pyx files in src/yt/utils/lib/
+cython_files = glob.glob('src/yt/utils/lib/*.pyx')
+extensions = [
+    Extension(
+        f"yt.utils.lib.{os.path.splitext(os.path.basename(f))[0]}", 
+        [f]
+    ) for f in cython_files
+]
 
 setup(
     name="simesh",
@@ -20,6 +33,7 @@ setup(
     # Core dependencies
     install_requires=[
         "numpy>=2.1.1",
+        "cython>=3.0.0",
     ],
     
     # Test dependencies
@@ -28,4 +42,7 @@ setup(
             "pytest>=8.3.4",
         ],
     },
+    
+    # Cython extension configuration
+    ext_modules=cythonize(extensions),
 ) 

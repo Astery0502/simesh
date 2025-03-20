@@ -1,8 +1,8 @@
 import abc
 import os
 import numpy as np
-from simesh.meshes.mesh import Mesh
-from simesh.meshes.amr_mesh import AMRMesh
+from simesh.mesh.mesh import Mesh
+from simesh.mesh.amr_mesh import AMRMesh
 from simesh.frontends.amrvac.datio import get_single_block_data, find_uniform_fields, write_header, write_forest_tree, write_blocks
 from typing import Tuple
 # temporary import, later will create a individual part for vtk output

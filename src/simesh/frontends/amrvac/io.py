@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from .datio import get_header, get_forest, get_tree_info, get_tree_size, write_header, write_forest_tree, write_single_block_field_data
-from simesh.meshes.amr_mesh import AMRMesh, amrmesh_from_uniform
+from simesh.mesh.amr_mesh import AMRMesh, amrmesh_from_uniform
 from simesh.geometry.amr.amr_forest import AMRForest
 from simesh.dataset.data_set import AMRDataSet
 
