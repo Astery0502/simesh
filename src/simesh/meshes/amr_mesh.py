@@ -646,20 +646,20 @@ class AMRMesh(Mesh):
             xmax_block = self.rnode[3:6,igrid]
             dx_block = self.rnode[6:9,igrid]
 
-            igmin_uniform = (xmin_block-xmin_uniform)/dx_uniform
-            igmax_uniform = (xmax_block-xmin_uniform)/dx_uniform
+            igmin_uniform = (xmin_block-xmin_uniform)/dx_uniform-0.5
+            igmax_uniform = (xmax_block-xmin_uniform)/dx_uniform-0.5
 
             # Skip if block is completely outside uniform grid
-            if np.any(igmin_uniform > np.array([nx,ny,nz])) or np.any(igmax_uniform < 0):
+            if np.any(igmin_uniform > np.array([nx,ny,nz])-1) or np.any(igmax_uniform < 0):
                 continue
 
             igzmin_uniform = np.maximum(igmin_uniform.astype(int), 0)
-            igzmax_uniform = np.minimum(igmax_uniform.astype(int), np.array([nx,ny,nz]))
+            igzmax_uniform = np.minimum(igmax_uniform.astype(int), np.array([nx,ny,nz])-1)
             
             # Create meshgrid for all points in this block's region
-            x_idx = np.arange(igzmin_uniform[0], igzmax_uniform[0])
-            y_idx = np.arange(igzmin_uniform[1], igzmax_uniform[1])
-            z_idx = np.arange(igzmin_uniform[2], igzmax_uniform[2])
+            x_idx = np.arange(igzmin_uniform[0], igzmax_uniform[0]+1)
+            y_idx = np.arange(igzmin_uniform[1], igzmax_uniform[1]+1)
+            z_idx = np.arange(igzmin_uniform[2], igzmax_uniform[2]+1)
             xx, yy, zz = np.meshgrid(x_idx, y_idx, z_idx, indexing='ij')
             
             # Calculate uniform grid positions
@@ -668,22 +668,22 @@ class AMRMesh(Mesh):
             z_uniform = xmin_uniform[2] + (zz + 0.5) * dx_uniform[2]
             
             # Calculate indices within block
-            igx = (x_uniform - xmin_block[0]) / dx_block[0]
-            igy = (y_uniform - xmin_block[1]) / dx_block[1]
-            igz = (z_uniform - xmin_block[2]) / dx_block[2]
+            igx = (x_uniform - xmin_block[0]) / dx_block[0]-0.5
+            igy = (y_uniform - xmin_block[1]) / dx_block[1]-0.5
+            igz = (z_uniform - xmin_block[2]) / dx_block[2]-0.5
             
             # Get integer indices and weights
-            i0x = igx.astype(int) + self.nghostcells - 1
-            i0y = igy.astype(int) + self.nghostcells - 1
-            i0z = igz.astype(int) + self.nghostcells - 1
+            i0x = np.floor(igx).astype(int) + self.nghostcells
+            i0y = np.floor(igy).astype(int) + self.nghostcells
+            i0z = np.floor(igz).astype(int) + self.nghostcells
             i1x = i0x + 1
             i1y = i0y + 1
             i1z = i0z + 1
             
             # Calculate interpolation weights
-            wx = igx - (i0x - self.nghostcells + 0.5)
-            wy = igy - (i0y - self.nghostcells + 0.5)
-            wz = igz - (i0z - self.nghostcells + 0.5)
+            wx = igx - (i0x - self.nghostcells)
+            wy = igy - (i0y - self.nghostcells)
+            wz = igz - (i0z - self.nghostcells)
             
             # Reshape weights for broadcasting
             wx = wx[..., None]
