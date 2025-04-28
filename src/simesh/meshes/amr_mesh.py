@@ -635,86 +635,8 @@ class AMRMesh(Mesh):
         return self.datac[igrid][*ixCo,:] + np.sum(slope * eta[np.newaxis,:], axis=1)
 
     def export_slab_uniform(self, xmin_uniform, xmax_uniform, nx, ny, nz):
-        xmin_uniform = np.asarray(xmin_uniform)
-        xmax_uniform = np.asarray(xmax_uniform)
-        dx_uniform = (xmax_uniform-xmin_uniform)/np.array([nx,ny,nz])
-        
-        slab_uniform = np.zeros((nx,ny,nz,len(self.field_names)))
 
-        for igrid in range(self.nleafs):
-            xmin_block = self.rnode[0:3,igrid]
-            xmax_block = self.rnode[3:6,igrid]
-            dx_block = self.rnode[6:9,igrid]
-
-            igmin_uniform = (xmin_block-xmin_uniform)/dx_uniform-0.5
-            igmax_uniform = (xmax_block-xmin_uniform)/dx_uniform-0.5
-
-            # Skip if block is completely outside uniform grid
-            if np.any(igmin_uniform > np.array([nx,ny,nz])-1) or np.any(igmax_uniform < 0):
-                continue
-
-            igzmin_uniform = np.maximum(igmin_uniform.astype(int), 0)
-            igzmax_uniform = np.minimum(igmax_uniform.astype(int), np.array([nx,ny,nz])-1)
-            
-            # Create meshgrid for all points in this block's region
-            x_idx = np.arange(igzmin_uniform[0], igzmax_uniform[0]+1)
-            y_idx = np.arange(igzmin_uniform[1], igzmax_uniform[1]+1)
-            z_idx = np.arange(igzmin_uniform[2], igzmax_uniform[2]+1)
-            xx, yy, zz = np.meshgrid(x_idx, y_idx, z_idx, indexing='ij')
-            
-            # Calculate uniform grid positions
-            x_uniform = xmin_uniform[0] + (xx + 0.5) * dx_uniform[0]
-            y_uniform = xmin_uniform[1] + (yy + 0.5) * dx_uniform[1]
-            z_uniform = xmin_uniform[2] + (zz + 0.5) * dx_uniform[2]
-            
-            # Calculate indices within block
-            igx = (x_uniform - xmin_block[0]) / dx_block[0]-0.5
-            igy = (y_uniform - xmin_block[1]) / dx_block[1]-0.5
-            igz = (z_uniform - xmin_block[2]) / dx_block[2]-0.5
-            
-            # Get integer indices and weights
-            i0x = np.floor(igx).astype(int) + self.nghostcells
-            i0y = np.floor(igy).astype(int) + self.nghostcells
-            i0z = np.floor(igz).astype(int) + self.nghostcells
-            i1x = i0x + 1
-            i1y = i0y + 1
-            i1z = i0z + 1
-            
-            # Calculate interpolation weights
-            wx = igx - (i0x - self.nghostcells)
-            wy = igy - (i0y - self.nghostcells)
-            wz = igz - (i0z - self.nghostcells)
-            
-            # Reshape weights for broadcasting
-            wx = wx[..., None]
-            wy = wy[..., None]
-            wz = wz[..., None]
-            
-            # Get all corner values at once using advanced indexing
-            c000 = self.data[igrid, i0x, i0y, i0z]
-            c001 = self.data[igrid, i0x, i0y, i1z]
-            c010 = self.data[igrid, i0x, i1y, i0z]
-            c011 = self.data[igrid, i0x, i1y, i1z]
-            c100 = self.data[igrid, i1x, i0y, i0z]
-            c101 = self.data[igrid, i1x, i0y, i1z]
-            c110 = self.data[igrid, i1x, i1y, i0z]
-            c111 = self.data[igrid, i1x, i1y, i1z]
-            
-            # Perform trilinear interpolation in one go
-            c00 = c000 * (1-wz) + c001 * wz
-            c01 = c010 * (1-wz) + c011 * wz
-            c10 = c100 * (1-wz) + c101 * wz
-            c11 = c110 * (1-wz) + c111 * wz
-            
-            c0 = c00 * (1-wy) + c01 * wy
-            c1 = c10 * (1-wy) + c11 * wy
-            
-            result = c0 * (1-wx) + c1 * wx
-            
-            # Store results
-            slab_uniform[x_idx[:,None,None], y_idx[None,:,None], z_idx[None,None,:]] = result
-
-        return slab_uniform
+        return self.export_uniform(self.data, xmin_uniform, xmax_uniform, nx, ny, nz)
     
     def load_current(self):
         self.current = self.calculate_current()
@@ -761,46 +683,73 @@ class AMRMesh(Mesh):
 
         return j1, j2, j3
 
-    def export_uniform_current(self, xmin_uniform, xmax_uniform, nx, ny, nz):
-        if not hasattr(self, 'current') or self.current is None:
-            print("No current data found")
-            return None
+    def calculate_divv(self):
+        if not self.m1_ or not self.m2_ or not self.m3_:
+            print("No velocity data found")
+            return
         
-        j1, j2, j3 = self.current
-        current = np.stack([j1, j2, j3], axis=-1)
-        
+        v1 = self.data[..., self.m1_]
+        v2 = self.data[..., self.m2_]
+        v3 = self.data[..., self.m3_]
+
+        full_shape = v1.shape
+        divv = np.zeros(full_shape)
+
+        # Reshape grid spacings for broadcasting
+        # From shape (nleafs,) to (nleafs, 1, 1, 1)
+        dx = self.rnode[6,:,None,None,None]
+        dy = self.rnode[7,:,None,None,None]
+        dz = self.rnode[8,:,None,None,None]
+
+        dv1dx = (v1[:,2:,:,:] - v1[:,:-2,:,:]) / (2*dx)
+        dv2dy = (v2[:,:,2:,:] - v2[:,:,:-2,:]) / (2*dy)
+        dv3dz = (v3[:,:,:,2:] - v3[:,:,:,:-2]) / (2*dz)
+
+        divv[:,1:-1,1:-1,1:-1] = dv1dx[:,:,1:-1,1:-1] + dv2dy[:,1:-1,:,1:-1] + dv3dz[:,1:-1,1:-1,:]
+
+        return divv
+
+    def export_uniform(self, data, xmin_uniform, xmax_uniform, nx, ny, nz):
+
+        assert data.shape[:4] == \
+            (self.nleafs, self.block_nx[0]+2*self.nghostcells, self.block_nx[1]+2*self.nghostcells, self.block_nx[2]+2*self.nghostcells), \
+            "data must have shape (nleafs, nx+2*nghostcells, ny+2*nghostcells, nz+2*nghostcells, nw)"
+
         xmin_uniform = np.asarray(xmin_uniform)
         xmax_uniform = np.asarray(xmax_uniform)
         dx_uniform = (xmax_uniform-xmin_uniform)/np.array([nx,ny,nz])
         
-        slab_uniform = np.zeros((nx,ny,nz,3))
+        if data.ndim == 4:
+            data = data[...,None]
+            udata = np.zeros((nx,ny,nz,1))
+        else:
+            udata = np.zeros((nx,ny,nz,data.shape[-1]))
 
         for igrid in range(self.nleafs):
             xmin_block = self.rnode[0:3,igrid]
             xmax_block = self.rnode[3:6,igrid]
             dx_block = self.rnode[6:9,igrid]
 
-            igmin_uniform = (xmin_block-xmin_uniform)/dx_uniform-0.5
-            igmax_uniform = (xmax_block-xmin_uniform)/dx_uniform-0.5
+            igmin_uniform = (xmin_block-xmin_uniform)/dx_uniform
+            igmax_uniform = (xmax_block-xmin_uniform)/dx_uniform
 
-            # Skip if block is completely outside uniform grid
-            if np.any(igmin_uniform > np.array([nx,ny,nz])-1) or np.any(igmax_uniform < 0):
+            # Skip if block is completely outside uniform grid cell centers (at least one cell center is inside)
+            if np.any(igmin_uniform > np.array([nx,ny,nz])-0.5) or np.any(igmax_uniform < 0.5):
                 continue
 
-            igzmin_uniform = np.maximum(igmin_uniform.astype(int), 0)
-            igzmax_uniform = np.minimum(igmax_uniform.astype(int), np.array([nx,ny,nz])-1)
+            igzmin_uniform = np.maximum(np.round(igmin_uniform).astype(int), 0)
+            igzmax_uniform = np.minimum((igmax_uniform+0.5).astype(int), np.array([nx,ny,nz]))
 
             # Create meshgrid for all points in this block's region
-            x_idx = np.arange(igzmin_uniform[0], igzmax_uniform[0]+1)
-            y_idx = np.arange(igzmin_uniform[1], igzmax_uniform[1]+1)
-            z_idx = np.arange(igzmin_uniform[2], igzmax_uniform[2]+1)
+            x_idx = np.arange(igzmin_uniform[0], igzmax_uniform[0])
+            y_idx = np.arange(igzmin_uniform[1], igzmax_uniform[1])
+            z_idx = np.arange(igzmin_uniform[2], igzmax_uniform[2])
             xx, yy, zz = np.meshgrid(x_idx, y_idx, z_idx, indexing='ij')
             
             # Calculate uniform grid positions
             x_uniform = xmin_uniform[0] + (xx + 0.5) * dx_uniform[0]
             y_uniform = xmin_uniform[1] + (yy + 0.5) * dx_uniform[1]
             z_uniform = xmin_uniform[2] + (zz + 0.5) * dx_uniform[2]
-
             
             # Calculate indices within block
             igx = (x_uniform - xmin_block[0]) / dx_block[0]-0.5
@@ -819,21 +768,21 @@ class AMRMesh(Mesh):
             wx = igx - (i0x - self.nghostcells)
             wy = igy - (i0y - self.nghostcells)
             wz = igz - (i0z - self.nghostcells)
-            
+
             # Reshape weights for broadcasting
             wx = wx[..., None]
             wy = wy[..., None]
             wz = wz[..., None]
             
             # Get all corner values at once using advanced indexing
-            c000 = current[igrid, i0x, i0y, i0z]
-            c001 = current[igrid, i0x, i0y, i1z]
-            c010 = current[igrid, i0x, i1y, i0z]
-            c011 = current[igrid, i0x, i1y, i1z]
-            c100 = current[igrid, i1x, i0y, i0z]
-            c101 = current[igrid, i1x, i0y, i1z]
-            c110 = current[igrid, i1x, i1y, i0z]
-            c111 = current[igrid, i1x, i1y, i1z]
+            c000 = data[igrid, i0x, i0y, i0z]
+            c001 = data[igrid, i0x, i0y, i1z]
+            c010 = data[igrid, i0x, i1y, i0z]
+            c011 = data[igrid, i0x, i1y, i1z]
+            c100 = data[igrid, i1x, i0y, i0z]
+            c101 = data[igrid, i1x, i0y, i1z]
+            c110 = data[igrid, i1x, i1y, i0z]
+            c111 = data[igrid, i1x, i1y, i1z]
             
             # Perform trilinear interpolation in one go
             c00 = c000 * (1-wz) + c001 * wz
@@ -847,9 +796,19 @@ class AMRMesh(Mesh):
             result = c0 * (1-wx) + c1 * wx
             
             # Store results
-            slab_uniform[x_idx[:,None,None], y_idx[None,:,None], z_idx[None,None,:]] = result
+            udata[x_idx[:,None,None], y_idx[None,:,None], z_idx[None,None],:] = result
 
-        return slab_uniform
+        return udata
+
+    def export_uniform_current(self, xmin_uniform, xmax_uniform, nx, ny, nz):
+        if not hasattr(self, 'current') or self.current is None:
+            print("No current data found")
+            return None
+        
+        j1, j2, j3 = self.current
+        current = np.stack([j1, j2, j3], axis=-1)
+        
+        return self.export_uniform(current, xmin_uniform, xmax_uniform, nx, ny, nz)
 
     def write_tree(self):
         """
