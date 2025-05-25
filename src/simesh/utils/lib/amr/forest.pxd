@@ -7,7 +7,7 @@ from libc.stdint cimport uint32_t
 
 from ..tree cimport octptr
 
-cdef class OctreeForest:
+cdef class AMRForest:
     cdef:
         uint32_t ng[3]
         bint periodB[3]

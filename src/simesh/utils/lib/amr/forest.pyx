@@ -18,7 +18,7 @@ cdef uint32_t neighbor_coarse = 2
 cdef uint32_t neighbor_sibling = 3
 cdef uint32_t neighbor_fine = 4
 
-cdef class OctreeForest:
+cdef class AMRForest:
 
     def __cinit__(self, uint32_t ndim, uint32_t ng1, uint32_t ng2, uint32_t ng3, bint[:] is_leaf):
 
@@ -443,13 +443,6 @@ cdef class OctreeForest:
                                     assert (ig[idim1]+iside*2-1 == ign[idim1])
                                 else:
                                     assert (ig[idim1] == ign[idim1])
-
-                        elif neighbor.node.level == level+1:
-                            for idim1 in range(self.ndim):
-                                if idim1 == idim:
-                                    assert (ign[idim1]%2 == iside) and ((ign[idim1]//2+2*iside-1) == ig[idim1])
-                                else:
-                                    assert (ign[idim1]//2 == ig[idim1]) # just exchange the ign and ig
-                        
+                        # neighbors are all at the same level
                         else:
                             assert False

@@ -1,6 +1,7 @@
 import numpy as np
 from src.simesh.utils.lib.amr.morton import pmorton3D, fill_morton_mapping3D
-from src.simesh.utils.lib.amr.forest import OctreeForest
+from src.simesh.utils.lib.amr.forest import AMRForest
+from src.simesh.utils.lib.amr.mesh import AMRMesh
 
 def interleave_bits(ign):
     answer = 0
@@ -55,7 +56,7 @@ def test_init_amr_forest():
     ng1 = ng2 = ng3 = 2
     is_leaf = np.ones(16, dtype=np.int32)
     is_leaf[0] = 0
-    forest = OctreeForest(3, ng1, ng2, ng3, is_leaf)
+    forest = AMRForest(3, ng1, ng2, ng3, is_leaf)
     forest_list = forest.write_forest()
     assert forest.nleafs == 15
     assert forest.nparents == 1
@@ -66,10 +67,20 @@ def test_init_amr_forest():
 
 def test_find_neighbors():
     ng1 = ng2 = ng3 = 2
-    is_leaf = np.ones(8, dtype=np.int32)
-    # is_leaf[0] = 0
-    forest = OctreeForest(3, ng1, ng2, ng3, is_leaf)
+    is_leaf = np.ones(16, dtype=np.int32)
+    is_leaf[0] = 0
+    forest = AMRForest(3, ng1, ng2, ng3, is_leaf)
     forest.test_neighbors()
+
+def test_getbc():
+    ng1 = ng2 = ng3 = 2
+    is_leaf = np.ones(16, dtype=np.int32)
+    is_leaf[0] = 0
+    forest = AMRForest(3, ng1, ng2, ng3, is_leaf)
+    bsize = np.array([10, 10, 10], dtype=np.uint32)
+    dsize = np.array([20, 20, 20], dtype=np.uint32)
+    mesh = AMRMesh(3, bsize, dsize, 2, 1, forest)
+    mesh.getbc()
     
 def run_tests():
     print("Running tests for amr submodule...")
