@@ -322,8 +322,9 @@ cdef class AMRForest:
         neighbor.node = tree.node.parent.node
         assert neighbor.node is not NULL
 
+        # check in idim direction if the neighbor is at another parent block (+- 1 beyond the local index 1)
         for idim in range(self.ndim):
-            # inp value ranges from 0 to 2
+            # inp value ranges from 0 to 2 
             igc[idim] = tree.node.ig[idim] % 2
             inp[idim] = (igc[idim] + (ii[idim] + 2))//2
             if (inp[idim] != 1):
