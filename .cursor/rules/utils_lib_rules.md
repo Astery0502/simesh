@@ -26,6 +26,7 @@ Cursor must keep these two lists up-to-date whenever it edits code.
 ### ✅ Completed
 <!-- cursor-done:start -->
 * Initial AMR prototype (Morton mapping, forest connectivity, basic BC) – tests pass
+* Fixed 2D compatibility issues and memory management in AMR modules
 <!-- cursor-done:end -->
 
 ---

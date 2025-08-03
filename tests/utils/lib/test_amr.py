@@ -29,7 +29,24 @@ def interleave_bits(ign):
 def test_pmorton3D():
 
     for i,j,k in np.ndindex(5,5,5):
-        assert pmorton3D(i, j, k) == interleave_bits([i, j, k]), f"pmorton3D({i}, {j}, {k}) = {pmorton3D(i, j, k)}, but interleave_bits([{i}, {j}, {k}]) = {interleave_bits([i, j, k])}"
+        assert pmorton3D(i, j, k) == interleave_bits([i, j, k]), \
+            f"pmorton3D({i}, {j}, {k}) = {pmorton3D(i, j, k)}, but interleave_bits([{i}, {j}, {k}]) = {interleave_bits([i, j, k])}"
+
+# test interleave_bits with only one at the third direction, whether it is the same as 2D morton code
+def test_morton2D():
+
+    morton2D = np.zeros(25)
+    for i,j in np.ndindex(5,5):
+        morton2D[i] = interleave_bits([i, j])
+    sorted_idx = np.argsort(morton2D)
+
+    morton3D = np.zeros(25)
+    for i,j in np.ndindex(5,5):
+        morton3D[i] = interleave_bits([i, j, 0])
+    sorted_idx_3D = np.argsort(morton3D)
+
+    assert np.all(sorted_idx == sorted_idx_3D), \
+        f"sorted_idx = {sorted_idx},\n sorted_idx_3D = {sorted_idx_3D}"
 
 def test_morton_mapping3D():
 
@@ -65,12 +82,30 @@ def test_init_amr_forest():
     for i in range(forest_list.shape[0]):
         assert forest_list[i] == is_leaf[i]
 
+    ng1 = ng2 = 4
+    ng3 = 1
+    is_leaf = np.ones(20, dtype=np.int32)
+    is_leaf[0] = 0
+    forest2d = AMRForest(2, ng1, ng2, ng3, is_leaf)
+    forest_list2d = forest2d.write_forest()
+    assert forest2d.nleafs == 19
+    assert forest2d.nparents == 1
+    assert forest2d.max_level == 2
+    assert np.all(forest_list2d == is_leaf)
+
 def test_find_neighbors():
     ng1 = ng2 = ng3 = 2
     is_leaf = np.ones(16, dtype=np.int32)
     is_leaf[0] = 0
     forest = AMRForest(3, ng1, ng2, ng3, is_leaf)
     forest.test_neighbors()
+
+    ng1 = ng2 = 4
+    ng3 = 1
+    is_leaf = np.ones(20, dtype=np.int32)
+    is_leaf[0] = 0
+    forest2d = AMRForest(2, ng1, ng2, ng3, is_leaf)
+    forest2d.test_neighbors()
 
 def test_getbc():
     ng1 = ng2 = ng3 = 2
@@ -86,6 +121,8 @@ def run_tests():
     print("Running tests for amr submodule...")
     test_pmorton3D()
     print("test_pmorton3D passed")
+    test_morton2D()
+    print("test_morton2D passed")
     test_morton_mapping3D()
     print("test_morton_mapping3D passed")
     test_init_amr_forest()

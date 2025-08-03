@@ -50,19 +50,34 @@ cdef class AMRMesh:
         for i in range(self.nleafs*bgsize[0]*bgsize[1]*bgsize[2]*self.nfields):
             data_data[i] = 0
         self.data = <double[:self.nleafs, :bgsize[0], :bgsize[1], :bgsize[2], :self.nfields]>data_data
+        self._data_ptr = data_data  # Store the original pointer for deallocation
 
         datac_data = <double*>malloc(self.nleafs*bCosize[0]*bCosize[1]*bCosize[2]*self.nfields*sizeof(double))
         for i in range(self.nleafs*bCosize[0]*bCosize[1]*bCosize[2]*self.nfields):
             datac_data[i] = 0
         self.datac = <double[:self.nleafs, :bCosize[0], :bCosize[1], :bCosize[2], :self.nfields]>datac_data
+        self._datac_ptr = datac_data  # Store the original pointer for deallocation
 
         idphyb_data = <int*>malloc(3*self.nleafs*sizeof(int))
         for i in range(3*self.nleafs):
             idphyb_data[i] = 0
         self.idphyb = <int[:self.nleafs, :3]>idphyb_data
+        self._idphyb_ptr = idphyb_data  # Store the original pointer for deallocation
 
         # initialize the grid indices
         self._init_block_gridindex()
+
+    def __dealloc__(self):
+        """Free all allocated memory when the object is destroyed"""
+        # Free the data arrays using stored pointers
+        if hasattr(self, '_data_ptr') and self._data_ptr is not NULL:
+            free(self._data_ptr)
+        
+        if hasattr(self, '_datac_ptr') and self._datac_ptr is not NULL:
+            free(self._datac_ptr)
+        
+        if hasattr(self, '_idphyb_ptr') and self._idphyb_ptr is not NULL:
+            free(self._idphyb_ptr)
 
     cdef void _init_block_gridindex(self):
         """Initialize the grid indices for each block."""
@@ -178,7 +193,7 @@ cdef class AMRMesh:
         # 3D case only
         return nc1*4*4 + nc2*4 + nc3
 
-    cdef bint is_boundary(self, uint32_t ileaf, uint32_t[:,:] neighbor_type) noexcept nogil:
+    cdef bint is_boundary(self, uint32_t ileaf, uint32_t[:,:] neighbor_type):# noexcept nogil:
 
         cdef uint32_t i
 
@@ -195,7 +210,8 @@ cdef class AMRMesh:
         cdef uint32_t[:,:] neighbor_type = self.forest.neighbor_type
         cdef bint isboundary
 
-        for ileaf in prange(self.nleafs, nogil=True, schedule='static'):
+        # for ileaf in prange(self.nleafs, nogil=True, schedule='static'):
+        for ileaf in range(self.nleafs):
 
             self.fill_boundary_before_gc(ileaf, neighbor_type)
 
@@ -211,7 +227,7 @@ cdef class AMRMesh:
                         if neighbor_type[ileaf, self.nindex(i,j,k)] == 2 and isboundary:
                             self.fill_coarse_boundary(ileaf, i,j,k, neighbor_type)
 
-    cdef void fill_boundary_before_gc(self, uint32_t ileaf, uint32_t[:,:] neighbor_type) noexcept nogil:
+    cdef void fill_boundary_before_gc(self, uint32_t ileaf, uint32_t[:,:] neighbor_type):# noexcept nogil:
         """Fill the boundary cells for each block."""
 
         cdef uint32_t idim, idir
@@ -248,7 +264,7 @@ cdef class AMRMesh:
                     continue
                 self.bc_phys(iside,idim,ileaf,ixBmin,ixBmax,False)
         
-    cdef void bc_phys(self, int iside, uint32_t idim, uint32_t ileaf, int ixBmin[3], int ixBmax[3], bint is_coarse) noexcept nogil:
+    cdef void bc_phys(self, int iside, uint32_t idim, uint32_t ileaf, int ixBmin[3], int ixBmax[3], bint is_coarse):# noexcept nogil:
 
         cdef int ixOmin[3]
         cdef int ixOmax[3]
@@ -290,7 +306,7 @@ cdef class AMRMesh:
                     for ifield in range(self.nfields):
                         data_array[o1,o2,o3,ifield] = data_array[i1,i2,i3,ifield]
 
-    cdef void coarsen_grid(self, uint32_t ileaf) noexcept nogil:
+    cdef void coarsen_grid(self, uint32_t ileaf):# noexcept nogil:
 
         cdef uint32_t ixCo1, ixCo2, ixCo3, ixFi1, ixFi2, ixFi3
         cdef uint32_t i, j, k
@@ -317,7 +333,7 @@ cdef class AMRMesh:
                         
                         self.datac[ileaf, ixCo1, ixCo2, ixCo3, ifield] = sum_value
 
-    cdef void fill_coarse_boundary(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t[:,:] neighbor_type) noexcept nogil:
+    cdef void fill_coarse_boundary(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t[:,:] neighbor_type):# noexcept nogil:
 
         cdef uint32_t idim
         cdef uint32_t ins[3]
@@ -368,11 +384,3 @@ cdef class AMRMesh:
                 iis[2] = 1 + (2*iside - 1) * (idim == 2)
 
                 should_continue = False
-                for i in range(3):
-                    if 
-
-                if neighbor_type[ileaf, self.nindex(ii1,ii2,ii3)] != 1:
-                    continue
-
-                
-

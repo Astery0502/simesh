@@ -41,6 +41,11 @@ cdef class AMRMesh:
         # physical boundary indices to help identify physical boundaries
         int[:,:] idphyb
 
+        # Store original pointers for deallocation
+        double* _data_ptr
+        double* _datac_ptr
+        int* _idphyb_ptr
+
         # grid indices
         int ixGmin[3]
         int ixGmax[3]
@@ -96,14 +101,14 @@ cdef class AMRMesh:
 
     cdef inline uint32_t ncindex(self, uint32_t nc1, uint32_t nc2, uint32_t nc3) noexcept nogil
 
-    cdef bint is_boundary(self, uint32_t ileaf, uint32_t[:,:] neighbor_type) noexcept nogil
+    cdef bint is_boundary(self, uint32_t ileaf, uint32_t[:,:] neighbor_type)# noexcept nogil
 
     cdef void getbc(self)
 
-    cdef void fill_boundary_before_gc(self, uint32_t ileaf, uint32_t[:,:] neighbor_type) noexcept nogil
+    cdef void fill_boundary_before_gc(self, uint32_t ileaf, uint32_t[:,:] neighbor_type)# noexcept nogil
 
-    cdef void bc_phys(self, int iside, uint32_t idim, uint32_t ileaf, int ixBmin[3], int ixBmax[3], bint is_coarse) noexcept nogil
+    cdef void bc_phys(self, int iside, uint32_t idim, uint32_t ileaf, int ixBmin[3], int ixBmax[3], bint is_coarse)# noexcept nogil
 
-    cdef void coarsen_grid(self, uint32_t ileaf) noexcept nogil
+    cdef void coarsen_grid(self, uint32_t ileaf)# noexcept nogil
     
-    cdef void fill_coarse_boundary(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t[:,:] neighbor_type) noexcept nogil
+    cdef void fill_coarse_boundary(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t[:,:] neighbor_type)# noexcept nogil

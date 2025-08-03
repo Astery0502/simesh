@@ -37,6 +37,7 @@ cdef uint32_t morton3D(uint32_t x, uint32_t y, uint32_t z):
     x, y, z = extract_10bits(x), extract_10bits(y), extract_10bits(z)
     return x | (y << 1) | (z << 2)
 
+# though 3D defined, it can operate on 2D and 1D as well with the relative order correct by defining n3 = 1
 cpdef void fill_morton_mapping3D(
     uint32_t[:,:,:] ig2morton,
     uint32_t[:,:] morton2ig,

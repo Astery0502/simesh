@@ -5,7 +5,7 @@
 
 from libc.stdint cimport uint32_t
 
-from ..tree cimport octptr
+from ..tree cimport treeptr, TreeNode
 
 cdef class AMRForest:
     cdef:
@@ -36,33 +36,38 @@ cdef class AMRForest:
         # index of the level 1 tree starts in the forest leaf list
         public uint32_t[:] idx1 
 
-        octptr* forest
-        octptr* sfc2node
+        treeptr* forest
+        treeptr* sfc2node
 
-    # [ig1, ig2, ig3] -> ig1 * ng[0] + ig2 * ng[1] + ig3
-    cdef inline uint32_t findex(self, uint32_t* ig)
+    # [child_dim3, child_dim2, child_dim1] (reversed indices in python to be compatiable with fortran, 
+    # to reserve the morton order) -> child_dim1*2**(ndim-1)+child_dim2*2**(ndim-2)+child_dim3*2**(ndim-3)
+    # for 2d, child_dim3=0
+    cdef inline uint32_t cindex(self, uint32_t* ic)
 
-    # [n1, n2, n3] -> n1 * 3 * 3 + n2 * 3 + n3
+    # morton index for self.forest, [ng1, ng2, ng3] format 1d array, column major here since i is lowest in mortonEncode
+    cdef inline uint32_t mindex(self, uint32_t* ig)
+
+    # neighbor index for self.neighbor_index/type, 
     cdef inline uint32_t nindex(self, uint32_t* n)
 
-    # [nc1, nc2, nc3] -> nc1 * 4 * 4 + nc2 * 4 + nc3
+    # neighbor children index for self.neighbor_children, [4, 4(, 4)] format 1d array, column major
     cdef inline uint32_t ncindex(self, uint32_t* nc)
 
     cdef void read_forest(self, bint[:] is_leaf)
 
-    cdef void read_node(self, octptr tree, uint32_t* ig, uint32_t level, 
+    cdef void read_node(self, treeptr tree, uint32_t* ig, uint32_t level, 
                         uint32_t* inode_ptr, uint32_t* ileaf_ptr)
 
     cpdef bint[:] write_forest(self)
 
-    cdef void write_node(self, octptr tree, bint[:] forest, uint32_t* inode_ptr)
+    cdef void write_node(self, treeptr tree, bint[:] forest, uint32_t* inode_ptr)
 
-    cdef void asign_tree_neighbor(self, octptr tree)
+    cdef void asign_tree_neighbor(self, treeptr tree)
 
-    cdef void find_root_neighbor(self, octptr* neighbor, octptr tree, int* ii)
+    cdef void find_root_neighbor(self, treeptr* neighbor, treeptr tree, int* ii)
 
     # find the neighbor type and index of tree at ii1, ii2[, ii3] direction
-    cdef uint32_t find_neighbor(self, octptr* neighbor, octptr tree, int* ii, bint* pole)
+    cdef uint32_t find_neighbor(self, treeptr* neighbor, treeptr tree, int* ii, bint* pole)
 
     # after read_forest, the non-corner/edge neighbors are allocated to each node
     cdef void build_connectivity(self)
