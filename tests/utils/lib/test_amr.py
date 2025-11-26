@@ -107,6 +107,33 @@ def test_find_neighbors():
     forest2d = AMRForest(2, ng1, ng2, ng3, is_leaf)
     forest2d.test_neighbors()
 
+def test_init_amr_mesh():
+    ng1 = ng2 = ng3 = 2
+    is_leaf = np.ones(16, dtype=np.int32)
+    is_leaf[0] = 0
+    forest = AMRForest(3, ng1, ng2, ng3, is_leaf)
+    bsize = np.array([10, 10, 10], dtype=np.uint32)
+    dsize = np.array([20, 20, 20], dtype=np.uint32)
+    xmin = np.array([0, 0, 0], dtype=np.double)
+    xmax = np.array([10, 10, 10], dtype=np.double)
+    mesh = AMRMesh(3, bsize, dsize, xmin, xmax, 0, 3, forest)
+    assert mesh.rnode.shape == (15, 9), f"mesh.rnode.shape = {mesh.rnode.shape}"
+
+def test_uniform_grid_zero_order():
+    ng1 = ng2 = ng3 = 2
+    is_leaf = np.ones(16, dtype=np.int32)
+    is_leaf[0] = 0
+    forest = AMRForest(3, ng1, ng2, ng3, is_leaf)
+    bsize = np.array([10, 10, 10], dtype=np.uint32)
+    dsize = np.array([20, 20, 20], dtype=np.uint32)
+    xmin = np.array([0, 0, 0], dtype=np.double)
+    xmax = np.array([10, 10, 10], dtype=np.double)
+    mesh = AMRMesh(3, bsize, dsize, xmin, xmax, 0, 3, forest)
+    data = np.ones((15, 10, 10, 10, 3), dtype=np.double)
+    uniform_grid = np.zeros((20, 20, 20, 3), dtype=np.double)
+    mesh.uniform_grid_zero_order(data, uniform_grid, np.array([20, 20, 20], dtype=np.uint32), np.array([0, 0, 0], dtype=np.double), np.array([10, 10, 10], dtype=np.double))
+    assert np.all(uniform_grid == 1)
+
 def test_getbc():
     ng1 = ng2 = ng3 = 2
     is_leaf = np.ones(16, dtype=np.int32)
@@ -129,6 +156,10 @@ def run_tests():
     print("test_init_amr_forest passed")
     test_find_neighbors()
     print("test_find_neighbors passed")
+    test_init_amr_mesh()
+    print("test_init_amr_mesh passed")
+    test_uniform_grid_zero_order()
+    print("test_uniform_grid_zero_order passed")
     print("All tests passed for amr submodule!")
 
 if __name__ == "__main__":

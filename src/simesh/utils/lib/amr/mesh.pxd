@@ -11,6 +11,10 @@ cdef class AMRMesh:
 
         uint32_t ndim
 
+        # physical domain
+        double xmin[3]
+        double xmax[3]
+
         # attached forest object, add a count
         AMRForest forest
 
@@ -32,10 +36,14 @@ cdef class AMRMesh:
         # number of fields
         uint32_t nfields
 
+        # coordinates of the block
+        # Exposed as a public attribute so Python tests can access mesh.rnode
+        public double[:,:] rnode
+
         # data array (very big)
         double[:,:,:,:,:] data
 
-        # coarse data array (very big also)
+        # coarse data array (very big, too)
         double[:,:,:,:,:] datac
 
         # physical boundary indices to help identify physical boundaries
@@ -44,6 +52,7 @@ cdef class AMRMesh:
         # Store original pointers for deallocation
         double* _data_ptr
         double* _datac_ptr
+        double* _rnode_ptr
         int* _idphyb_ptr
 
         # grid indices
@@ -97,9 +106,13 @@ cdef class AMRMesh:
 
     cdef void _init_block_gridindex(self)
 
+    cdef void _init_block_coordinates(self)
+
     cdef inline uint32_t nindex(self, uint32_t n1, uint32_t n2, uint32_t n3) noexcept nogil
 
     cdef inline uint32_t ncindex(self, uint32_t nc1, uint32_t nc2, uint32_t nc3) noexcept nogil
+
+    cpdef void uniform_grid_zero_order(self, double[:,:,:,:,:] data, double[:,:,:,:] uniform_grid, uint32_t[:] nx, double[:] xmin_new, double[:] xmax_new)
 
     cdef bint is_boundary(self, uint32_t ileaf, uint32_t[:,:] neighbor_type)# noexcept nogil
 
@@ -112,3 +125,4 @@ cdef class AMRMesh:
     cdef void coarsen_grid(self, uint32_t ileaf)# noexcept nogil
     
     cdef void fill_coarse_boundary(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t[:,:] neighbor_type)# noexcept nogil
+

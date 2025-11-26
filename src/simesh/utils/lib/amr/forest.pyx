@@ -59,41 +59,79 @@ cdef class AMRForest:
         for i in range(nblocks):
             idx1_data[i] = 0
         self.idx1 = <uint32_t[:nblocks]>idx1_data
+        self._idx1_ptr = idx1_data  # Store the original pointer for deallocation
 
         ig2morton_data = <uint32_t*>malloc(nblocks* sizeof(uint32_t))
         for i in range(nblocks):
             ig2morton_data[i] = 0
         self.ig2morton = <uint32_t[:ng1,:ng2,:ng3]>ig2morton_data
+        self._ig2morton_ptr = ig2morton_data  # Store the original pointer for deallocation
 
         # ndim=2 means n3=1
         morton2ig_data = <uint32_t*>malloc(nblocks*3* sizeof(uint32_t))
         for i in range(nblocks*3):
             morton2ig_data[i] = 0
         self.morton2ig = <uint32_t[:nblocks, :3]>morton2ig_data
+        self._morton2ig_ptr = morton2ig_data  # Store the original pointer for deallocation
 
         is_leaf_data = <bint*>malloc(is_leaf.shape[0]* sizeof(bint))
         for i in range(is_leaf.shape[0]):
             is_leaf_data[i] = is_leaf[i]
         self.is_leaf = <bint[:is_leaf.shape[0]]>is_leaf_data
+        self._is_leaf_ptr = is_leaf_data  # Store the original pointer for deallocation
 
         neighbor_children_data = <uint32_t*>malloc(num_leafs*4**ndim* sizeof(uint32_t))
         for i in range(num_leafs*4**ndim):
             neighbor_children_data[i] = 0
         self.neighbor_children = <uint32_t[:num_leafs, :4**ndim]>neighbor_children_data
+        self._neighbor_children_ptr = neighbor_children_data  # Store the original pointer for deallocation
 
         neighbor_index_data = <uint32_t*>malloc(num_leafs*3**ndim* sizeof(uint32_t))
         for i in range(num_leafs*3**ndim):
             neighbor_index_data[i] = 0
         self.neighbor_index = <uint32_t[:num_leafs, :3**ndim]>neighbor_index_data
+        self._neighbor_index_ptr = neighbor_index_data  # Store the original pointer for deallocation
 
         neighbor_type_data = <uint32_t*>malloc(num_leafs*3**ndim* sizeof(uint32_t))
         for i in range(num_leafs*3**ndim):
             neighbor_type_data[i] = 0
         self.neighbor_type = <uint32_t[:num_leafs, :3**ndim]>neighbor_type_data
+        self._neighbor_type_ptr = neighbor_type_data  # Store the original pointer for deallocation
 
         # read the forest boolean array
         self.read_forest(is_leaf)
         self.build_connectivity()
+
+    def __dealloc__(self):
+        """Free all allocated memory when the object is destroyed"""
+        # Free the data arrays using stored pointers
+        if hasattr(self, '_idx1_ptr') and self._idx1_ptr is not NULL:
+            free(self._idx1_ptr)
+        
+        if hasattr(self, '_ig2morton_ptr') and self._ig2morton_ptr is not NULL:
+            free(self._ig2morton_ptr)
+        
+        if hasattr(self, '_morton2ig_ptr') and self._morton2ig_ptr is not NULL:
+            free(self._morton2ig_ptr)
+        
+        if hasattr(self, '_is_leaf_ptr') and self._is_leaf_ptr is not NULL:
+            free(self._is_leaf_ptr)
+        
+        if hasattr(self, '_neighbor_children_ptr') and self._neighbor_children_ptr is not NULL:
+            free(self._neighbor_children_ptr)
+        
+        if hasattr(self, '_neighbor_index_ptr') and self._neighbor_index_ptr is not NULL:
+            free(self._neighbor_index_ptr)
+        
+        if hasattr(self, '_neighbor_type_ptr') and self._neighbor_type_ptr is not NULL:
+            free(self._neighbor_type_ptr)
+        
+        # Free the treeptr arrays
+        if hasattr(self, 'forest') and self.forest is not NULL:
+            free(self.forest)
+        
+        if hasattr(self, 'sfc2node') and self.sfc2node is not NULL:
+            free(self.sfc2node)
 
     # child index: 0/1 -> 0->3 or 7, column major
     cdef inline uint32_t cindex(self, uint32_t* ic):

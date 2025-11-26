@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pytest
 from simesh.mesh.amr_mesh import AMRMesh, create_empty_amrmesh, create_empty_uniform_amrmesh
@@ -47,7 +48,7 @@ def common_mesh():
                 else slice(mesh.ixMmin[i]-1, mesh.ixMmin[i]-3) for i in range(3))
 
     # Fill data with ones
-    mesh.data.fill(1.0)
+    # mesh.data.fill(1.0)
     return mesh
 
 def test_bc_phys(common_mesh):
@@ -113,7 +114,7 @@ def test_coarsen_grid(common_mesh):
     # Check results
     # Each coarse cell should be the average of 8 fine cells (2x2x2)
     # Since input is 1.0, output should be 1.0 (8/8 = 1)
-    coarse_region = tuple(slice(ixComin[i], ixComax[i]+1) for i in range(3))
+    coarse_region = tuple[slice[Any, Any, Any], ...](slice(ixComin[i], ixComax[i]+1) for i in range(3))
     assert np.allclose(common_mesh.datac[igrid][coarse_region], 1.0)
 
 def test_fill_coarse_boundary(common_mesh):

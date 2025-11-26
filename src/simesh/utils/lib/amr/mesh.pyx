@@ -3,15 +3,19 @@
 
 from libc.stdlib cimport malloc, free
 from libc.stdint cimport uint32_t
+from libc.math cimport ceil, floor
 
 from cython.parallel import prange
 
 from .forest cimport AMRForest
+from ..tree cimport treeptr
+from ..math cimport max2, min2
 
 cdef class AMRMesh:
 
-    def __cinit__(self, uint32_t ndim, uint32_t[:] bsize, uint32_t[:] dsize,
-                   uint32_t nghostcells, uint32_t nfields, AMRForest forest):
+    def __cinit__(self, uint32_t ndim, uint32_t[:] bsize, uint32_t[:] dsize, 
+                  double[:] xmin, double[:] xmax, uint32_t nghostcells, uint32_t nfields, 
+                  AMRForest forest):
 
         cdef uint32_t i
 
@@ -25,11 +29,21 @@ cdef class AMRMesh:
         self.ndim = ndim
         assert self.ndim == forest.ndim
 
+        # initialize the rnode array (coordinates of blocks)
+        rnode_data = <double*>malloc(self.nleafs * 9 * sizeof(double))
+        for i in range(self.nleafs * 9):
+            rnode_data[i] = 0
+        self.rnode = <double[:self.nleafs, :9]>rnode_data
+        self._rnode_ptr = rnode_data  # Store the original pointer for deallocation
+
         # calculate the block size and the coarse block size
         cdef uint32_t bgsize[3]
         cdef uint32_t bCosize[3]
 
         for i in range(self.ndim):
+            self.xmin[i] = xmin[i]
+            self.xmax[i] = xmax[i]
+
             self.bsize[i] = bsize[i]
             self.dsize[i] = dsize[i]
             bgsize[i] = self.bsize[i] + 2*self.ng
@@ -46,26 +60,29 @@ cdef class AMRMesh:
         self.nfields = nfields
 
         # initialize the data array
-        data_data = <double*>malloc(self.nleafs*bgsize[0]*bgsize[1]*bgsize[2]*self.nfields*sizeof(double))
-        for i in range(self.nleafs*bgsize[0]*bgsize[1]*bgsize[2]*self.nfields):
-            data_data[i] = 0
-        self.data = <double[:self.nleafs, :bgsize[0], :bgsize[1], :bgsize[2], :self.nfields]>data_data
-        self._data_ptr = data_data  # Store the original pointer for deallocation
+        if self.ng > 0:
+            data_data = <double*>malloc(self.nleafs*bgsize[0]*bgsize[1]*bgsize[2]*self.nfields*sizeof(double))
+            for i in range(self.nleafs*bgsize[0]*bgsize[1]*bgsize[2]*self.nfields):
+                data_data[i] = 0
+            self.data = <double[:self.nleafs, :bgsize[0], :bgsize[1], :bgsize[2], :self.nfields]>data_data
+            self._data_ptr = data_data  # Store the original pointer for deallocation
 
-        datac_data = <double*>malloc(self.nleafs*bCosize[0]*bCosize[1]*bCosize[2]*self.nfields*sizeof(double))
-        for i in range(self.nleafs*bCosize[0]*bCosize[1]*bCosize[2]*self.nfields):
-            datac_data[i] = 0
-        self.datac = <double[:self.nleafs, :bCosize[0], :bCosize[1], :bCosize[2], :self.nfields]>datac_data
-        self._datac_ptr = datac_data  # Store the original pointer for deallocation
+            datac_data = <double*>malloc(self.nleafs*bCosize[0]*bCosize[1]*bCosize[2]*self.nfields*sizeof(double))
+            for i in range(self.nleafs*bCosize[0]*bCosize[1]*bCosize[2]*self.nfields):
+                datac_data[i] = 0
+            self.datac = <double[:self.nleafs, :bCosize[0], :bCosize[1], :bCosize[2], :self.nfields]>datac_data
+            self._datac_ptr = datac_data  # Store the original pointer for deallocation
 
-        idphyb_data = <int*>malloc(3*self.nleafs*sizeof(int))
-        for i in range(3*self.nleafs):
-            idphyb_data[i] = 0
-        self.idphyb = <int[:self.nleafs, :3]>idphyb_data
-        self._idphyb_ptr = idphyb_data  # Store the original pointer for deallocation
+            idphyb_data = <int*>malloc(3*self.nleafs*sizeof(int))
+            for i in range(3*self.nleafs):
+                idphyb_data[i] = 0
+            self.idphyb = <int[:self.nleafs, :3]>idphyb_data
+            self._idphyb_ptr = idphyb_data  # Store the original pointer for deallocation
 
-        # initialize the grid indices
-        self._init_block_gridindex()
+            # initialize the grid indices
+            self._init_block_gridindex()
+        
+        self._init_block_coordinates()
 
     def __dealloc__(self):
         """Free all allocated memory when the object is destroyed"""
@@ -76,8 +93,35 @@ cdef class AMRMesh:
         if hasattr(self, '_datac_ptr') and self._datac_ptr is not NULL:
             free(self._datac_ptr)
         
+        if hasattr(self, '_rnode_ptr') and self._rnode_ptr is not NULL:
+            free(self._rnode_ptr)
+        
         if hasattr(self, '_idphyb_ptr') and self._idphyb_ptr is not NULL:
             free(self._idphyb_ptr)
+
+    cdef void _init_block_coordinates(self):
+        """Initialize the coordinates for each block."""
+
+        cdef int ileaf
+        cdef treeptr leaf_node_ptr
+        cdef int idim,
+        cdef int ig[3]
+
+        for ileaf in range(self.nleafs):
+            leaf_node_ptr = self.forest.sfc2node[ileaf]
+            level = leaf_node_ptr.node.level
+            for idim in range(self.ndim):
+                ig[idim] = leaf_node_ptr.node.ig[idim]
+
+                # 0: xmin, 1: ymin, 2: zmin
+                self.rnode[ileaf, idim] = ig[idim] * (self.xmax[idim]-self.xmin[idim])/2**(level-1)/self.nb[idim] + self.xmin[idim]
+                
+                # 3: xmax, 4: ymax, 5: zmax
+                self.rnode[ileaf, 3+idim] = self.rnode[ileaf, idim] + (self.xmax[idim]-self.xmin[idim])/2**(level-1)/self.nb[idim]
+
+                # 6: dx, 7: dy, 8: dz
+                self.rnode[ileaf, 6+idim] = (self.xmax[idim]-self.xmin[idim])/2**(level-1)/self.dsize[idim]
+        
 
     cdef void _init_block_gridindex(self):
         """Initialize the grid indices for each block."""
@@ -183,6 +227,48 @@ cdef class AMRMesh:
             self.ixS_p_max[i][2][1] = self.ixGmax[i]
             self.ixR_p_min[i][0][1] = self.ixGmin[i]
             self.ixR_p_max[i][2][1] = self.ixCoGmax[i]
+
+    cpdef void uniform_grid_zero_order(self, double[:,:,:,:,:] data, double[:,:,:,:] uniform_grid, uint32_t[:] nx,
+                                      double[:] xmin_new, double[:] xmax_new):
+        """
+        Interpolate the data from amr grid to uniform grid, zero order interpolation (nearest neighbor)
+        """
+        cdef uint32_t ileaf, idim
+        cdef double dx_uniform[3]
+        cdef int igmin[3]
+        cdef int igmax[3]
+        cdef uint32_t ix_uniform_in_block[3]
+        cdef int i, j, k
+        cdef bint flag
+
+        for idim in range(self.ndim):
+            dx_uniform[idim] = (xmax_new[idim]-xmin_new[idim])/nx[idim]
+
+        for ileaf in range(self.nleafs):
+            flag = False
+            for idim in range(self.ndim):
+
+                igmin[idim] = <int>ceil((self.rnode[ileaf, idim]-xmin_new[idim])/dx_uniform[idim]-0.5)
+                igmax[idim] = <int>floor((self.rnode[ileaf, idim+3]-xmin_new[idim])/dx_uniform[idim]+0.5)
+                igmin[idim] = max2(igmin[idim], 0)
+                igmax[idim] = min2(igmax[idim], nx[idim]-1)
+
+                if igmin[idim] > igmax[idim]:
+                    flag = True
+                    break
+            
+            if flag:
+                continue
+
+            for k in range(igmin[2], igmax[2]+1):
+                for j in range(igmin[1], igmax[1]+1):
+                    for i in range(igmin[0], igmax[0]+1):
+                        ix_uniform_in_block[0] = <uint32_t>floor(((i+0.5)*dx_uniform[0]-self.rnode[ileaf, 0])/self.rnode[ileaf, 6])
+                        ix_uniform_in_block[1] = <uint32_t>floor(((j+0.5)*dx_uniform[1]-self.rnode[ileaf, 1])/self.rnode[ileaf, 7])
+                        ix_uniform_in_block[2] = <uint32_t>floor(((k+0.5)*dx_uniform[2]-self.rnode[ileaf, 2])/self.rnode[ileaf, 8])
+
+                        uniform_grid[i,j,k,:] = data[ileaf, ix_uniform_in_block[0], ix_uniform_in_block[1], ix_uniform_in_block[2],:]
+
 
     # two helper funcnctions to get the index same as forest to avoid python object usage (forest)
     cdef inline uint32_t nindex(self, uint32_t n1, uint32_t n2, uint32_t n3) noexcept nogil:

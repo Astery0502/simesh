@@ -26,3 +26,9 @@ cdef inline uint32_t max2(uint32_t a, uint32_t b) nogil:
 
 cdef inline uint32_t max3(uint32_t a, uint32_t b, uint32_t c) nogil:
     return max2(max2(a, b), c)
+
+cdef inline int min2(int a, int b) nogil:
+    return a if a < b else b
+
+cdef inline int min3(int a, int b, int c) nogil:
+    return min2(min2(a, b), c)

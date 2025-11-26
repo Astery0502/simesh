@@ -38,6 +38,15 @@ cdef class AMRForest:
 
         treeptr* forest
         treeptr* sfc2node
+        
+        # Store original pointers for deallocation
+        uint32_t* _idx1_ptr
+        uint32_t* _ig2morton_ptr
+        uint32_t* _morton2ig_ptr
+        bint* _is_leaf_ptr
+        uint32_t* _neighbor_children_ptr
+        uint32_t* _neighbor_index_ptr
+        uint32_t* _neighbor_type_ptr
 
     # [child_dim3, child_dim2, child_dim1] (reversed indices in python to be compatiable with fortran, 
     # to reserve the morton order) -> child_dim1*2**(ndim-1)+child_dim2*2**(ndim-2)+child_dim3*2**(ndim-3)
