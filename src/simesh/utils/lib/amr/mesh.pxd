@@ -112,7 +112,10 @@ cdef class AMRMesh:
 
     cdef inline uint32_t ncindex(self, uint32_t nc1, uint32_t nc2, uint32_t nc3) noexcept nogil
 
-    cpdef void uniform_grid_zero_order(self, double[:,:,:,:,:] data, double[:,:,:,:] uniform_grid, uint32_t[:] nx, double[:] xmin_new, double[:] xmax_new)
+    cpdef void uniform_grid_zero_order(self, double[:,:,:,:,:] data, double[:,:,:,:] uniform_grid, 
+        uint32_t[:] nx, double[:] xmin_new, double[:] xmax_new)
+
+    cpdef void uniform_to_sfc(self, double[:,:,:,:] uniform_data, double[:,:,:,:,:] sfc_data)
 
     cdef bint is_boundary(self, uint32_t ileaf, uint32_t[:,:] neighbor_type)# noexcept nogil
 

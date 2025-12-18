@@ -117,11 +117,11 @@ cdef class AMRMesh:
                 self.rnode[ileaf, idim] = ig[idim] * (self.xmax[idim]-self.xmin[idim])/2**(level-1)/self.nb[idim] + self.xmin[idim]
                 
                 # 3: xmax, 4: ymax, 5: zmax
-                self.rnode[ileaf, 3+idim] = self.rnode[ileaf, idim] + (self.xmax[idim]-self.xmin[idim])/2**(level-1)/self.nb[idim]
+                self.rnode[ileaf, self.ndim+idim] = self.rnode[ileaf, idim] + (self.xmax[idim]-self.xmin[idim])/2**(level-1)/self.nb[idim]
 
                 # 6: dx, 7: dy, 8: dz
-                self.rnode[ileaf, 6+idim] = (self.xmax[idim]-self.xmin[idim])/2**(level-1)/self.dsize[idim]
-        
+                self.rnode[ileaf, 2*self.ndim+idim] = (self.xmax[idim]-self.xmin[idim])/2**(level-1)/self.dsize[idim]
+
 
     cdef void _init_block_gridindex(self):
         """Initialize the grid indices for each block."""
@@ -241,6 +241,16 @@ cdef class AMRMesh:
         cdef int i, j, k
         cdef bint flag
 
+        assert data.shape[0] == self.nleafs, \
+            f"data must have the same number of leafs as the mesh, {data.shape[0]} != {self.nleafs}"
+        assert data.shape[1] == uniform_grid.shape[0], \
+            f"data must have the same number of fields as the uniform grid, {data.shape[1]} != {uniform_grid.shape[0]}"
+        # Compare spatial shape of uniform_grid with nx component-wise
+        for idim in range(self.ndim):
+            assert uniform_grid.shape[idim + 1] == nx[idim], \
+                f"uniform_grid shape mismatch on dim {idim}: " \
+                f"{uniform_grid.shape[idim + 1]} != {nx[idim]}"
+
         for idim in range(self.ndim):
             dx_uniform[idim] = (xmax_new[idim]-xmin_new[idim])/nx[idim]
 
@@ -248,10 +258,14 @@ cdef class AMRMesh:
             flag = False
             for idim in range(self.ndim):
 
+                # calculate the cell center of uniform grid included in the block: 0->nx
                 igmin[idim] = <int>ceil((self.rnode[ileaf, idim]-xmin_new[idim])/dx_uniform[idim]-0.5)
-                igmax[idim] = <int>floor((self.rnode[ileaf, idim+3]-xmin_new[idim])/dx_uniform[idim]+0.5)
-                igmin[idim] = max2(igmin[idim], 0)
-                igmax[idim] = min2(igmax[idim], nx[idim]-1)
+                igmax[idim] = <int>floor((self.rnode[ileaf, idim+self.ndim]-xmin_new[idim])/dx_uniform[idim]+0.5)
+                # Clamp to valid range (don't use max2 - it takes uint32_t and breaks for negative ints)
+                if igmin[idim] < 0:
+                    igmin[idim] = 0
+                if igmax[idim] > <int>nx[idim]:
+                    igmax[idim] = <int>nx[idim]
 
                 if igmin[idim] > igmax[idim]:
                     flag = True
@@ -260,14 +274,38 @@ cdef class AMRMesh:
             if flag:
                 continue
 
-            for k in range(igmin[2], igmax[2]+1):
-                for j in range(igmin[1], igmax[1]+1):
-                    for i in range(igmin[0], igmax[0]+1):
-                        ix_uniform_in_block[0] = <uint32_t>floor(((i+0.5)*dx_uniform[0]-self.rnode[ileaf, 0])/self.rnode[ileaf, 6])
-                        ix_uniform_in_block[1] = <uint32_t>floor(((j+0.5)*dx_uniform[1]-self.rnode[ileaf, 1])/self.rnode[ileaf, 7])
-                        ix_uniform_in_block[2] = <uint32_t>floor(((k+0.5)*dx_uniform[2]-self.rnode[ileaf, 2])/self.rnode[ileaf, 8])
+            # calculate the index of block cell that includes the uniform grid cell
+            for i in range(igmin[0], igmax[0]):
+                for j in range(igmin[1], igmax[1]):
+                    for k in range(igmin[2], igmax[2]):
+                        ix_uniform_in_block[0] = <uint32_t>floor(((i+0.5)*dx_uniform[0]+xmin_new[0]-self.rnode[ileaf, 0])/self.rnode[ileaf, 6])
+                        ix_uniform_in_block[1] = <uint32_t>floor(((j+0.5)*dx_uniform[1]+xmin_new[1]-self.rnode[ileaf, 1])/self.rnode[ileaf, 7])
+                        ix_uniform_in_block[2] = <uint32_t>floor(((k+0.5)*dx_uniform[2]+xmin_new[2]-self.rnode[ileaf, 2])/self.rnode[ileaf, 8])
 
-                        uniform_grid[i,j,k,:] = data[ileaf, ix_uniform_in_block[0], ix_uniform_in_block[1], ix_uniform_in_block[2],:]
+                        uniform_grid[:,i,j,k] = data[ileaf, :, ix_uniform_in_block[0], ix_uniform_in_block[1], ix_uniform_in_block[2]]
+
+    cpdef void uniform_to_sfc(self, double[:,:,:,:] uniform_data, double[:,:,:,:,:] sfc_data):
+        """
+        reallocate uniform data to block based sfc sequence
+        """
+        cdef uint32_t ileaf, idim
+        cdef uint32_t nxg1[3]
+        cdef uint32_t nxg2[3]
+
+        assert uniform_data.shape[0] == self.nfields, \
+         f"uniform_data must have the same number of fields as the mesh, {uniform_data.shape[0]} != {self.nfields}"
+        assert sfc_data.shape[0] == self.nleafs, \
+         f"sfc_data must have the same number of leafs as the mesh, {sfc_data.shape[0]} != {self.nleafs}"
+
+        for ileaf in range(self.nleafs):
+            for idim in range(self.ndim):
+                nxg1[idim] = self.forest.sfc2node[ileaf].node.ig[idim]*self.bsize[idim]
+                nxg2[idim] = (self.forest.sfc2node[ileaf].node.ig[idim]+1)*self.bsize[idim]
+            if self.ndim == 2:
+                nxg1[2] = 0
+                nxg2[2] = 1
+            sfc_data[ileaf,0:self.nfields,:self.bsize[0],:self.bsize[1],:self.bsize[2]] = \
+                uniform_data[0:self.nfields,nxg1[0]:nxg2[0],nxg1[1]:nxg2[1],nxg1[2]:nxg2[2]]
 
 
     # two helper funcnctions to get the index same as forest to avoid python object usage (forest)

@@ -14,6 +14,35 @@ NAME_LEN = 16
 # For un-aligned data, use '=' (for aligned data set to '')
 ALIGN = "="
 
+header_template = {
+    'datfile_version': 5,
+    'offset_tree': 0,
+    'offset_blocks': 0,
+    'nw': 7,
+    'ndir': 3,
+    'ndim': 3,
+    'levmax': 1,
+    'nleafs': 1,
+    'nparents': 0,
+    'it': 0,
+    'time': 0.0,
+    'xmin': np.array([-1., -1., -1.]),
+    'xmax': np.array([1., 1., 1.]),
+    'domain_nx': np.array([20, 20, 20]),
+    'block_nx': np.array([10, 10, 10]),
+    'periodic': np.array([False, False, False]),
+    'geometry': 'Cartesian_3D',
+    'staggered': False,
+    'w_names': ['rho', 'm1', 'm2', 'm3', 'b1', 'b2', 'b3'],
+    'physics_type': 'mhd',
+    'n_par': 1,
+    'params': np.array([1.66666667]),
+    'param_names': ['gamma'],
+    'snapshotnext': 1,
+    'slicenext': 0,
+    'collapsenext': 0
+}
+
 def get_header(istream):
     """Read header from an MPI-AMRVAC 2.0 snapshot.
     istream' should be a file
@@ -188,8 +217,8 @@ def read_blocks_mmap_sequential(filename, field_indices=None):
     nblocks = len(block_offsets)
     print(f"Reading {nblocks} blocks sequentially with mmap...")
 
-    # Pre-allocate memory for results: (nblocks, *block_shape, nfields)
-    result_shape = (nblocks, ) + block_shape + (len(field_indices),)
+    # Pre-allocate memory for results: (nblocks, nfields, *block_shape)
+    result_shape = (nblocks, len(field_indices)) + block_shape
     block_fields_all = np.empty(result_shape, dtype=np.float64)
     
     # Open file and create mmap
@@ -228,7 +257,7 @@ def read_blocks_mmap_sequential(filename, field_indices=None):
                     interior = arr[tuple(slices)]
                     
                     # Store in pre-allocated array
-                    block_fields_all[i, ..., field_idx_idx] = interior.copy()
+                    block_fields_all[i, field_idx_idx, ...] = interior.copy()
 
             # close mmap data view
             del interior, ghostcells_view
@@ -251,7 +280,8 @@ def read_blocks_sequential(filename, field_indices=None):
     if field_indices is None:
         field_indices = list(range(nw))
     
-    block_fields_all = np.empty((len(block_offsets), ) + block_shape + (len(field_indices),), dtype=np.float64)
+    # Pre-allocate memory for results: (nblocks, nfields, *block_shape)
+    block_fields_all = np.empty((len(block_offsets), len(field_indices)) + block_shape, dtype=np.float64)
     with open(filename, 'rb') as f:
         for i, offset in enumerate(block_offsets):
             f.seek(offset)
@@ -278,6 +308,230 @@ def read_blocks_sequential(filename, field_indices=None):
                 
                 # Extract interior region (without ghost cells)
                 interior = arr[tuple(slices)]
-                block_fields_all[i, ..., field_idx_idx] = interior.copy()
+                block_fields_all[i, field_idx_idx, ...] = interior.copy()
     
     return block_fields_all
+
+def get_tree_size(header):
+
+    if header['datfile_version'] < 3:
+        raise OSError("Unsupported AMRVAC .dat file version: %d", header["datfile_version"])
+
+    tree_size = 0
+    tree_size += 10 * SIZE_INT # first 10 integers fixed
+    tree_size += SIZE_DOUBLE # time
+    
+    for key, value in header.items():
+        if key in ['w_names', 'param_names']:
+            tree_size += len(value) * NAME_LEN
+        elif key in ['xmin', 'xmax', 'params']:
+            tree_size += len(value) * SIZE_DOUBLE
+        elif key in ['domain_nx', 'block_nx']:
+            tree_size += len(value) * SIZE_INT
+
+    if header['datfile_version'] >= 4:
+        tree_size += SIZE_INT * header['ndim'] # periodic conditions
+        tree_size += NAME_LEN # geometry name
+        tree_size += SIZE_INT # staggered flag
+
+    tree_size += NAME_LEN # physics type
+    tree_size += SIZE_INT # number of physics-defined parameters: n_par
+    tree_size += 3 * SIZE_INT # snapshotnext, slicenext, collapsenext
+
+    offset_size = tree_size + SIZE_INT*(header['nleafs'] + header['nparents']) # the forest
+    offset_size += SIZE_INT*header['nleafs'] # the block levels
+    offset_size += SIZE_INT*header['nleafs']*header['ndim'] # the block indices
+    offset_size += SIZE_DOUBLE*header['nleafs'] # the block offsets with long long int
+    
+    return tree_size, offset_size
+
+def write_header(fi, header):
+    """
+    write the amrvac header to the .dat file
+    """
+    fi.seek(0)
+
+    fmt = ALIGN + "i"
+    size = struct.calcsize(fmt)
+    packed_data = struct.pack(fmt, header['datfile_version'])
+    fi.write(packed_data)
+
+    fmt = ALIGN + 9 * "i"  + "d"
+    packed_data = struct.pack(fmt,
+        header["offset_tree"],
+        header["offset_blocks"],
+        header["nw"],
+        header["ndir"],
+        header["ndim"],
+        header["levmax"],
+        header["nleafs"],
+        header["nparents"],
+        header["it"],
+        header["time"],
+     )
+    fi.write(packed_data)
+
+    # 
+    fmt = ALIGN + header['ndim'] * "d"
+    packed_data = struct.pack(fmt, *header['xmin'])
+    fi.write(packed_data)
+    packed_data = struct.pack(fmt, *header['xmax'])
+    fi.write(packed_data)
+
+    # 
+    fmt = ALIGN + header["ndim"] * "i"
+    packed_data = struct.pack(fmt, *header["domain_nx"])
+    fi.write(packed_data)
+    packed_data = struct.pack(fmt, *header["block_nx"])
+    fi.write(packed_data)
+
+    # 
+    if header["datfile_version"] >= 5:
+        fmt = ALIGN + header["ndim"] * "i"
+        # Convert boolean array to integers for struct.pack
+        periodic = header["periodic"]
+        if isinstance(periodic, np.ndarray) and periodic.dtype == bool:
+            periodic = periodic.astype(np.int32)
+        packed_data = struct.pack(fmt, *periodic)
+        fi.write(packed_data)
+
+        decoded_data = header["geometry"].encode().ljust(NAME_LEN)
+        fi.write(decoded_data) 
+
+        fmt = ALIGN + "i"
+        # Convert boolean to integer for struct.pack
+        staggered = header["staggered"]
+        if isinstance(staggered, bool):
+            staggered = int(staggered)
+        packed_data = struct.pack(fmt, staggered)
+        fi.write(packed_data)
+
+    # Write w_names
+    for i in range(header['nw']):
+        decoded_data = header['w_names'][i].encode().ljust(NAME_LEN)
+        fi.write(decoded_data)
+    
+    # Write physics_type
+    decoded_data = header["physics_type"].encode().ljust(NAME_LEN)
+    fi.write(decoded_data)
+
+    # Write number of physics-defined parameters
+    fmt  = ALIGN + "i"
+    packed_data = struct.pack(fmt, header["n_par"]) # n_pars = 1
+    fi.write(packed_data)
+
+    # Write physics-parameter values
+    fmt = ALIGN + header["n_par"] * "d"
+    packed_data = struct.pack(fmt, *header['params'])
+    fi.write(packed_data)
+
+    # Write physics-parameter names
+    for i in range(header['n_par']):
+        decoded_data = header["param_names"][i].encode().ljust(NAME_LEN)
+        fi.write(decoded_data)
+
+    # Write snapshotnext, slicenext, and collapsenext
+    fmt = ALIGN + 1 * "i"
+    packed_data = struct.pack(fmt, header["snapshotnext"])
+    fi.write(packed_data)
+
+    packed_data = struct.pack(fmt, header["slicenext"])
+    fi.write(packed_data)
+
+    packed_data = struct.pack(fmt, header["collapsenext"])
+    fi.write(packed_data)
+
+    assert(fi.tell()) == header['offset_tree'], f"Header is not written correctly, {fi.tell()} != {header['offset_tree']}"
+    return fi.tell()
+
+def update_header(header: dict, **kwargs):
+    """
+    Create a new header dictionary with updated values from kwargs.
+    Validates that kwargs only contain standard header keywords from the template.
+    
+    Args:
+        header: Original header dictionary
+        **kwargs: Keyword arguments to update in the header
+        
+    Returns:
+        Updated header dictionary
+        
+    Raises:
+        ValueError: If any key in kwargs is not a standard header keyword
+    """
+    # Get all standard header keywords from the template
+    standard_keys = set(header_template.keys())
+    
+    # Validate that all kwargs are standard header keywords
+    for key in kwargs.keys():
+        if key not in standard_keys:
+            raise ValueError(f"Key '{key}' is not a standard header keyword. "
+                           f"Valid keys are: {sorted(standard_keys)}")
+    
+    # Create a copy of the header and update with kwargs
+    header_new = header.copy()
+    for key, value in kwargs.items():
+        header_new[key] = value
+
+    tree_size, offset_size = get_tree_size(header_new)
+    header_new['offset_tree'] = tree_size
+    header_new['offset_blocks'] = offset_size
+    return header_new
+
+
+def write_forest_tree(fi, header, forest, tree):
+
+    fi.seek(header['offset_tree'])
+    len_forest = len(forest)
+    assert(len_forest == (header['nleafs'] + header['nparents'])), f"Forest data is not written correctly, {len_forest} != {header['nleafs'] + header['nparents']}"
+
+    fmt = ALIGN + len_forest * "i"
+    packed_data = struct.pack(fmt, *forest)
+    fi.write(packed_data)
+
+    block_lvls, block_ixs, block_offsets = tree
+    assert(len(block_lvls) == len(block_ixs) == len(block_offsets))
+    assert(len(block_lvls) == header['nleafs'])
+    
+    fmt = ALIGN + len(block_lvls) * "i"
+    packed_data = struct.pack(fmt, *block_lvls)
+    fi.write(packed_data)
+
+    fmt = ALIGN + len(block_ixs) * header['ndim'] * "i"
+    packed_data = struct.pack(fmt, *(block_ixs.flatten()))
+    fi.write(packed_data)
+
+    fmt = ALIGN + len(block_offsets) * "q"
+    packed_data = struct.pack(fmt, *block_offsets)
+    fi.write(packed_data)
+
+    assert(fi.tell() == header['offset_blocks']), f"Tree data is not written correctly, {fi.tell()} != {header['offset_blocks']}"
+    return fi.tell()
+
+def write_blocks(fi, data, ndim, offsets):
+
+    """
+    fi: file buffer for input
+    data: blocks of data in the morton order
+    offsets: list of offsets for each block in fi
+    """
+
+    fi.seek(offsets[0])
+
+    for i in range(len(offsets)):
+
+        offset = offsets[i]
+        block_array = data[i]
+
+        fmt = ALIGN + 2 * ndim * "i"
+        ghostcells = np.zeros(2 * ndim, dtype=np.int32) # no ghostcells written into
+        packed_data = struct.pack(fmt, *ghostcells.flatten())
+        fi.write(packed_data)
+
+        fmt = ALIGN + np.prod(block_array.shape) * "d"
+        block_data = np.transpose(block_array, (0,3,2,1)).flatten()
+        packed_data = struct.pack(fmt, *block_data)
+        fi.write(packed_data)
+
+        if (i < len(offsets)-1):
+            assert(fi.tell() == offsets[i+1]), f"Block data is not written correctly, {fi.tell()} != {offsets[i+1]}"

@@ -1,5 +1,8 @@
+import os
 import numpy as np
+from functools import cached_property
 from datio import get_metadata, read_blocks_sequential
+from datio import update_header, write_header, write_forest_tree, write_blocks
 from simesh.dataset.data_set import DataSet
 from simesh.utils.lib.amr.forest import AMRForest
 from simesh.utils.lib.amr.mesh import AMRMesh
@@ -16,9 +19,12 @@ class AMRVACDataSet(DataSet):
         Load the metadata from the data file.
         """
 
-        header, is_leaf, _ = get_metadata(self.sfile)
+        self.ng = 0
+
+        header, is_leaf, tree_info = get_metadata(self.sfile)
         self.metadata = header.copy()
         self.is_leaf = is_leaf.copy().astype(np.int32)
+        self.tree_info = tree_info
 
         # Basic metadata
         self.ndim = np.uint32(header['ndim'])
@@ -63,44 +69,143 @@ class AMRVACDataSet(DataSet):
     def load_data(self, field_indices: list[int] = None):
         """
         Load the amr 1d managed block data from the data file
+        Can reload the data if the field_indices are different
         """
 
-        if self.data is None:
-            data = read_blocks_sequential(self.sfile, field_indices)
-            self.data = data
-            self.field_indices = list(range(self.nw)) if field_indices is None else field_indices
-        else:
-            indices_to_add = []
-            for i in field_indices:
-                if i not in self.field_indices:
-                    indices_to_add.append(i)
-            if len(indices_to_add) > 0:
-                new_data = read_blocks_sequential(self.sfile, indices_to_add)
-                # Concatenate along the last dimension (field indices)
-                # old_data: (block_num, nx1, nx2, nx3, fidx1)
-                # new_data: (block_num, nx1, nx2, nx3, fidx2)
-                # result:   (block_num, nx1, nx2, nx3, fidx1+fidx2)
-                self.data = np.concatenate((self.data, new_data), axis=-1)
-                self.field_indices.extend(indices_to_add)
+        data = read_blocks_sequential(self.sfile, field_indices)
+        self.data = data
 
+        if field_indices is not None:
+            self.field_indices = field_indices
+
+
+    @cached_property
+    def field_indices(self):
+        """
+        Cached property for field indices.
+        If not explicitly set via load_data, defaults to all fields (0 to nw-1).
+        """
+        # Default to all fields if not declared/defined
+        return list(range(self.nw))
+    
     def __getitem__(self, key):
         """
-        Get the data from the dataset with uniform grid 
-        """
-        return
+        Get data from the dataset on a uniform grid using NumPy-like slicing.
 
-    def uniform_grid(self, xmin, xmax, nx, field_indices:list[int] = None):
+        The indexing uses a convention similar to ``numpy.mgrid`` where a
+        complex-valued step encodes the total number of points in that
+        direction.
+
+        Examples
+        --------
+        - ``ds[::100j, ::100j, ::100j]``:
+            build a uniform grid over the *entire* domain with a resolution of
+            100 × 100 × 100 and return the full grid.
+
+        - ``ds[50:100:200j, 50:100:200j, 50:100:200j]``:
+            build a uniform grid over the *entire* domain with a resolution of
+            200 × 200 × 200 and then return the sub-box ``50:100`` in each
+            direction.
+
+        Notes
+        -----
+        - Only 3D slicing with complex steps is currently supported.
+        - The internal uniform grid is computed with shape ``(n_fields, nx, ny, nz)``.
+          This method returns a view transposed to ``(nx, ny, nz, n_fields)`` for
+          user-facing convenience.
         """
-        Get the uniform grid data from the 1d amr managed data (zero order interpolation)
+        # Expect a 3D indexing key
+        if not isinstance(key, tuple) or len(key) != 3:
+            raise TypeError(
+                "Indexing expects a tuple of three slices, e.g. "
+                "[::100j, ::100j, ::100j] or [50:100:200j, 50:100:200j, 50:100:200j]"
+            )
+
+        slices = []
+        nx = []
+
+        for s in key:
+            if not isinstance(s, slice) or not isinstance(s.step, complex):
+                raise TypeError(
+                    "Each index must be a slice with a complex step, e.g. ::100j or 50:100:200j"
+                )
+
+            # Total number of points along this axis
+            n_axis = int(round(s.step.imag))
+            if n_axis <= 0:
+                raise ValueError("Complex step imag part must give a positive number of points")
+
+            nx.append(n_axis)
+
+            start = 0 if s.start is None else s.start
+            stop = n_axis if s.stop is None else s.stop
+            slices.append(slice(start, stop))
+
+        # Build the full-domain uniform grid at the requested resolution.
+        # This returns data with shape (n_fields, nx, ny, nz)
+        full_grid = self.uniform_grid(nx)
+
+        # Extract the requested sub-box
+        return full_grid[slices[0], slices[1], slices[2], :]
+
+    def uniform_grid(self, nx, xmin: list = None, xmax: list = None, field_indices: list[int] = None):
         """
+        Get the uniform grid data from the 1d amr managed data (zero order interpolation).
+        If xmin or xmax are not provided, they default to the full physical domain of the dataset.
+        
+        Parameters:
+        -----------
+        field_indices : list[int], optional
+            Indices to select from the already-loaded fields. If None, uses all loaded fields.
+            These indices are relative to self.field_indices (the fields that were loaded),
+            not the original nw fields in the raw data.
+        """
+        # Default to full domain if bounds are not specified
+        if xmin is None:
+            xmin = self.physical_domain[0]
+        if xmax is None:
+            xmax = self.physical_domain[1]
+
+        # Load data if not already loaded (load all fields to allow selection later)
         if self.data is None:
-            self.load_data(field_indices)
-        if field_indices is None:
-            field_indices = list(range(self.nw))
-        uniform_grid = np.zeros((nx[0], nx[1], nx[2], len(field_indices)), dtype=np.double)
-        self.mesh.uniform_grid_zero_order(self.data[:,:,:,:,field_indices], uniform_grid, np.array(nx, dtype=np.uint32), 
+            self.load_data(None)  # Load all fields
+        
+        # Select which of the already-loaded fields to use
+        # If field_indices is provided, use those to select from the loaded data
+        # Otherwise, use all loaded fields
+        if field_indices is not None:
+            # field_indices are indices into the already-loaded data (self.data)
+            # Select the corresponding columns from self.data
+            data_to_use = self.data[:, field_indices, :, :, :]
+            n_fields = len(field_indices)
+        else:
+            # Use all loaded fields
+            data_to_use = self.data
+            n_fields = len(self.field_indices)
+        
+        uniform_grid = np.zeros((n_fields, nx[0], nx[1], nx[2]), dtype=np.double)
+        self.mesh.uniform_grid_zero_order(data_to_use, uniform_grid, np.array(nx, dtype=np.uint32), 
                 np.array(xmin, dtype=np.double), np.array(xmax, dtype=np.double))
         return uniform_grid
-    
+
+    def write_datfile(self, sfile: str):
+
+        if os.path.exists(sfile):
+            raise FileExistsError(f"File {sfile} already exists")
+        with open(sfile, 'wb') as fb:
+            # update the header if not fully read original fields
+            updated_header = update_header(self.metadata, nw=len(self.field_indices), 
+                w_names=[self.wnames[i] for i in self.field_indices])
+            print(updated_header)
+            print(self.metadata)
+            write_header(fb, updated_header)
+
+            # required to rewrite the block offset tree (staggered grid not read here)
+            write_forest_tree(fb, updated_header, self.is_leaf, self.tree_info)
+            # the non-ghostcells data0, now default ng=0, no ghostcells
+            data0 = self.data[:,:,self.ng:self.ng+self.block_nx[0],
+                self.ng:self.ng+self.block_nx[1],
+                self.ng:self.ng+self.block_nx[2]]
+            write_blocks(fb, data0, updated_header['ndim'], self.tree_info[2])
 
 

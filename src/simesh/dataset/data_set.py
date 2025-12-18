@@ -17,7 +17,6 @@ class DataSet(abc.ABC):
         self.load_metadata()
 
         self.data = None  # Initialize data attribute
-        self.field_indices = None  # Initialize field_indices attribute
 
     
     def load_metadata(self):

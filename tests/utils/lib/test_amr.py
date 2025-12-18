@@ -129,8 +129,8 @@ def test_uniform_grid_zero_order():
     xmin = np.array([0, 0, 0], dtype=np.double)
     xmax = np.array([10, 10, 10], dtype=np.double)
     mesh = AMRMesh(3, bsize, dsize, xmin, xmax, 0, 3, forest)
-    data = np.ones((15, 10, 10, 10, 3), dtype=np.double)
-    uniform_grid = np.zeros((20, 20, 20, 3), dtype=np.double)
+    data = np.ones((15, 3, 10, 10, 10), dtype=np.double)
+    uniform_grid = np.zeros((3, 20, 20, 20), dtype=np.double)
     mesh.uniform_grid_zero_order(data, uniform_grid, np.array([20, 20, 20], dtype=np.uint32), np.array([0, 0, 0], dtype=np.double), np.array([10, 10, 10], dtype=np.double))
     assert np.all(uniform_grid == 1)
 
