@@ -1,12 +1,18 @@
 import abc
 import os
 import numpy as np
-from simesh.mesh.mesh import Mesh
-from simesh.mesh.amr_mesh import AMRMesh
-from simesh.frontends.amrvac.datio import get_single_block_data, find_uniform_fields, write_header, write_forest_tree, write_blocks
+from simesh.legacy.meshes.mesh import Mesh
+from simesh.legacy.meshes.amr_mesh import AMRMesh
+from simesh.legacy.frontends.amrvac.datio import get_single_block_data, find_uniform_fields, write_header, write_forest_tree, write_blocks
 from typing import Tuple
-# temporary import, later will create a individual part for vtk output
-from vtk import vtkNonOverlappingAMR, vtkUniformGrid, vtkDoubleArray, vtkXMLHierarchicalBoxDataWriter
+
+try:
+    from vtk import vtkNonOverlappingAMR, vtkUniformGrid, vtkDoubleArray, vtkXMLHierarchicalBoxDataWriter
+except ImportError:
+    vtkNonOverlappingAMR = None
+    vtkUniformGrid = None
+    vtkDoubleArray = None
+    vtkXMLHierarchicalBoxDataWriter = None
 
 class DataSet(abc.ABC):
     """
@@ -144,6 +150,8 @@ class AMRDataSet(DataSet):
 
     # the vthb only supports the slab Cartesian mesh for now
     def write_vthb(self, filename: str):
+        if vtkNonOverlappingAMR is None:
+            raise ImportError("VTK is required for write_vthb(); install the 'vtk' package to enable this export.")
 
         max_level = self.header['levmax']
         block_nx = self.header['block_nx']

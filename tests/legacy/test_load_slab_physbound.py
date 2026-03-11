@@ -1,4 +1,4 @@
-from simesh import amr_loader
+from simesh.legacy.frontends.amrvac.io import amr_loader
 import numpy as np
 
 def load_slab_physbound(filename, load_ghost=True):

@@ -1,0 +1,1 @@
+"""Legacy AMRVAC frontend implementation."""

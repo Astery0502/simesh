@@ -1,7 +1,7 @@
 import numpy as np
-from src.simesh.utils.lib.amr.morton import pmorton3D, fill_morton_mapping3D
-from src.simesh.utils.lib.amr.forest import AMRForest
-from src.simesh.utils.lib.amr.mesh import AMRMesh
+from simesh.utils.lib.amr.morton import pmorton3D, fill_morton_mapping3D
+from simesh.utils.lib.amr.forest import AMRForest
+from simesh.utils.lib.amr.mesh import AMRMesh
 
 def interleave_bits(ign):
     answer = 0
@@ -161,6 +161,3 @@ def run_tests():
     test_uniform_grid_zero_order()
     print("test_uniform_grid_zero_order passed")
     print("All tests passed for amr submodule!")
-
-if __name__ == "__main__":
-    run_tests()

@@ -4,9 +4,14 @@ __pycache__/
 /figs/
 .vscode/
 build/
+dist/
+*.egg-info/
+.venv/
+.venv-smoke/
 
 # cython compilation files excluded
 *.so
+*.pyd
 *.c
 *.cpp
 
@@ -20,3 +25,4 @@ build/
 
 # spared
 *bak.*
+.DS_Store

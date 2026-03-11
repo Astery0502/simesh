@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "simesh"
 version = "0.1.0"
-description = "A mesh handling package for simulation data"
+description = "Python/Cython toolkit for reading, writing, and manipulating AMRVAC-style AMR mesh data"
 authors = ["Astery <aster0502@outlook.com>"]
 packages = [
     { include = "simesh", from = "src" }
@@ -10,16 +10,15 @@ license = "GPL-3.0"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
-numpy = "^2.2.1"
-cython = "^3.0.12"
+python = ">=3.11,<4.0"
+numpy = ">=1.23.5,<3.0"
 
 [tool.poetry.group.test.dependencies]
 jupyterlab = "^4.3.4"
 ipykernel = "^6.29.5"
 
 [build-system]
-requires = ["poetry-core>=1.0.0", "setuptools>=42", "wheel", "Cython>=3.0.0"]
+requires = ["poetry-core>=1.0.0", "setuptools>=42", "wheel", "numpy>=1.23.5,<3.0", "Cython>=3.0,<4.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.build]

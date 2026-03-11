@@ -1,74 +1,128 @@
-### Installation
+# simesh
 
-You can install this package using either pip with setup.py or Poetry.
+`simesh` is a Python/Cython toolkit for working with AMRVAC-style adaptive mesh
+refinement (AMR) data. The current canonical implementation is centered on
+`src/simesh/amrvac/` and `src/simesh/utils/`.
 
-#### Using pip (setup.py)
+The project follows a two-layer design:
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Astery0502/simesh.git
-   cd simesh
-   ```
+- Python provides the user-facing interfaces for loading datasets, creating new
+  datasets from NumPy arrays, inspecting metadata, and exporting results.
+- Cython-backed AMR data structures and kernels provide the fast path for
+  forest connectivity, Morton ordering, mesh bookkeeping, and uniform-grid
+  extraction.
 
-2. Install the package:
-   ```bash
-   pip install .
-   ```
+In practice, the package is meant to serve as both:
 
-   To install with test dependencies:
-   ```bash
-   pip install .[test]
-   ```
+- an AMRVAC `.dat` reader/writer
+- an AMR mesh manipulation library for block-structured simulation data
 
-#### Using Poetry (pyproject.toml)
+## Core capabilities
 
-1. First, install Poetry if you haven't already:
-   ```bash
-   curl -sSL https://install.python-poetry.org | python3 -
-   ```
+- Load AMRVAC `.dat` files into Python-accessible dataset and mesh objects
+- Parse and write AMRVAC metadata, forest structure, tree information, and
+  block field data
+- Represent the AMR hierarchy through octree/forest-based data structures
+- Manipulate block data with ghost-cell handling and AMR neighbor connectivity
+- Build datasets directly from uniform NumPy arrays without an existing input
+  file
+- Resample AMR data onto uniform grids for analysis or downstream workflows
+- Export AMR data to VTK hierarchical box output
 
-2. Clone the repository:
-   ```bash
-   git clone https://github.com/Astery0502/simesh.git
-   cd simesh
-   ```
+## Architecture
 
-3. Install dependencies and the package:
-   ```bash
-   poetry install
-   ```
+- `src/simesh/amrvac/`: canonical AMRVAC-facing dataset and file-format modules
+- `src/simesh/utils/lib/`: Cython source tree; all `.pyx` files under this
+  directory are compiled during package build, with `.pxd` files used as
+  headers/interfaces
+- `src/simesh/utils/configurations.py`: utilities for generating synthetic or
+  physically motivated field configurations
+- `src/simesh/legacy/`: preserved Python-first implementation path kept as
+  legacy/reference
+- `archive/src_old/`: archived historical code kept outside the installable
+  package tree
 
-   To install with test dependencies:
-   ```bash
-   poetry install --with test
-   ```
+## Installation
+
+The supported install path is `pyproject.toml`-based. Cython extensions are
+compiled automatically during installation.
+
+### Using pip
+
+```bash
+git clone https://github.com/Astery0502/simesh.git
+cd simesh
+pip install .
+```
+
+For editable local development:
+
+```bash
+pip install -e .
+```
+
+### Using Poetry
+
+```bash
+git clone https://github.com/Astery0502/simesh.git
+cd simesh
+poetry install
+```
 
 #### Requirements
 
 - Python ≥ 3.11
-- NumPy ≥ 2.1.1
+- NumPy ≥ 1.23.5
+- Cython ≥ 3.0 for source builds
+- JupyterLab and ipykernel are optional development dependencies
 
-Optional test dependencies:
-- pytest ≥ 8.3.4
-- JupyterLab ≥ 4.3.4
-- ipykernel ≥ 6.29.5
+## Development build and test
 
-### Usage
+Package installation compiles all Cython modules found under
+`src/simesh/utils/lib/`.
 
-The package provides interfaces to load AMR structured data from datfiles output by AMRVAC and manipulate over the AMR structured data in a AMRVAC-like manner. By the way, the package also provides interfaces to generate the AMR structured data independent of any file input.
+For local development:
 
-#### Load AMRVAC data
-
-```python
-from simesh import amr_loader
-
-ds = amr_loader(datfile)
+```bash
+make build
+make build-amr
+make test
 ```
 
-#### Manipulation of the AMR structured data
+Notes:
 
-See details in the [demo.ipynb](demo.ipynb) for now.
+- `make build` compiles all `.pyx` files under `src/simesh/utils/lib/`
+- `make build-amr` compiles only the `src/simesh/utils/lib/amr/` subtree
+- `make test` rebuilds extensions and runs the direct Cython test script
+
+## Usage
+
+The canonical code path uses `simesh.amrvac` for AMRVAC datasets and
+`simesh.utils.lib` for compiled internals.
+
+### Load AMRVAC data
+
+```python
+from simesh.amrvac.amrvac_dataset import AMRVACDataSet
+
+ds = AMRVACDataSet(datfile)
+ds.load_data()
+```
+
+### Low-level metadata access
+
+```python
+from simesh.amrvac.datio import get_metadata
+
+header, forest, tree = get_metadata(datfile)
+```
+
+Legacy Python-only code is preserved under `simesh.legacy`, but it is not the
+default path and is not part of the current default test workflow.
 
 ## Limitations
 
-Note that the package for now can only work on ***Cartesian, 3D AMR Mesh with constant boundary condition***. For further specific implementation, please contact with the author.
+The current implementation is primarily targeted at ***Cartesian 3D AMR meshes***.
+Several code paths and tests also assume constant or simple physical boundary
+handling. If you need broader geometry or dimensional support, treat the current
+state as specialized rather than fully general.

@@ -16,13 +16,13 @@ def build_cython(group=None, clean=False):
     if group:
         cmd.extend(['--group', group])
     
-    subprocess.run(cmd, cwd=str(root_dir))
+    subprocess.run(cmd, cwd=str(root_dir), check=True)
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--group', help='Specific group to compile (core, io, amr, etc.)')
+    parser.add_argument('--group', help='Specific subdirectory under src/simesh/utils/lib to compile')
     parser.add_argument('--clean', action='store_true', help='Clean before building')
     args = parser.parse_args()
     
-    build_cython(args.group, args.clean) 
+    build_cython(args.group, args.clean)

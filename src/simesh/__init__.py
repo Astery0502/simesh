@@ -1,8 +1,9 @@
 """
-Simesh: A Python package for handling AMR (Adaptive Mesh Refinement) data structures.
+Simesh: a Python/Cython toolkit for AMRVAC-style AMR data.
 
-This package provides tools for working with AMR meshes, particularly focused on
-AMRVAC data handling and visualization.
+The package combines Python user interfaces with compiled AMR data structures
+for reading, writing, exploring, and manipulating block-structured adaptive
+mesh refinement datasets.
 """
 
 __version__ = "0.1.0"

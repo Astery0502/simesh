@@ -1,25 +1,15 @@
-.PHONY: build utils amr clean test test-amr
+.PHONY: build build-amr clean test
 
-# Define dependencies
-amr: utils
+PYTHON ?= python3
 
-# Basic build commands
-utils:
-	python scripts/build_ext.py --group utils
+build:
+	$(PYTHON) scripts/build_ext.py
 
-amr:
-	python scripts/build_ext.py --group amr
+build-amr:
+	$(PYTHON) scripts/build_ext.py --group amr
 
-# Build all
-build: utils amr
+test: build
+	PYTHONPATH=src $(PYTHON) tests/utils/lib/test_amr.py
 
-# Testing targets
-test-amr: amr
-	PYTHONPATH=. python tests/utils/lib/test_amr.py
-
-test: test-amr
-	# Add other test targets as needed
-
-# Utilities
 clean:
-	python scripts/build_ext.py --clean
+	$(PYTHON) scripts/build_ext.py --clean

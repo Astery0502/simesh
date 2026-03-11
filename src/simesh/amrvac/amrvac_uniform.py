@@ -2,7 +2,7 @@ import os
 import struct
 import numpy as np
 from simesh.amrvac.amrvac_dataset import AMRVACDataSet
-from simesh.geometry.amr.amr_forest import AMRForest
+from simesh.utils.lib.amr.forest import AMRForest
 from simesh.utils.lib.amr.mesh import AMRMesh
 from simesh.utils.lib.amr.morton import fill_morton_mapping3D
 
@@ -22,7 +22,7 @@ def load_from_uniform(udata:np.ndarray, w_names:list[str], xmin:np.ndarray, xmax
     nblev1 = np.array(domain_nx // block_nx).astype(np.uint32)
 
     is_leaf = np.ones(nblev1[0]*nblev1[1]*nblev1[2], dtype=np.int32)
-    forest = AMRForest(nblev1[0], nblev1[1], nblev1[2], is_leaf)
+    forest = AMRForest(np.uint32(ndim), nblev1[0], nblev1[1], nblev1[2], is_leaf)
     mesh = AMRMesh(ndim, block_nx, domain_nx, xmin, xmax, 0, len(w_names), forest)
     ds = AMRVACDataSet(mesh)
 
@@ -106,5 +106,4 @@ def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.
             # Write binary data directly (no size prefix in standard VTK legacy format)
             f.write(field_data_big_endian.tobytes())
             f.write(b'\n')  # Add newline after binary data block
-
 

@@ -1,9 +1,8 @@
 import os
 import numpy as np
-from functools import cached_property
-from datio import get_metadata, read_blocks_sequential
-from datio import update_header, write_header, write_forest_tree, write_blocks
-from simesh.dataset.data_set import DataSet
+from .datio import get_metadata, read_blocks_sequential
+from .datio import update_header, write_header, write_forest_tree, write_blocks
+from .dataset_base import DataSet
 from simesh.utils.lib.amr.forest import AMRForest
 from simesh.utils.lib.amr.mesh import AMRMesh
 
@@ -71,22 +70,33 @@ class AMRVACDataSet(DataSet):
         Load the amr 1d managed block data from the data file
         Can reload the data if the field_indices are different
         """
+        if field_indices is None:
+            field_indices = list(range(int(self.nw)))
+        else:
+            field_indices = [int(i) for i in field_indices]
 
         data = read_blocks_sequential(self.sfile, field_indices)
         self.data = data
+        self.loaded_field_indices = field_indices
 
-        if field_indices is not None:
-            self.field_indices = field_indices
-
-
-    @cached_property
-    def field_indices(self):
+    @property
+    def loaded_field_indices(self):
         """
-        Cached property for field indices.
-        If not explicitly set via load_data, defaults to all fields (0 to nw-1).
+        Original file/header field indices currently loaded in self.data.
         """
-        # Default to all fields if not declared/defined
-        return list(range(self.nw))
+        if not hasattr(self, "_loaded_field_indices"):
+            self._loaded_field_indices = list(range(int(self.nw)))
+        return self._loaded_field_indices
+
+    @loaded_field_indices.setter
+    def loaded_field_indices(self, value):
+        self._loaded_field_indices = [int(i) for i in value]
+
+    def _loaded_field_map(self):
+        """
+        Map original file/header field indices to column positions in self.data.
+        """
+        return {field_idx: i for i, field_idx in enumerate(self.loaded_field_indices)}
     
     def __getitem__(self, key):
         """
@@ -156,9 +166,8 @@ class AMRVACDataSet(DataSet):
         Parameters:
         -----------
         field_indices : list[int], optional
-            Indices to select from the already-loaded fields. If None, uses all loaded fields.
-            These indices are relative to self.field_indices (the fields that were loaded),
-            not the original nw fields in the raw data.
+            Original file/header field indices to extract, corresponding to self.wnames.
+            If None, uses all currently loaded fields.
         """
         # Default to full domain if bounds are not specified
         if xmin is None:
@@ -166,27 +175,46 @@ class AMRVACDataSet(DataSet):
         if xmax is None:
             xmax = self.physical_domain[1]
 
-        # Load data if not already loaded (load all fields to allow selection later)
+        # Load all fields lazily if nothing is loaded yet.
         if self.data is None:
-            self.load_data(None)  # Load all fields
-        
-        # Select which of the already-loaded fields to use
-        # If field_indices is provided, use those to select from the loaded data
-        # Otherwise, use all loaded fields
+            self.load_data(None)
+
+        loaded_field_map = self._loaded_field_map()
+
         if field_indices is not None:
-            # field_indices are indices into the already-loaded data (self.data)
-            # Select the corresponding columns from self.data
-            data_to_use = self.data[:, field_indices, :, :, :]
-            n_fields = len(field_indices)
+            field_indices = [int(i) for i in field_indices]
+            missing = [i for i in field_indices if i not in loaded_field_map]
+            if missing:
+                raise ValueError(
+                    f"Requested field indices {missing} are not loaded. "
+                    f"Currently loaded original field indices: {self.loaded_field_indices}"
+                )
+
+            loaded_columns = [loaded_field_map[i] for i in field_indices]
+            data_to_use = self.data[:, loaded_columns, :, :, :]
+            n_fields = len(loaded_columns)
         else:
-            # Use all loaded fields
             data_to_use = self.data
-            n_fields = len(self.field_indices)
+            n_fields = len(self.loaded_field_indices)
         
         uniform_grid = np.zeros((n_fields, nx[0], nx[1], nx[2]), dtype=np.double)
         self.mesh.uniform_grid_zero_order(data_to_use, uniform_grid, np.array(nx, dtype=np.uint32), 
                 np.array(xmin, dtype=np.double), np.array(xmax, dtype=np.double))
         return uniform_grid
+
+    def uniform_full(self, field_indices: list[int] = None):
+        """
+        Return the full-domain uniform grid for datasets without refinement.
+        """
+        if int(self.levmax) != 1:
+            raise ValueError("uniform_full() is only available when levmax == 1.")
+
+        return self.uniform_grid(
+            self.domain_nx,
+            xmin=self.physical_domain[0],
+            xmax=self.physical_domain[1],
+            field_indices=field_indices,
+        )
 
     def write_datfile(self, sfile: str):
 
@@ -194,8 +222,8 @@ class AMRVACDataSet(DataSet):
             raise FileExistsError(f"File {sfile} already exists")
         with open(sfile, 'wb') as fb:
             # update the header if not fully read original fields
-            updated_header = update_header(self.metadata, nw=len(self.field_indices), 
-                w_names=[self.wnames[i] for i in self.field_indices])
+            updated_header = update_header(self.metadata, nw=len(self.loaded_field_indices), 
+                w_names=[self.wnames[i] for i in self.loaded_field_indices])
             print(updated_header)
             print(self.metadata)
             write_header(fb, updated_header)
@@ -207,5 +235,3 @@ class AMRVACDataSet(DataSet):
                 self.ng:self.ng+self.block_nx[1],
                 self.ng:self.ng+self.block_nx[2]]
             write_blocks(fb, data0, updated_header['ndim'], self.tree_info[2])
-
-
