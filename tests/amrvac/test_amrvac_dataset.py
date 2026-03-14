@@ -6,7 +6,7 @@ import numpy as np
 from simesh.amrvac.amrvac_dataset import AMRVACDataSet
 from simesh.amrvac.datio import extract_uniform_data
 from simesh.amrvac.layouts import datau_to_udata, udata_to_datau
-from simesh.amrvac.amrvac_uniform import load_uniform_data, write_datfile_from_uniform
+from simesh.amrvac.amrvac_uniform import datfile_to_vtk, load_uniform_data, write_datfile_from_uniform
 
 
 def _uniform_input(domain_nx=(4, 4, 4), nw=7):
@@ -18,6 +18,48 @@ def _uniform_input(domain_nx=(4, 4, 4), nw=7):
             udata[ix, iy, iz, ifield] = 1000 * ifield + 100 * ix + 10 * iy + iz
 
     return udata
+
+
+def _read_structured_points_vtk(path: str):
+    with open(path, "rb") as fh:
+        assert fh.readline() == b"# vtk DataFile Version 2.0\n"
+        title = fh.readline().decode("ascii").strip()
+        assert title == "Uniform grid data"
+        assert fh.readline() == b"BINARY\n"
+        assert fh.readline() == b"DATASET STRUCTURED_POINTS\n"
+
+        dims = tuple(int(value) for value in fh.readline().decode("ascii").split()[1:])
+        origin = np.array([float(value) for value in fh.readline().decode("ascii").split()[1:]], dtype=np.double)
+        spacing = np.array([float(value) for value in fh.readline().decode("ascii").split()[1:]], dtype=np.double)
+        npoints = int(fh.readline().decode("ascii").split()[1])
+
+        fields = {}
+        for _ in range(1000):
+            line = fh.readline()
+            if not line:
+                break
+
+            tokens = line.decode("ascii").split()
+            if not tokens:
+                continue
+            assert tokens[0] == "SCALARS", f"Unexpected VTK token line: {line!r}"
+            field_name = tokens[1]
+            assert fh.readline() == b"LOOKUP_TABLE default\n"
+
+            raw = fh.read(npoints * 8)
+            flat = np.frombuffer(raw, dtype=">f8").astype(np.double, copy=False)
+            fields[field_name] = flat.reshape((dims[2], dims[1], dims[0]), order="C").transpose(2, 1, 0)
+
+            trailing = fh.read(1)
+            if trailing not in (b"", b"\n"):
+                raise AssertionError(f"Unexpected VTK binary terminator: {trailing!r}")
+
+        return {
+            "dims": dims,
+            "origin": origin,
+            "spacing": spacing,
+            "fields": fields,
+        }
 
 
 def test_dataset_uniform_full():
@@ -179,6 +221,42 @@ def test_dataset_getitem_returns_udata_layout():
             os.remove(path)
 
 
+def test_datfile_to_vtk():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as dat_tmp:
+        dat_path = dat_tmp.name
+    with tempfile.NamedTemporaryFile(suffix=".vtk", delete=False) as vtk_tmp:
+        vtk_path = vtk_tmp.name
+
+    try:
+        os.remove(vtk_path)
+        udata = _uniform_input()
+        write_datfile_from_uniform(
+            dat_path,
+            udata,
+            [f"w{i}" for i in range(udata.shape[-1])],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        datfile_to_vtk(dat_path, vtk_path, field_indices=[1, 3])
+
+        vtk = _read_structured_points_vtk(vtk_path)
+
+        assert vtk["dims"] == (4, 4, 4)
+        assert np.allclose(vtk["origin"], np.array([0.0, 0.0, 0.0]))
+        assert np.allclose(vtk["spacing"], np.array([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0]))
+        assert set(vtk["fields"]) == {"w1", "w3"}
+        assert np.array_equal(vtk["fields"]["w1"], udata[..., 1])
+        assert np.array_equal(vtk["fields"]["w3"], udata[..., 3])
+    finally:
+        if os.path.exists(dat_path):
+            os.remove(dat_path)
+        if os.path.exists(vtk_path):
+            os.remove(vtk_path)
+
+
 def run_tests():
     print("Running tests for AMRVAC dataset...")
     test_dataset_uniform_full()
@@ -191,6 +269,8 @@ def run_tests():
     print("test_load_uniform_data passed")
     test_dataset_getitem_returns_udata_layout()
     print("test_dataset_getitem_returns_udata_layout passed")
+    test_datfile_to_vtk()
+    print("test_datfile_to_vtk passed")
     print("All tests passed for AMRVAC dataset!")
 
 

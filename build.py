@@ -34,10 +34,11 @@ def get_extensions(group: str | None = None) -> list[Extension]:
     extensions: list[Extension] = []
     for source in get_extension_sources(group):
         module_path = ".".join(source.relative_to(ROOT_DIR / "src").with_suffix("").parts)
+        source_path = source.relative_to(ROOT_DIR).as_posix()
         extensions.append(
             Extension(
                 module_path,
-                [str(source)],
+                [source_path],
                 extra_compile_args=["-O3"],
                 include_dirs=include_dirs,
             )
@@ -67,16 +68,21 @@ def cythonize_extensions(
     )
 
 
-def build(setup_kwargs=None):
-    """Poetry build hook: always compile all Cython modules under utils/lib."""
-    if setup_kwargs is not None:
-        setup_kwargs.update(
-            {
-                "package_dir": {"": "src"},
-                "ext_modules": cythonize_extensions(),
-            }
-        )
-    return setup_kwargs
+def get_setup_kwargs(
+    group: str | None = None,
+    *,
+    profile: bool = False,
+    linetrace: bool = False,
+):
+    """Return setuptools kwargs for compiling the requested Cython extensions."""
+    return {
+        "package_dir": {"": "src"},
+        "ext_modules": cythonize_extensions(
+            group,
+            profile=profile,
+            linetrace=linetrace,
+        ),
+    }
 
 
 if __name__ == "__main__":
@@ -100,7 +106,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        ext_modules = cythonize_extensions(
+        setup_kwargs = get_setup_kwargs(
             args.group,
             profile=args.debug,
             linetrace=args.debug,
@@ -112,13 +118,12 @@ if __name__ == "__main__":
     if args.inplace:
         setup(
             name="simesh",
-            package_dir={"": "src"},
-            ext_modules=ext_modules,
+            **setup_kwargs,
             script_args=["build_ext", "--inplace"],
         )
     else:
         setup(
             name="simesh",
-            ext_modules=ext_modules,
+            **setup_kwargs,
             script_args=["build"],
         )

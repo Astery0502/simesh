@@ -1,6 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
+import shutil
 
 def build_cython(group=None, clean=False):
     root_dir = Path(__file__).parent.parent
@@ -11,6 +12,12 @@ def build_cython(group=None, clean=False):
         for ext in ['*.so', '*.pyd', '*.c']:
             for file in root_dir.rglob(ext):
                 file.unlink()
+        for artifact in ['build', 'dist']:
+            artifact_path = root_dir / artifact
+            if artifact_path.exists():
+                shutil.rmtree(artifact_path)
+        for egg_info in root_dir.rglob('*.egg-info'):
+            shutil.rmtree(egg_info)
     
     cmd = [sys.executable, str(build_script), '--inplace']  # Use absolute path
     if group:

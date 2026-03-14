@@ -153,6 +153,27 @@ def load_uniform_data(file_path: str, field_indices: list[int] | None = None,
     }
     return udata, geometry_info
 
+
+def datfile_to_vtk(file_path: str, filename: str, field_indices: list[int] | None = None):
+    """
+    Convert a level-1 AMRVAC .dat file directly to VTK.
+
+    This is a convenience wrapper that loads user-facing uniform data with
+    shape (nx, ny, nz, nw), converts it to the compute-oriented layout
+    expected by ``uniform_to_vtk()``, and writes the VTK file using the
+    metadata stored in the datfile.
+    """
+    udata, geometry = load_uniform_data(file_path, field_indices=field_indices, return_geometry=True)
+    datau = udata_to_datau(udata)
+    uniform_to_vtk(
+        datau,
+        geometry["w_names"],
+        filename,
+        geometry["xmin"],
+        geometry["xmax"],
+    )
+
+
 def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.ndarray, xmax:np.ndarray = None):
 
     """

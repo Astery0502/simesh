@@ -44,8 +44,8 @@ In practice, the package is meant to serve as both:
 
 ## Installation
 
-The supported install path is `pyproject.toml`-based. Cython extensions are
-compiled automatically during installation.
+The supported install path is `pip`/`setuptools`-based. Cython extensions are
+compiled automatically during installation, including editable installs.
 
 ### Using pip
 
@@ -59,14 +59,6 @@ For editable local development:
 
 ```bash
 pip install -e .
-```
-
-### Using Poetry
-
-```bash
-git clone https://github.com/Astery0502/simesh.git
-cd simesh
-poetry install
 ```
 
 #### Requirements
@@ -84,6 +76,7 @@ Package installation compiles all Cython modules found under
 For local development:
 
 ```bash
+pip install -e .
 make build
 make build-amr
 make test
@@ -93,6 +86,8 @@ Notes:
 
 - `make build` compiles all `.pyx` files under `src/simesh/utils/lib/`
 - `make build-amr` compiles only the `src/simesh/utils/lib/amr/` subtree
+- after editing `.pyx` files, rerun `make build` to rebuild extensions in place
+- `make clean` removes compiled extensions and generated packaging artifacts
 - `make test` rebuilds extensions and runs the script-based tests under `tests/`
 - tests follow the package structure, for example `tests/utils/lib/` for Cython AMR internals and `tests/amrvac/` for canonical AMRVAC dataset behavior
 
