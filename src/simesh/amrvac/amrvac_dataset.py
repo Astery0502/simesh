@@ -1,8 +1,8 @@
-import os
 import numpy as np
 from .datio import get_metadata, read_blocks_sequential
-from .datio import update_header, write_header, write_forest_tree, write_blocks
+from .datio import update_header, write_datfile_from_sfc
 from .dataset_base import DataSet
+from .layouts import datau_to_udata
 from simesh.utils.lib.amr.forest import AMRForest
 from simesh.utils.lib.amr.mesh import AMRMesh
 
@@ -120,9 +120,9 @@ class AMRVACDataSet(DataSet):
         Notes
         -----
         - Only 3D slicing with complex steps is currently supported.
-        - The internal uniform grid is computed with shape ``(n_fields, nx, ny, nz)``.
-          This method returns a view transposed to ``(nx, ny, nz, n_fields)`` for
-          user-facing convenience.
+        - The internal compute layout is ``(n_fields, nx, ny, nz)``.
+        - This method converts that to the user-facing ``(nx, ny, nz, n_fields)``
+          layout before applying the requested slices.
         """
         # Expect a 3D indexing key
         if not isinstance(key, tuple) or len(key) != 3:
@@ -152,16 +152,21 @@ class AMRVACDataSet(DataSet):
             slices.append(slice(start, stop))
 
         # Build the full-domain uniform grid at the requested resolution.
-        # This returns data with shape (n_fields, nx, ny, nz)
-        full_grid = self.uniform_grid(nx)
+        # This returns data with shape (nx, ny, nz, n_fields)
+        full_grid = datau_to_udata(self.uniform_grid(nx))
 
         # Extract the requested sub-box
         return full_grid[slices[0], slices[1], slices[2], :]
 
     def uniform_grid(self, nx, xmin: list = None, xmax: list = None, field_indices: list[int] = None):
         """
-        Get the uniform grid data from the 1d amr managed data (zero order interpolation).
-        If xmin or xmax are not provided, they default to the full physical domain of the dataset.
+        Get the uniform grid data from the 1d AMR-managed data by zero-order
+        interpolation.
+
+        Returns data in compute-oriented ``datau`` layout with shape
+        ``(n_fields, nx, ny, nz)``. If you want user-facing ``udata`` layout
+        ``(nx, ny, nz, n_fields)``, convert it with
+        ``simesh.amrvac.layouts.datau_to_udata``.
         
         Parameters:
         -----------
@@ -204,34 +209,58 @@ class AMRVACDataSet(DataSet):
 
     def uniform_full(self, field_indices: list[int] = None):
         """
-        Return the full-domain uniform grid for datasets without refinement.
+        Return the full-domain uniform grid in compute-oriented ``datau``
+        layout with shape ``(n_fields, nx, ny, nz)`` for datasets without
+        refinement.
         """
         if int(self.levmax) != 1:
             raise ValueError("uniform_full() is only available when levmax == 1.")
 
-        return self.uniform_grid(
-            self.domain_nx,
-            xmin=self.physical_domain[0],
-            xmax=self.physical_domain[1],
-            field_indices=field_indices,
-        )
+        if self.data is None:
+            self.load_data(None)
+
+        loaded_field_map = self._loaded_field_map()
+
+        if field_indices is not None:
+            field_indices = [int(i) for i in field_indices]
+            missing = [i for i in field_indices if i not in loaded_field_map]
+            if missing:
+                raise ValueError(
+                    f"Requested field indices {missing} are not loaded. "
+                    f"Currently loaded original field indices: {self.loaded_field_indices}"
+                )
+
+            loaded_columns = [loaded_field_map[i] for i in field_indices]
+            data_to_use = self.data[:, loaded_columns, :, :, :]
+            n_fields = len(loaded_columns)
+        else:
+            data_to_use = self.data
+            n_fields = len(self.loaded_field_indices)
+
+        uniform_grid = np.zeros((n_fields, *self.domain_nx), dtype=np.double)
+        self.mesh.uniform_full_level1(data_to_use, uniform_grid)
+
+        expected_shape = (n_fields, int(self.domain_nx[0]), int(self.domain_nx[1]), int(self.domain_nx[2]))
+        assert uniform_grid.shape == expected_shape, \
+            f"uniform_full result shape mismatch: {uniform_grid.shape} != {expected_shape}"
+
+        return uniform_grid
 
     def write_datfile(self, sfile: str):
 
-        if os.path.exists(sfile):
-            raise FileExistsError(f"File {sfile} already exists")
-        with open(sfile, 'wb') as fb:
-            # update the header if not fully read original fields
-            updated_header = update_header(self.metadata, nw=len(self.loaded_field_indices), 
-                w_names=[self.wnames[i] for i in self.loaded_field_indices])
-            print(updated_header)
-            print(self.metadata)
-            write_header(fb, updated_header)
+        if self.data is None:
+            self.load_data(None)
 
-            # required to rewrite the block offset tree (staggered grid not read here)
-            write_forest_tree(fb, updated_header, self.is_leaf, self.tree_info)
-            # the non-ghostcells data0, now default ng=0, no ghostcells
-            data0 = self.data[:,:,self.ng:self.ng+self.block_nx[0],
-                self.ng:self.ng+self.block_nx[1],
-                self.ng:self.ng+self.block_nx[2]]
-            write_blocks(fb, data0, updated_header['ndim'], self.tree_info[2])
+        updated_header = update_header(
+            self.metadata,
+            nw=len(self.loaded_field_indices),
+            w_names=[self.wnames[i] for i in self.loaded_field_indices],
+        )
+        data0 = self.data[
+            :,
+            :,
+            self.ng:self.ng+self.block_nx[0],
+            self.ng:self.ng+self.block_nx[1],
+            self.ng:self.ng+self.block_nx[2],
+        ]
+        return write_datfile_from_sfc(sfile, data0, updated_header, self.is_leaf, self.tree_info)

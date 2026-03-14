@@ -2,6 +2,8 @@ import os
 import struct
 import numpy as np
 from simesh.amrvac.amrvac_dataset import AMRVACDataSet
+from simesh.amrvac.datio import extract_uniform_data, header_template, update_header, write_datfile_from_sfc
+from simesh.amrvac.layouts import udata_to_datau
 from simesh.utils.lib.amr.forest import AMRForest
 from simesh.utils.lib.amr.mesh import AMRMesh
 from simesh.utils.lib.amr.morton import fill_morton_mapping3D
@@ -10,7 +12,7 @@ from simesh.utils.lib.amr.morton import fill_morton_mapping3D
 def load_from_uniform(udata:np.ndarray, w_names:list[str], xmin:np.ndarray, xmax:np.ndarray, 
         block_nx:np.ndarray, **kwargs):
     """
-    Load the data in the sfc sequence from the uniform grid
+    Load data from a user-facing uniform grid with shape (nx, ny, nz, nw).
     """
     assert len(w_names) == udata.shape[-1]
     if len(udata.shape) == 3 or udata.shape[-2] == 1:
@@ -28,6 +30,129 @@ def load_from_uniform(udata:np.ndarray, w_names:list[str], xmin:np.ndarray, xmax
 
     return ds
 
+
+def _build_uniform_level1_tree(domain_nx: np.ndarray, block_nx: np.ndarray):
+    """
+    Build level-1 forest/tree metadata for a uniform grid.
+    """
+    nblev1 = np.array(domain_nx // block_nx, dtype=np.uint32)
+    nleafs = int(np.prod(nblev1))
+    is_leaf = np.ones(nleafs, dtype=np.int32)
+
+    morton2ig = np.zeros((nleafs, 3), dtype=np.uint32)
+    fill_morton_mapping3D(np.zeros(tuple(nblev1), dtype=np.uint32), morton2ig, *nblev1)
+
+    block_lvls = np.ones(nleafs, dtype=np.int32)
+    block_ixs = morton2ig.astype(np.int32) + 1
+    block_offsets = np.zeros(nleafs, dtype=np.int64)
+
+    return is_leaf, (block_lvls, block_ixs, block_offsets)
+
+
+def _sfc_data_from_uniform(udata: np.ndarray, block_nx: np.ndarray, xmin: np.ndarray, xmax: np.ndarray):
+    """
+    Convert uniform cell-centered data with shape (nx, ny, nz, nw) into
+    canonical SFC/Morton-ordered block data with shape (nleafs, nw, bx, by, bz).
+    """
+    udata = np.asarray(udata, dtype=np.double)
+    block_nx = np.asarray(block_nx, dtype=np.uint32)
+    xmin = np.asarray(xmin, dtype=np.double)
+    xmax = np.asarray(xmax, dtype=np.double)
+
+    if udata.ndim != 4:
+        raise ValueError(f"udata must have shape (nx, ny, nz, nw), got {udata.shape}")
+    if len(block_nx) != 3:
+        raise ValueError(f"block_nx must have length 3, got {block_nx}")
+    if len(xmin) != 3 or len(xmax) != 3:
+        raise ValueError("xmin and xmax must have length 3")
+
+    domain_nx = np.array(udata.shape[:3], dtype=np.uint32)
+    nfields = int(udata.shape[3])
+
+    if np.any(domain_nx % block_nx != 0):
+        raise ValueError(f"domain_nx must be divisible by block_nx, got {domain_nx} and {block_nx}")
+
+    nblev1 = np.array(domain_nx // block_nx, dtype=np.uint32)
+    nleafs = int(np.prod(nblev1))
+    is_leaf = np.ones(nleafs, dtype=np.int32)
+
+    forest = AMRForest(np.uint32(3), nblev1[0], nblev1[1], nblev1[2], is_leaf)
+    mesh = AMRMesh(np.uint32(3), block_nx, domain_nx, xmin, xmax, np.uint32(0), np.uint32(nfields), forest)
+
+    uniform_data = np.ascontiguousarray(udata_to_datau(udata), dtype=np.double)
+    sfc_data = np.zeros((nleafs, nfields, block_nx[0], block_nx[1], block_nx[2]), dtype=np.double)
+    mesh.uniform_to_sfc(uniform_data, sfc_data)
+
+    return sfc_data
+
+
+def write_datfile_from_uniform(file_path: str, udata: np.ndarray, w_names: list[str],
+                               xmin: np.ndarray, xmax: np.ndarray, block_nx: np.ndarray,
+                               overwrite: bool = False, **header_updates) -> dict:
+    """
+    Write an AMRVAC .dat file from uniform data by first arranging it into
+    canonical Morton/SFC-ordered blocks.
+    """
+    udata = np.asarray(udata, dtype=np.double)
+    if udata.ndim != 4:
+        raise ValueError(f"udata must have shape (nx, ny, nz, nw), got {udata.shape}")
+    if len(w_names) != udata.shape[3]:
+        raise ValueError(f"w_names length must match udata.shape[-1], {len(w_names)} != {udata.shape[3]}")
+
+    domain_nx = np.array(udata.shape[:3], dtype=np.int32)
+    block_nx = np.asarray(block_nx, dtype=np.int32)
+    xmin = np.asarray(xmin, dtype=np.double)
+    xmax = np.asarray(xmax, dtype=np.double)
+
+    sfc_data = _sfc_data_from_uniform(udata, block_nx, xmin, xmax)
+    is_leaf, tree_info = _build_uniform_level1_tree(domain_nx, block_nx)
+
+    header = header_template.copy()
+    header["nw"] = len(w_names)
+    header["w_names"] = list(w_names)
+    header["levmax"] = 1
+    header["nleafs"] = int(sfc_data.shape[0])
+    header["nparents"] = 0
+    header["xmin"] = xmin
+    header["xmax"] = xmax
+    header["domain_nx"] = domain_nx
+    header["block_nx"] = block_nx
+
+    if header_updates:
+        header = update_header(header, **header_updates)
+
+    return write_datfile_from_sfc(file_path, sfc_data, header, is_leaf, tree_info, overwrite=overwrite)
+
+
+def load_uniform_data(file_path: str, field_indices: list[int] | None = None,
+                      return_geometry: bool = True):
+    """
+    Load level-1 AMRVAC data directly as a uniform grid.
+
+    Returns uniform data with shape (nx, ny, nz, n_selected_fields). When
+    `return_geometry` is True, a compact geometry/metadata dictionary is
+    returned alongside the data.
+    """
+    udata, header = extract_uniform_data(file_path, field_indices=field_indices)
+
+    if not return_geometry:
+        return udata
+
+    geometry_info = {
+        "xmin": np.asarray(header["xmin"]).copy(),
+        "xmax": np.asarray(header["xmax"]).copy(),
+        "domain_nx": np.asarray(header["domain_nx"]).copy(),
+        "block_nx": np.asarray(header["block_nx"]).copy(),
+        "w_names": list(header["w_names"]),
+        "geometry": header["geometry"],
+        "periodic": np.asarray(header["periodic"]).copy(),
+        "ndim": int(header["ndim"]),
+        "ndir": int(header["ndir"]),
+        "time": float(header["time"]),
+        "it": int(header["it"]),
+    }
+    return udata, geometry_info
+
 def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.ndarray, xmax:np.ndarray = None):
 
     """
@@ -36,7 +161,7 @@ def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.
     Parameters:
     -----------
     udata : np.ndarray
-        Uniform grid data, of size (nw, nx, ny, nz)
+        Compute-oriented uniform grid data, of size (nw, nx, ny, nz)
     w_names : list[str]
         List of field names, of size (nw,)
     filename : str
@@ -106,4 +231,3 @@ def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.
             # Write binary data directly (no size prefix in standard VTK legacy format)
             f.write(field_data_big_endian.tobytes())
             f.write(b'\n')  # Add newline after binary data block
-

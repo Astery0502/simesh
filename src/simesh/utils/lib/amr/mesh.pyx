@@ -284,6 +284,44 @@ cdef class AMRMesh:
 
                         uniform_grid[:,i,j,k] = data[ileaf, :, ix_uniform_in_block[0], ix_uniform_in_block[1], ix_uniform_in_block[2]]
 
+    cpdef void uniform_full_level1(self, double[:,:,:,:,:] data, double[:,:,:,:] uniform_grid):
+        """
+        Redistribute level-1 block data directly into the full-domain uniform grid.
+        This path uses only AMR structure information and performs no interpolation.
+        """
+        cdef uint32_t ileaf, idim
+        cdef uint32_t nxg1[3]
+        cdef uint32_t nxg2[3]
+
+        assert data.shape[0] == self.nleafs, \
+            f"data must have the same number of leafs as the mesh, {data.shape[0]} != {self.nleafs}"
+        assert data.shape[1] == uniform_grid.shape[0], \
+            f"data must have the same number of fields as the uniform grid, {data.shape[1]} != {uniform_grid.shape[0]}"
+        assert data.shape[2] == self.bsize[0], \
+            f"data block size mismatch on dim 0: {data.shape[2]} != {self.bsize[0]}"
+        assert data.shape[3] == self.bsize[1], \
+            f"data block size mismatch on dim 1: {data.shape[3]} != {self.bsize[1]}"
+        assert data.shape[4] == self.bsize[2], \
+            f"data block size mismatch on dim 2: {data.shape[4]} != {self.bsize[2]}"
+        assert uniform_grid.shape[1] == self.dsize[0], \
+            f"uniform grid size mismatch on dim 0: {uniform_grid.shape[1]} != {self.dsize[0]}"
+        assert uniform_grid.shape[2] == self.dsize[1], \
+            f"uniform grid size mismatch on dim 1: {uniform_grid.shape[2]} != {self.dsize[1]}"
+        assert uniform_grid.shape[3] == self.dsize[2], \
+            f"uniform grid size mismatch on dim 2: {uniform_grid.shape[3]} != {self.dsize[2]}"
+
+        for ileaf in range(self.nleafs):
+            for idim in range(self.ndim):
+                nxg1[idim] = self.forest.sfc2node[ileaf].node.ig[idim] * self.bsize[idim]
+                nxg2[idim] = (self.forest.sfc2node[ileaf].node.ig[idim] + 1) * self.bsize[idim]
+
+            if self.ndim == 2:
+                nxg1[2] = 0
+                nxg2[2] = 1
+
+            uniform_grid[:, nxg1[0]:nxg2[0], nxg1[1]:nxg2[1], nxg1[2]:nxg2[2]] = \
+                data[ileaf, :, :self.bsize[0], :self.bsize[1], :self.bsize[2]]
+
     cpdef void uniform_to_sfc(self, double[:,:,:,:] uniform_data, double[:,:,:,:,:] sfc_data):
         """
         reallocate uniform data to block based sfc sequence

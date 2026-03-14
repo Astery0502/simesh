@@ -38,7 +38,9 @@ Detailed explanations live in `docs/`.
 - `archive/src_old/`
   Historical code outside the installable package tree.
 - `tests/`
-  Behavioral reference for current expectations and supported workflows.
+  Behavioral reference for current expectations and supported workflows. Mirror
+  the package structure when adding tests, for example `tests/amrvac/` for
+  canonical dataset behavior and `tests/utils/lib/` for compiled AMR internals.
 
 ## Working Assumptions
 

@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import mmap
 from concurrent.futures import ThreadPoolExecutor
@@ -312,6 +313,56 @@ def read_blocks_sequential(filename, field_indices=None):
     
     return block_fields_all
 
+
+def _normalize_field_indices(header: dict, field_indices=None) -> list[int]:
+    """
+    Normalize and validate field indices against the original header ordering.
+    """
+    nw = int(header["nw"])
+    if field_indices is None:
+        return list(range(nw))
+
+    normalized = [int(i) for i in field_indices]
+    if any(i < 0 or i >= nw for i in normalized):
+        raise ValueError(f"field_indices must be within [0, {nw - 1}], got {normalized}")
+    return normalized
+
+
+def extract_uniform_data(file_path: str, field_indices=None) -> tuple[np.ndarray, dict]:
+    """
+    Extract level-1 AMRVAC data directly into a uniform grid.
+
+    Returns
+    -------
+    udata : np.ndarray
+        Uniform data with shape (nx, ny, nz, n_selected_fields).
+    header : dict
+        Header metadata with `w_names` and `nw` updated to match the selected
+        fields when `field_indices` is provided.
+    """
+    header, _forest, tree_info = get_metadata(file_path)
+    if int(header["levmax"]) != 1:
+        raise ValueError("extract_uniform_data() is only available when levmax == 1.")
+
+    field_indices = _normalize_field_indices(header, field_indices)
+    block_data = read_blocks_sequential(file_path, field_indices)
+
+    domain_nx = np.asarray(header["domain_nx"], dtype=np.int32)
+    block_nx = np.asarray(header["block_nx"], dtype=np.int32)
+    block_ixs = np.asarray(tree_info[1], dtype=np.int32)
+
+    udata = np.zeros((*domain_nx, len(field_indices)), dtype=np.float64)
+    for ileaf, block_idx in enumerate(block_ixs):
+        x0, y0, z0 = (block_idx - 1) * block_nx
+        x1, y1, z1 = block_idx * block_nx
+        udata[x0:x1, y0:y1, z0:z1, :] = np.transpose(block_data[ileaf], (1, 2, 3, 0))
+
+    header_out = header.copy()
+    header_out["nw"] = len(field_indices)
+    header_out["w_names"] = [header["w_names"][i] for i in field_indices]
+
+    return udata, header_out
+
 def get_tree_size(header):
 
     if header['datfile_version'] < 3:
@@ -476,6 +527,127 @@ def update_header(header: dict, **kwargs):
     tree_size, offset_size = get_tree_size(header_new)
     header_new['offset_tree'] = tree_size
     header_new['offset_blocks'] = offset_size
+    return header_new
+
+
+def _normalize_header_for_sfc_write(header: dict, data: np.ndarray) -> dict:
+    """
+    Normalize header values for writing Morton/SFC-ordered block data.
+    """
+    data = np.asarray(data)
+    if data.ndim != 5:
+        raise ValueError(f"data must be a 5D array with shape (nleafs, nfields, bx, by, bz), got {data.shape}")
+
+    if int(header["ndim"]) != 3:
+        raise ValueError(f"Only 3D canonical AMRVAC writing is supported for now, got ndim={header['ndim']}")
+
+    nleafs, nfields, bx, by, bz = data.shape
+
+    header_new = header.copy()
+    header_new["nw"] = int(nfields)
+    header_new["nleafs"] = int(nleafs)
+    header_new["block_nx"] = np.array([bx, by, bz], dtype=np.int32)
+
+    if "w_names" not in header_new:
+        raise ValueError("header must contain 'w_names'")
+    if len(header_new["w_names"]) != nfields:
+        raise ValueError(
+            f"header['w_names'] length must match the number of fields in data, "
+            f"{len(header_new['w_names'])} != {nfields}"
+        )
+
+    if "nparents" not in header_new:
+        raise ValueError("header must contain 'nparents'")
+
+    tree_size, offset_size = get_tree_size(header_new)
+    header_new["offset_tree"] = tree_size
+    header_new["offset_blocks"] = offset_size
+
+    return header_new
+
+
+def _block_record_size(header: dict) -> int:
+    """
+    Size in bytes of one block record written without ghost cells.
+    """
+    ghost_bytes = 2 * int(header["ndim"]) * SIZE_INT
+    field_bytes = int(np.prod(header["block_nx"])) * int(header["nw"]) * SIZE_DOUBLE
+    return ghost_bytes + field_bytes
+
+
+def _build_block_offsets(header: dict, nleafs: int) -> np.ndarray:
+    """
+    Build contiguous block offsets for a zero-ghostcell SFC write.
+    """
+    block_bytes = _block_record_size(header)
+    start = int(header["offset_blocks"])
+    return start + np.arange(nleafs, dtype=np.int64) * block_bytes
+
+
+def _validate_sfc_tree(header: dict, is_leaf: np.ndarray, tree_info):
+    """
+    Validate forest/tree metadata for canonical SFC writing.
+    """
+    if not isinstance(tree_info, tuple) or len(tree_info) != 3:
+        raise ValueError("tree_info must be a tuple of (block_lvls, block_ixs, block_offsets)")
+
+    is_leaf = np.asarray(is_leaf, dtype=np.int32)
+    block_lvls = np.asarray(tree_info[0], dtype=np.int32)
+    block_ixs = np.asarray(tree_info[1], dtype=np.int32)
+
+    nleafs = int(header["nleafs"])
+    nparents = int(header["nparents"])
+    ndim = int(header["ndim"])
+
+    if is_leaf.shape != (nleafs + nparents,):
+        raise ValueError(
+            f"is_leaf must have length nleafs + nparents, {is_leaf.shape} != {(nleafs + nparents,)}"
+        )
+    if block_lvls.shape != (nleafs,):
+        raise ValueError(f"block_lvls must have shape ({nleafs},), got {block_lvls.shape}")
+    if block_ixs.shape != (nleafs, ndim):
+        raise ValueError(f"block_ixs must have shape ({nleafs}, {ndim}), got {block_ixs.shape}")
+    if np.any(block_lvls < 1):
+        raise ValueError("block_lvls must be positive integers")
+    if np.any(block_ixs < 1):
+        raise ValueError("block_ixs must use AMRVAC's 1-based indexing")
+
+    return is_leaf, block_lvls, block_ixs
+
+
+def write_datfile_from_sfc(file_path: str, data: np.ndarray, header: dict, is_leaf: np.ndarray,
+                           tree_info, overwrite: bool = False) -> dict:
+    """
+    Write an AMRVAC .dat file from Morton/SFC-ordered block data.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Array with shape (nleafs, nfields, bx, by, bz).
+    header : dict
+        Header metadata. Offsets and a subset of shape-dependent fields are
+        normalized from `data` before writing.
+    is_leaf : np.ndarray
+        Forest flags of length nleafs + nparents.
+    tree_info : tuple
+        Tuple of (block_lvls, block_ixs, block_offsets). The incoming
+        block_offsets are ignored and rebuilt for the output file.
+    overwrite : bool
+        If False, refuse to overwrite an existing file.
+    """
+    data = np.ascontiguousarray(np.asarray(data, dtype=np.float64))
+    header_new = _normalize_header_for_sfc_write(header, data)
+    is_leaf_arr, block_lvls, block_ixs = _validate_sfc_tree(header_new, is_leaf, tree_info)
+    block_offsets = _build_block_offsets(header_new, int(header_new["nleafs"]))
+
+    if not overwrite and os.path.exists(file_path):
+        raise FileExistsError(f"File {file_path} already exists")
+
+    with open(file_path, "wb") as fb:
+        write_header(fb, header_new)
+        write_forest_tree(fb, header_new, is_leaf_arr, (block_lvls, block_ixs, block_offsets))
+        write_blocks(fb, data, header_new["ndim"], block_offsets)
+
     return header_new
 
 

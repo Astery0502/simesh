@@ -134,6 +134,38 @@ def test_uniform_grid_zero_order():
     mesh.uniform_grid_zero_order(data, uniform_grid, np.array([20, 20, 20], dtype=np.uint32), np.array([0, 0, 0], dtype=np.double), np.array([10, 10, 10], dtype=np.double))
     assert np.all(uniform_grid == 1)
 
+def test_uniform_full_level1():
+    ng1 = ng2 = ng3 = 2
+    is_leaf = np.ones(ng1 * ng2 * ng3, dtype=np.int32)
+    forest = AMRForest(3, ng1, ng2, ng3, is_leaf)
+    bsize = np.array([2, 2, 2], dtype=np.uint32)
+    dsize = np.array([4, 4, 4], dtype=np.uint32)
+    xmin = np.array([0, 0, 0], dtype=np.double)
+    xmax = np.array([1, 1, 1], dtype=np.double)
+    mesh = AMRMesh(3, bsize, dsize, xmin, xmax, 0, 2, forest)
+
+    data = np.zeros((forest.nleafs, 2, 2, 2, 2), dtype=np.double)
+    expected = np.zeros((2, 4, 4, 4), dtype=np.double)
+
+    morton2ig = np.zeros((ng1 * ng2 * ng3, 3), dtype=np.uint32)
+    fill_morton_mapping3D(np.zeros((ng1, ng2, ng3), dtype=np.uint32), morton2ig, ng1, ng2, ng3)
+
+    for ileaf in range(forest.nleafs):
+        ig = morton2ig[ileaf]
+        value0 = 100 * ig[0] + 10 * ig[1] + ig[2]
+        value1 = value0 + 1000
+        data[ileaf, 0, :, :, :] = value0
+        data[ileaf, 1, :, :, :] = value1
+
+        x0, y0, z0 = ig * bsize
+        x1, y1, z1 = (ig + 1) * bsize
+        expected[0, x0:x1, y0:y1, z0:z1] = value0
+        expected[1, x0:x1, y0:y1, z0:z1] = value1
+
+    uniform_grid = np.zeros((2, 4, 4, 4), dtype=np.double)
+    mesh.uniform_full_level1(data, uniform_grid)
+    assert np.array_equal(uniform_grid, expected)
+
 def test_getbc():
     ng1 = ng2 = ng3 = 2
     is_leaf = np.ones(16, dtype=np.int32)
@@ -160,4 +192,10 @@ def run_tests():
     print("test_init_amr_mesh passed")
     test_uniform_grid_zero_order()
     print("test_uniform_grid_zero_order passed")
+    test_uniform_full_level1()
+    print("test_uniform_full_level1 passed")
     print("All tests passed for amr submodule!")
+
+
+if __name__ == "__main__":
+    run_tests()

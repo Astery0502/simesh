@@ -93,7 +93,8 @@ Notes:
 
 - `make build` compiles all `.pyx` files under `src/simesh/utils/lib/`
 - `make build-amr` compiles only the `src/simesh/utils/lib/amr/` subtree
-- `make test` rebuilds extensions and runs the direct Cython test script
+- `make test` rebuilds extensions and runs the script-based tests under `tests/`
+- tests follow the package structure, for example `tests/utils/lib/` for Cython AMR internals and `tests/amrvac/` for canonical AMRVAC dataset behavior
 
 ## Usage
 
@@ -115,6 +116,20 @@ ds.load_data()
 from simesh.amrvac.datio import get_metadata
 
 header, forest, tree = get_metadata(datfile)
+```
+
+### Array Layouts
+
+The canonical AMRVAC path uses three array layout names:
+
+- `udata`: user-facing uniform data with shape `(nx, ny, nz, nw)`
+- `datau`: compute-oriented uniform data with shape `(nw, nx, ny, nz)`
+- `sfc_data`: Morton/SFC block data with shape `(nleafs, nw, bx, by, bz)`
+
+Conversion helpers live in `simesh.amrvac.layouts`:
+
+```python
+from simesh.amrvac.layouts import datau_to_udata, udata_to_datau
 ```
 
 Legacy Python-only code is preserved under `simesh.legacy`, but it is not the

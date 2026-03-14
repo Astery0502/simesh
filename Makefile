@@ -10,6 +10,8 @@ build-amr:
 
 test: build
 	PYTHONPATH=src $(PYTHON) tests/utils/lib/test_amr.py
+	PYTHONPATH=src $(PYTHON) tests/amrvac/test_amrvac_dataset.py
+	PYTHONPATH=src $(PYTHON) tests/amrvac/test_amrvac_write.py
 
 clean:
 	$(PYTHON) scripts/build_ext.py --clean

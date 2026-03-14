@@ -47,6 +47,18 @@ For now, it is safest to think of the public API in two layers:
 2. lower-level Cython acceleration modules under `simesh.utils.lib` that should
    usually stay behind the Python interface
 
+## Array Layouts
+
+The canonical AMRVAC path uses three explicit layout conventions:
+
+- `udata`: user-facing uniform data with shape `(nx, ny, nz, nw)`
+- `datau`: compute-oriented uniform data with shape `(nw, nx, ny, nz)`
+- `sfc_data`: Morton/SFC block data with shape `(nleafs, nw, bx, by, bz)`
+
+Helpers for converting between `udata` and `datau` live in:
+
+- `src/simesh/amrvac/layouts.py`
+
 ## Documentation rule
 
 When adding new user-facing functions:

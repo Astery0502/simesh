@@ -70,6 +70,11 @@ Current Make targets:
 - `make build-amr`
 - `make test`
 
+Current tests mirror the package structure:
+
+- `tests/utils/lib/` covers compiled AMR internals
+- `tests/amrvac/` covers canonical AMRVAC dataset behavior
+
 ## Why this matters
 
 The repository contains both canonical and legacy AMR code. When
