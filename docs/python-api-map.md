@@ -16,7 +16,7 @@ The main public functions are:
 
 - `open_dataset(path, *, ghost_width=0)`
 - `read_blocks(path, *, field_indices=None, ghost_width=0, include_ghosts=False)`
-- `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0)`
+- `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0, interpolation="zero")`
 - `write_datfile(path, output_path, *, field_indices=None, ghost_width=0, overwrite=False)`
 
 The lower-level canonical Python modules live in:
@@ -27,6 +27,13 @@ The lower-level canonical Python modules live in:
 Treat `api.py` as the first user-facing entrypoint, `amrvac_dataset.py` as the
 stateful dataset implementation, and `datio.py` as the canonical low-level
 AMRVAC format module.
+
+`read_uniform(..., interpolation="linear", ghost_width=1)` exposes the
+canonical Cython-backed trilinear interpolation path. Keep ``"zero"`` as the
+default for compatibility with the previous piecewise-constant behavior and as
+the low-memory path when ghost-cell storage is not wanted. For level-1 data
+sampled on the native full-domain grid, `uniform_full()` is the exact block
+placement path rather than a resampling path.
 
 ## Main objects behind the entrypoints
 

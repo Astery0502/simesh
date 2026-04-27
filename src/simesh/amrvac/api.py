@@ -40,6 +40,7 @@ def read_uniform(
     bounds: tuple | None = None,
     field_indices: list[int] | None = None,
     ghost_width: int = 0,
+    interpolation: str = "zero",
 ) -> np.ndarray:
     """
     Read AMRVAC data on a user-facing uniform grid.
@@ -47,6 +48,13 @@ def read_uniform(
     The returned array has shape ``(nx, ny, nz, nw)``. ``resolution`` must have
     three entries. ``bounds`` may be ``(xmin, xmax)``; by default the full
     physical domain is sampled.
+
+    ``interpolation="zero"`` preserves the previous piecewise-constant
+    behavior, is exact for native level-1 uniform data, and avoids allocating
+    ghost-cell storage. ``interpolation="linear"`` uses trilinear interpolation
+    from ghost-cell-padded mesh storage and therefore requires
+    ``ghost_width > 0``. For level-1 data sampled on its native full-domain
+    grid, use ``open_dataset(...).uniform_full()`` for exact block placement.
     """
     ds = open_dataset(path, ghost_width=ghost_width)
     ds.load_data(field_indices=field_indices)
@@ -63,7 +71,13 @@ def read_uniform(
             raise ValueError("bounds must be a tuple of (xmin, xmax)")
         xmin, xmax = bounds
 
-    datau = ds.uniform_grid(nx, xmin=xmin, xmax=xmax, field_indices=field_indices)
+    datau = ds.uniform_grid(
+        nx,
+        xmin=xmin,
+        xmax=xmax,
+        field_indices=field_indices,
+        interpolation=interpolation,
+    )
     return datau_to_udata(datau)
 
 

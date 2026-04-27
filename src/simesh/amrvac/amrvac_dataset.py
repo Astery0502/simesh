@@ -217,10 +217,16 @@ class AMRVACDataSet(DataSet):
         # Extract the requested sub-box
         return full_grid[slices[0], slices[1], slices[2], :]
 
-    def uniform_grid(self, nx, xmin: list = None, xmax: list = None, field_indices: list[int] = None):
+    def uniform_grid(
+        self,
+        nx,
+        xmin: list = None,
+        xmax: list = None,
+        field_indices: list[int] = None,
+        interpolation: str = "zero",
+    ):
         """
-        Get the uniform grid data from the 1d AMR-managed data by zero-order
-        interpolation.
+        Get the uniform grid data from the 1d AMR-managed data.
 
         Returns data in compute-oriented ``datau`` layout with shape
         ``(n_fields, nx, ny, nz)``. If you want user-facing ``udata`` layout
@@ -232,6 +238,9 @@ class AMRVACDataSet(DataSet):
         field_indices : list[int], optional
             Original file/header field indices to extract, corresponding to self.wnames.
             If None, uses all currently loaded fields.
+        interpolation : {"zero", "linear"}, optional
+            ``"zero"`` uses piecewise-constant sampling. ``"linear"`` uses
+            trilinear interpolation from ghost-cell-padded mesh storage.
         """
         # Default to full domain if bounds are not specified
         if xmin is None:
@@ -262,8 +271,32 @@ class AMRVACDataSet(DataSet):
             n_fields = len(self.loaded_field_indices)
         
         uniform_grid = np.zeros((n_fields, nx[0], nx[1], nx[2]), dtype=np.double)
-        self.mesh.uniform_grid_zero_order(data_to_use, uniform_grid, np.array(nx, dtype=np.uint32), 
-                np.array(xmin, dtype=np.double), np.array(xmax, dtype=np.double))
+
+        interpolation = interpolation.lower()
+        if interpolation in ("zero", "nearest", "piecewise_constant"):
+            self.mesh.uniform_grid_zero_order(
+                data_to_use,
+                uniform_grid,
+                np.array(nx, dtype=np.uint32),
+                np.array(xmin, dtype=np.double),
+                np.array(xmax, dtype=np.double),
+            )
+        elif interpolation in ("linear", "trilinear"):
+            if self.ghost_width <= 0:
+                raise ValueError("Linear interpolation requires opening the dataset with ghost_width > 0.")
+            if field_indices is None:
+                field_positions = np.arange(n_fields, dtype=np.uint32)
+            else:
+                field_positions = np.array(loaded_columns, dtype=np.uint32)
+            self.mesh.uniform_grid_linear(
+                uniform_grid,
+                np.array(nx, dtype=np.uint32),
+                np.array(xmin, dtype=np.double),
+                np.array(xmax, dtype=np.double),
+                field_positions,
+            )
+        else:
+            raise ValueError(f"Unknown interpolation mode: {interpolation}")
         return uniform_grid
 
     def uniform_full(self, field_indices: list[int] = None):

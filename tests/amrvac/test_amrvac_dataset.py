@@ -184,11 +184,19 @@ def test_public_api_reads_blocks_and_uniform_data():
         blocks = read_blocks(path, field_indices=[0, 2])
         ghosted = read_blocks(path, field_indices=[0, 2], ghost_width=1, include_ghosts=True)
         grid = read_uniform(path, resolution=(4, 4, 4), field_indices=[1])
+        linear_grid = read_uniform(
+            path,
+            resolution=(4, 4, 4),
+            field_indices=[1],
+            ghost_width=1,
+            interpolation="linear",
+        )
 
         assert blocks.shape == (8, 2, 2, 2, 2)
         assert ghosted.shape == (8, 2, 4, 4, 4)
         assert grid.shape == (4, 4, 4, 1)
         assert np.array_equal(grid[..., 0], udata[..., 1])
+        assert np.array_equal(linear_grid[..., 0], udata[..., 1])
     finally:
         if os.path.exists(path):
             os.remove(path)

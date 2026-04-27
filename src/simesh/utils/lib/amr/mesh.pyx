@@ -470,6 +470,105 @@ cdef class AMRMesh:
                             ix_uniform_in_block[2],
                         ]
 
+    cpdef void uniform_grid_linear(
+        self,
+        double[:,:,:,:] uniform_grid,
+        uint32_t[:] nx,
+        double[:] xmin_new,
+        double[:] xmax_new,
+        uint32_t[:] field_positions,
+    ):
+        cdef uint32_t ileaf, idim
+        cdef uint32_t ifield_out, ifield_src
+        cdef double dx_uniform[3]
+        cdef int igmin[3]
+        cdef int igmax[3]
+        cdef int i, j, k
+        cdef int i0, j0, k0
+        cdef int i1, j1, k1
+        cdef double x, y, z
+        cdef double gx, gy, gz
+        cdef double wx, wy, wz
+        cdef double c00, c01, c10, c11
+        cdef double c0, c1
+        cdef bint skip_leaf
+
+        if self._data_ptr is NULL or self.ng == 0:
+            raise ValueError("Linear uniform interpolation requires padded ghost-cell storage.")
+        if self.ndim != 3:
+            raise NotImplementedError("Linear uniform interpolation is currently implemented only for 3D meshes.")
+
+        assert uniform_grid.shape[0] == field_positions.shape[0]
+
+        for ifield_out in range(<uint32_t>field_positions.shape[0]):
+            assert field_positions[ifield_out] < self.nfields
+
+        for idim in range(self.ndim):
+            assert uniform_grid.shape[idim + 1] == nx[idim]
+            dx_uniform[idim] = (xmax_new[idim] - xmin_new[idim]) / nx[idim]
+
+        for ileaf in range(self.nleafs):
+            skip_leaf = False
+            for idim in range(self.ndim):
+                igmin[idim] = <int>ceil((self.rnode[ileaf, idim] - xmin_new[idim]) / dx_uniform[idim] - 0.5)
+                igmax[idim] = <int>floor((self.rnode[ileaf, idim + self.ndim] - xmin_new[idim]) / dx_uniform[idim] + 0.5)
+
+                if igmin[idim] < 0:
+                    igmin[idim] = 0
+                if igmax[idim] > <int>nx[idim]:
+                    igmax[idim] = <int>nx[idim]
+
+                if igmin[idim] > igmax[idim]:
+                    skip_leaf = True
+                    break
+
+            if skip_leaf:
+                continue
+
+            for i in range(igmin[0], igmax[0]):
+                x = xmin_new[0] + (i + 0.5) * dx_uniform[0]
+                gx = (x - self.rnode[ileaf, 0]) / self.rnode[ileaf, 6] - 0.5
+                i0 = <int>floor(gx) + <int>self.ng
+                i1 = i0 + 1
+                wx = gx - (i0 - <int>self.ng)
+
+                for j in range(igmin[1], igmax[1]):
+                    y = xmin_new[1] + (j + 0.5) * dx_uniform[1]
+                    gy = (y - self.rnode[ileaf, 1]) / self.rnode[ileaf, 7] - 0.5
+                    j0 = <int>floor(gy) + <int>self.ng
+                    j1 = j0 + 1
+                    wy = gy - (j0 - <int>self.ng)
+
+                    for k in range(igmin[2], igmax[2]):
+                        z = xmin_new[2] + (k + 0.5) * dx_uniform[2]
+                        gz = (z - self.rnode[ileaf, 2]) / self.rnode[ileaf, 8] - 0.5
+                        k0 = <int>floor(gz) + <int>self.ng
+                        k1 = k0 + 1
+                        wz = gz - (k0 - <int>self.ng)
+
+                        for ifield_out in range(<uint32_t>field_positions.shape[0]):
+                            ifield_src = field_positions[ifield_out]
+                            c00 = (
+                                self.data[ileaf, i0, j0, k0, ifield_src] * (1.0 - wz)
+                                + self.data[ileaf, i0, j0, k1, ifield_src] * wz
+                            )
+                            c01 = (
+                                self.data[ileaf, i0, j1, k0, ifield_src] * (1.0 - wz)
+                                + self.data[ileaf, i0, j1, k1, ifield_src] * wz
+                            )
+                            c10 = (
+                                self.data[ileaf, i1, j0, k0, ifield_src] * (1.0 - wz)
+                                + self.data[ileaf, i1, j0, k1, ifield_src] * wz
+                            )
+                            c11 = (
+                                self.data[ileaf, i1, j1, k0, ifield_src] * (1.0 - wz)
+                                + self.data[ileaf, i1, j1, k1, ifield_src] * wz
+                            )
+
+                            c0 = c00 * (1.0 - wy) + c01 * wy
+                            c1 = c10 * (1.0 - wy) + c11 * wy
+                            uniform_grid[ifield_out, i, j, k] = c0 * (1.0 - wx) + c1 * wx
+
     cpdef void uniform_full_level1(self, double[:,:,:,:,:] data, double[:,:,:,:] uniform_grid):
         cdef uint32_t ileaf, idim
         cdef uint32_t nxg1[3]

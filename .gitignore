@@ -8,6 +8,8 @@ dist/
 *.egg-info/
 .venv/
 .venv-smoke/
+.benchmark-data/
+benchmark-results/
 
 # cython compilation files excluded
 *.so

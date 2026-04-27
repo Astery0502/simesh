@@ -267,6 +267,53 @@ def test_uniform_grid_zero_order():
     assert np.all(uniform_grid == 1)
 
 
+def test_uniform_grid_linear_uses_ghost_cells():
+    forest, mesh, _, block_nx = _mesh_pair(
+        np.ones(8, dtype=np.int32),
+        root_grid=(2, 2, 2),
+        nghost=1,
+        nfields=2,
+        block_nx=(4, 4, 4),
+    )
+    data = np.zeros((forest.nleafs, 2, *block_nx), dtype=np.double)
+
+    ix = np.arange(block_nx[0], dtype=np.double)[:, None, None]
+    iy = np.arange(block_nx[1], dtype=np.double)[None, :, None]
+    iz = np.arange(block_nx[2], dtype=np.double)[None, None, :]
+
+    for ileaf in range(int(forest.nleafs)):
+        x = mesh.rnode[ileaf, 0] + (ix + 0.5) * mesh.rnode[ileaf, 6]
+        y = mesh.rnode[ileaf, 1] + (iy + 0.5) * mesh.rnode[ileaf, 7]
+        z = mesh.rnode[ileaf, 2] + (iz + 0.5) * mesh.rnode[ileaf, 8]
+        data[ileaf, 0] = x + 2.0 * y + 3.0 * z
+        data[ileaf, 1] = 10.0 + data[ileaf, 0]
+
+    mesh.load_interior_data(data)
+    mesh.apply_ghost_cells()
+
+    xmin = np.array([0.25, 0.25, 0.25], dtype=np.double)
+    xmax = np.array([0.75, 0.75, 0.75], dtype=np.double)
+    nx = np.array([6, 6, 6], dtype=np.uint32)
+    uniform_grid = np.zeros((2, 6, 6, 6), dtype=np.double)
+
+    mesh.uniform_grid_linear(
+        uniform_grid,
+        nx,
+        xmin,
+        xmax,
+        np.array([0, 1], dtype=np.uint32),
+    )
+
+    dx = (xmax - xmin) / nx
+    x = xmin[0] + (np.arange(nx[0], dtype=np.double)[:, None, None] + 0.5) * dx[0]
+    y = xmin[1] + (np.arange(nx[1], dtype=np.double)[None, :, None] + 0.5) * dx[1]
+    z = xmin[2] + (np.arange(nx[2], dtype=np.double)[None, None, :] + 0.5) * dx[2]
+    expected = x + 2.0 * y + 3.0 * z
+
+    np.testing.assert_allclose(uniform_grid[0], expected, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(uniform_grid[1], expected + 10.0, rtol=1e-12, atol=1e-12)
+
+
 def test_uniform_full_level1():
     ng1 = ng2 = ng3 = 2
     is_leaf = np.ones(ng1 * ng2 * ng3, dtype=np.int32)
@@ -374,6 +421,8 @@ def run_tests():
     print("test_mesh_load_interior_data_exposes_view passed")
     test_uniform_grid_zero_order()
     print("test_uniform_grid_zero_order passed")
+    test_uniform_grid_linear_uses_ghost_cells()
+    print("test_uniform_grid_linear_uses_ghost_cells passed")
     test_uniform_full_level1()
     print("test_uniform_full_level1 passed")
     test_getbc_matches_legacy_reference()
