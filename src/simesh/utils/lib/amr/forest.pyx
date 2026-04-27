@@ -321,7 +321,8 @@ cdef class AMRForest:
     cdef void find_root_neighbor(self, treeptr* neighbor, treeptr tree, int* ii):
 
         cdef uint32_t idim
-        cdef uint32_t jg[3]
+        cdef int jg[3]
+        cdef uint32_t jg_index[3]
 
         for idim in range(self.ndim):
             jg[idim] = tree.node.ig[idim] + ii[idim]
@@ -337,8 +338,11 @@ cdef class AMRForest:
         
         if self.ndim == 2:
             jg[2] = 0
-        
-        neighbor.node = self.forest[self.mindex(jg)].node
+
+        for idim in range(3):
+            jg_index[idim] = <uint32_t>jg[idim]
+
+        neighbor.node = self.forest[self.mindex(jg_index)].node
         return
 
     cdef uint32_t find_neighbor(self, treeptr* neighbor, treeptr tree, int* ii, bint* pole):
@@ -379,7 +383,7 @@ cdef class AMRForest:
             igc[idim] = tree.node.ig[idim] % 2
             inp[idim] = (igc[idim] + (ii[idim] + 2))//2
             if (inp[idim] != 1):
-                neighbor.node = neighbor.node.neighbors[idim][igc[idim]//2].node
+                neighbor.node = neighbor.node.neighbors[idim][igc[idim]].node
                 if neighbor.node is NULL:
                     return neighbor_boundary
         
@@ -460,19 +464,15 @@ cdef class AMRForest:
         elif (neighbor_type == neighbor_fine):
             self.neighbor_index[ileaf, self.nindex(ii)] = 0
 
-            # 1-i//2 reflects 0 and 2 (neighbor direction) to 1 (neighbor 2nd child) and 0 (neighbor 1st child)
-            # but with 1, non-changed direction reserves both children (0 and 1)
-
-            # for inc, 0,1->0, 2,0->4 1,0->2, 1,1->3
-            for ic1 in range((1-ii[0]//2)-ii[0]%2, 2-ii[0]//2):
-                inc[0] = 2*ii[0]+ic1
-                ih[0] = ic1
-                for ic2 in range((1-ii[1]//2)-ii[1]%2, 2-ii[1]//2):
-                    inc[1] = 2*ii[1]+ic2
-                    ih[1] = ic2
-                    for ic3 in range((1-ii[2]//2)-ii[2]%2, 2-ii[2]//2):
-                        inc[2] = 2*ii[2]+ic3
-                        ih[2] = ic3
+            for ic1 in range(1 + (2 - ii[0]) // 2, 2 - ii[0] // 2 + 1):
+                inc[0] = 2 * (<int>ii[0] - 1) + ic1
+                ih[0] = ic1 - 1
+                for ic2 in range(1 + (2 - ii[1]) // 2, 2 - ii[1] // 2 + 1):
+                    inc[1] = 2 * (<int>ii[1] - 1) + ic2
+                    ih[1] = ic2 - 1
+                    for ic3 in range(1 + (2 - ii[2]) // 2, 2 - ii[2] // 2 + 1):
+                        inc[2] = 2 * (<int>ii[2] - 1) + ic3
+                        ih[2] = ic3 - 1
                         if self.ndim == 2:
                             inc[2] = 0
                             ih[2] = 0 # 2D case, no children in z direction

@@ -10,15 +10,33 @@ class AMRVACDataSet(DataSet):
     """
     AMRVAC specific implementation of DataSet.
     """
-    def __init__(self, sfile: str):
+    def __init__(self, sfile: str, ghost_width: int = 0):
+        self.ghost_width = int(ghost_width)
+        if self.ghost_width < 0:
+            raise ValueError("ghost_width must be non-negative")
         super().__init__(sfile)
+
+    def _build_mesh(self, nfields: int | None = None):
+        if nfields is None:
+            nfields = int(self.nw)
+
+        return AMRMesh(
+            self.ndim,
+            self.block_nx,
+            self.domain_nx,
+            np.array(self.physical_domain[0], dtype=np.double),
+            np.array(self.physical_domain[1], dtype=np.double),
+            np.uint32(self.ghost_width),
+            np.uint32(nfields),
+            self.forest,
+        )
 
     def load_metadata(self):
         """
         Load the metadata from the data file.
         """
 
-        self.ng = 0
+        self.ng = self.ghost_width
 
         header, is_leaf, tree_info = get_metadata(self.sfile)
         self.metadata = header.copy()
@@ -49,11 +67,7 @@ class AMRVACDataSet(DataSet):
                                 np.uint32(self.domain_nx[1]//self.block_nx[1]), 
                                 np.uint32(self.domain_nx[2]//self.block_nx[2]), 
                                 self.is_leaf)
-        self.mesh = AMRMesh(self.ndim, 
-                            self.block_nx, self.domain_nx, 
-                            np.array(self.physical_domain[0], dtype=np.double), 
-                            np.array(self.physical_domain[1], dtype=np.double), 
-                            np.uint32(0), self.nw, self.forest)
+        self.mesh = self._build_mesh()
 
     def print_metadata_impl(self):
         """
@@ -76,8 +90,23 @@ class AMRVACDataSet(DataSet):
             field_indices = [int(i) for i in field_indices]
 
         data = read_blocks_sequential(self.sfile, field_indices)
-        self.data = data
+        if self.ghost_width > 0:
+            self.mesh = self._build_mesh(len(field_indices))
+            self.mesh.load_interior_data(np.ascontiguousarray(data, dtype=np.double))
+            self.mesh.apply_ghost_cells()
+            self.data = self.mesh.interior_view()
+        else:
+            self.data = data
         self.loaded_field_indices = field_indices
+
+    def update_ghost_cells(self):
+        if self.ghost_width <= 0:
+            return
+        if self.data is None:
+            self.load_data(None)
+            return
+        self.mesh.apply_ghost_cells()
+        self.data = self.mesh.interior_view()
 
     @property
     def loaded_field_indices(self):
@@ -256,11 +285,5 @@ class AMRVACDataSet(DataSet):
             nw=len(self.loaded_field_indices),
             w_names=[self.wnames[i] for i in self.loaded_field_indices],
         )
-        data0 = self.data[
-            :,
-            :,
-            self.ng:self.ng+self.block_nx[0],
-            self.ng:self.ng+self.block_nx[1],
-            self.ng:self.ng+self.block_nx[2],
-        ]
+        data0 = np.asarray(self.data)
         return write_datfile_from_sfc(sfile, data0, updated_header, self.is_leaf, self.tree_info)

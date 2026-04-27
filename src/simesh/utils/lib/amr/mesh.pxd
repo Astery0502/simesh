@@ -40,10 +40,10 @@ cdef class AMRMesh:
         # Exposed as a public attribute so Python tests can access mesh.rnode
         public double[:,:] rnode
 
-        # data array (very big)
+        # padded data array (authoritative only when ng > 0)
         double[:,:,:,:,:] data
 
-        # coarse data array (very big, too)
+        # scratch coarse data array, allocated lazily
         double[:,:,:,:,:] datac
 
         # physical boundary indices to help identify physical boundaries
@@ -108,9 +108,31 @@ cdef class AMRMesh:
 
     cdef void _init_block_coordinates(self)
 
+    cdef void _allocate_padded_storage(self)
+
+    cdef void _ensure_idphyb_storage(self)
+
+    cdef void _ensure_coarse_storage(self)
+
+    cdef void _zero_idphyb_storage(self)
+
+    cdef void _zero_coarse_storage(self)
+
+    cdef bint _has_coarse_or_fine_neighbors(self, uint32_t[:,:] neighbor_type)
+
     cdef inline uint32_t nindex(self, uint32_t n1, uint32_t n2, uint32_t n3) noexcept nogil
 
     cdef inline uint32_t ncindex(self, uint32_t nc1, uint32_t nc2, uint32_t nc3) noexcept nogil
+
+    cpdef bint has_padded_data(self)
+
+    cpdef object padded_view(self)
+
+    cpdef object interior_view(self)
+
+    cpdef void load_interior_data(self, double[:,:,:,:,:] interior)
+
+    cpdef void apply_ghost_cells(self)
 
     cpdef void uniform_grid_zero_order(self, double[:,:,:,:,:] data, double[:,:,:,:] uniform_grid, 
         uint32_t[:] nx, double[:] xmin_new, double[:] xmax_new)
@@ -125,8 +147,34 @@ cdef class AMRMesh:
 
     cdef void fill_boundary_before_gc(self, uint32_t ileaf, uint32_t[:,:] neighbor_type)# noexcept nogil
 
+    cdef void fill_boundary_after_gc(self, uint32_t ileaf, uint32_t[:,:] neighbor_type)
+
     cdef void bc_phys(self, int iside, uint32_t idim, uint32_t ileaf, int ixBmin[3], int ixBmax[3], bint is_coarse)# noexcept nogil
 
     cdef void coarsen_grid(self, uint32_t ileaf)# noexcept nogil
     
     cdef void fill_coarse_boundary(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t[:,:] neighbor_type)# noexcept nogil
+
+    cdef void identifyphysbound(self, uint32_t ileaf, uint32_t[:,:] neighbor_type)
+
+    cdef void bc_fill_srl(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3)
+
+    cdef void bc_fill_restrict(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3)
+
+    cdef void bc_fill_prolong(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3)
+
+    cdef void gc_prolong(self, uint32_t ileaf, uint32_t[:,:] neighbor_type)
+
+    cdef void bc_prolong(self, uint32_t ileaf, uint32_t i1, uint32_t i2, uint32_t i3)
+
+    cdef void interpolation_linear(self, uint32_t ileaf, int ixFimin[3], int ixFimax[3],
+        double dxFi[3], double xFimin[3], double dxCo[3], double invdxCo[3], double xComin[3])
+
+    cdef void copy_data_to_data(self, uint32_t src_leaf, uint32_t dst_leaf, int src_min[3],
+        int src_max[3], int dst_min[3])
+
+    cdef void copy_datac_to_data(self, uint32_t src_leaf, uint32_t dst_leaf, int src_min[3],
+        int src_max[3], int dst_min[3])
+
+    cdef void copy_data_to_datac(self, uint32_t src_leaf, uint32_t dst_leaf, int src_min[3],
+        int src_max[3], int dst_min[3])

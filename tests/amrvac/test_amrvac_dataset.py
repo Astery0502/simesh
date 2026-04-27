@@ -80,6 +80,8 @@ def test_dataset_uniform_full():
         )
 
         ds = AMRVACDataSet(path)
+        assert ds.ghost_width == 0
+        assert not ds.mesh.has_padded_data()
 
         full_general = ds.uniform_grid(ds.domain_nx, xmin=ds.physical_domain[0], xmax=ds.physical_domain[1])
         full_direct = ds.uniform_full()
@@ -115,6 +117,42 @@ def test_dataset_uniform_full():
             assert "levmax == 1" in str(exc)
         else:
             raise AssertionError("uniform_full should fail when levmax > 1")
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_ghost_mode_uses_mesh_storage():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        udata = _uniform_input(domain_nx=(4, 4, 4), nw=3)
+        expected = np.transpose(udata[..., [0, 2]], (3, 0, 1, 2))
+        write_datfile_from_uniform(
+            path,
+            udata,
+            [f"w{i}" for i in range(udata.shape[-1])],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=1)
+        ds.load_data(field_indices=[0, 2])
+
+        padded = ds.mesh.padded_view()
+        interior = ds.mesh.interior_view()
+
+        assert padded.shape == (8, 4, 4, 4, 2)
+        assert ds.data.shape == (8, 2, 2, 2, 2)
+        assert np.array_equal(ds.data, interior)
+        assert np.shares_memory(ds.data, padded)
+        assert np.array_equal(ds.uniform_full(), expected)
+
+        ds.data[0, 1, 0, 0, 0] = -5.0
+        assert ds.mesh.interior_view()[0, 1, 0, 0, 0] == -5.0
     finally:
         if os.path.exists(path):
             os.remove(path)
@@ -261,6 +299,8 @@ def run_tests():
     print("Running tests for AMRVAC dataset...")
     test_dataset_uniform_full()
     print("test_dataset_uniform_full passed")
+    test_dataset_ghost_mode_uses_mesh_storage()
+    print("test_dataset_ghost_mode_uses_mesh_storage passed")
     test_extract_uniform_data()
     print("test_extract_uniform_data passed")
     test_uniform_layout_helpers()
