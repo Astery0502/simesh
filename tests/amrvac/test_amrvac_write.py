@@ -3,6 +3,7 @@ import tempfile
 
 import numpy as np
 
+from simesh.amrvac import write_datfile as api_write_datfile
 from simesh.amrvac.amrvac_dataset import AMRVACDataSet
 from simesh.amrvac.datio import header_template, write_datfile_from_sfc
 from simesh.utils.lib.amr.morton import fill_morton_mapping3D
@@ -101,12 +102,37 @@ def test_dataset_write_datfile_roundtrip():
             os.remove(path_out)
 
 
+def test_public_api_write_datfile_roundtrip():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp_in:
+        path_in = tmp_in.name
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp_out:
+        path_out = tmp_out.name
+
+    try:
+        data, header, is_leaf, tree_info, expected = _sfc_input()
+        write_datfile_from_sfc(path_in, data, header, is_leaf, tree_info, overwrite=True)
+
+        api_write_datfile(path_in, path_out, field_indices=[1], overwrite=True)
+
+        rewritten = AMRVACDataSet(path_out)
+        rewritten_grid = rewritten.uniform_full()
+        assert rewritten.wnames == ["w1"]
+        assert np.array_equal(rewritten_grid, expected[[1]])
+    finally:
+        if os.path.exists(path_in):
+            os.remove(path_in)
+        if os.path.exists(path_out):
+            os.remove(path_out)
+
+
 def run_tests():
     print("Running tests for AMRVAC writing...")
     test_write_datfile_from_sfc_roundtrip()
     print("test_write_datfile_from_sfc_roundtrip passed")
     test_dataset_write_datfile_roundtrip()
     print("test_dataset_write_datfile_roundtrip passed")
+    test_public_api_write_datfile_roundtrip()
+    print("test_public_api_write_datfile_roundtrip passed")
     print("All tests passed for AMRVAC writing!")
 
 

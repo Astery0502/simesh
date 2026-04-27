@@ -96,13 +96,27 @@ Notes:
 The canonical code path uses `simesh.amrvac` for AMRVAC datasets and
 `simesh.utils.lib` for compiled internals.
 
-### Load AMRVAC data
+### Read AMRVAC data
 
 ```python
-from simesh.amrvac.amrvac_dataset import AMRVACDataSet
+from simesh.amrvac import read_blocks, read_uniform
 
-ds = AMRVACDataSet(datfile)
-ds.load_data()
+blocks = read_blocks(datfile, field_indices=[0, 1])
+ghosted = read_blocks(datfile, field_indices=[0, 1], ghost_width=2, include_ghosts=True)
+grid = read_uniform(datfile, resolution=(128, 128, 128), field_indices=[0])
+```
+
+Use `open_dataset()` when you need a stateful object, for example to mutate
+block data and refresh ghost cells before writing:
+
+```python
+from simesh.amrvac import open_dataset
+
+ds = open_dataset(datfile, ghost_width=2)
+ds.load_data(field_indices=[0, 1])
+ds.blocks()[:, 0] *= 1.01
+ds.exchange_ghost_cells()
+ds.write_datfile("updated.dat")
 ```
 
 ### Low-level metadata access

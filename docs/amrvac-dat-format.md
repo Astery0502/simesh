@@ -78,7 +78,9 @@ The typical read flow is:
 7. create dataset object
 8. load block data into mesh storage
 
-In the canonical path, the dataset entrypoint is `AMRVACDataSet(...)` in
+In the canonical path, user-facing reads should start with `read_blocks()`,
+`read_uniform()`, or `open_dataset()` from `simesh.amrvac`. The stateful
+implementation object is `AMRVACDataSet(...)` in
 `src/simesh/amrvac/amrvac_dataset.py`.
 
 ## Write path

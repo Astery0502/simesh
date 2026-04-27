@@ -108,6 +108,36 @@ class AMRVACDataSet(DataSet):
         self.mesh.apply_ghost_cells()
         self.data = self.mesh.interior_view()
 
+    def exchange_ghost_cells(self):
+        """
+        Refresh ghost cells after mutating loaded interior block data.
+        """
+        self.update_ghost_cells()
+
+    @property
+    def has_ghost_cells(self):
+        """
+        Whether this dataset was opened with ghost-cell storage enabled.
+        """
+        return self.ghost_width > 0
+
+    def blocks(self, include_ghosts: bool = False):
+        """
+        Return loaded block data in SFC layout.
+
+        The default interior layout is ``(nleafs, nw, bx, by, bz)``. When
+        ``include_ghosts`` is true and ``ghost_width > 0``, the returned view
+        has shape ``(nleafs, nw, bx + 2g, by + 2g, bz + 2g)``.
+        """
+        if self.data is None:
+            self.load_data(None)
+
+        if not include_ghosts or self.ghost_width <= 0:
+            return self.data
+
+        padded = self.mesh.padded_view()
+        return np.transpose(padded, (0, 4, 1, 2, 3))
+
     @property
     def loaded_field_indices(self):
         """
@@ -275,7 +305,7 @@ class AMRVACDataSet(DataSet):
 
         return uniform_grid
 
-    def write_datfile(self, sfile: str):
+    def write_datfile(self, sfile: str, overwrite: bool = False):
 
         if self.data is None:
             self.load_data(None)
@@ -286,4 +316,4 @@ class AMRVACDataSet(DataSet):
             w_names=[self.wnames[i] for i in self.loaded_field_indices],
         )
         data0 = np.asarray(self.data)
-        return write_datfile_from_sfc(sfile, data0, updated_header, self.is_leaf, self.tree_info)
+        return write_datfile_from_sfc(sfile, data0, updated_header, self.is_leaf, self.tree_info, overwrite=overwrite)

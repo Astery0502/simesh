@@ -7,13 +7,26 @@ workflows and how they relate to the lower-level AMR implementation.
 
 ## Primary public entrypoints
 
-The most important canonical Python modules currently live in:
+The clean user-facing API is exported from:
+
+- `src/simesh/amrvac/__init__.py`
+- `src/simesh/amrvac/api.py`
+
+The main public functions are:
+
+- `open_dataset(path, *, ghost_width=0)`
+- `read_blocks(path, *, field_indices=None, ghost_width=0, include_ghosts=False)`
+- `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0)`
+- `write_datfile(path, output_path, *, field_indices=None, ghost_width=0, overwrite=False)`
+
+The lower-level canonical Python modules live in:
 
 - `src/simesh/amrvac/amrvac_dataset.py`
 - `src/simesh/amrvac/datio.py`
 
-Treat `amrvac_dataset.py` as the canonical dataset entrypoint and `datio.py` as
-the canonical low-level AMRVAC format module.
+Treat `api.py` as the first user-facing entrypoint, `amrvac_dataset.py` as the
+stateful dataset implementation, and `datio.py` as the canonical low-level
+AMRVAC format module.
 
 ## Main objects behind the entrypoints
 

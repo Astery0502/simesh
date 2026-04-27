@@ -3,6 +3,7 @@ import tempfile
 
 import numpy as np
 
+from simesh.amrvac import open_dataset, read_blocks, read_uniform
 from simesh.amrvac.amrvac_dataset import AMRVACDataSet
 from simesh.amrvac.datio import extract_uniform_data
 from simesh.amrvac.layouts import datau_to_udata, udata_to_datau
@@ -158,6 +159,41 @@ def test_dataset_ghost_mode_uses_mesh_storage():
             os.remove(path)
 
 
+def test_public_api_reads_blocks_and_uniform_data():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        udata = _uniform_input(domain_nx=(4, 4, 4), nw=3)
+        write_datfile_from_uniform(
+            path,
+            udata,
+            [f"w{i}" for i in range(udata.shape[-1])],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = open_dataset(path, ghost_width=1)
+        assert ds.has_ghost_cells
+        ds.load_data(field_indices=[0, 2])
+        assert ds.blocks().shape == (8, 2, 2, 2, 2)
+        assert ds.blocks(include_ghosts=True).shape == (8, 2, 4, 4, 4)
+
+        blocks = read_blocks(path, field_indices=[0, 2])
+        ghosted = read_blocks(path, field_indices=[0, 2], ghost_width=1, include_ghosts=True)
+        grid = read_uniform(path, resolution=(4, 4, 4), field_indices=[1])
+
+        assert blocks.shape == (8, 2, 2, 2, 2)
+        assert ghosted.shape == (8, 2, 4, 4, 4)
+        assert grid.shape == (4, 4, 4, 1)
+        assert np.array_equal(grid[..., 0], udata[..., 1])
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
 def test_extract_uniform_data():
     with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
         path = tmp.name
@@ -301,6 +337,8 @@ def run_tests():
     print("test_dataset_uniform_full passed")
     test_dataset_ghost_mode_uses_mesh_storage()
     print("test_dataset_ghost_mode_uses_mesh_storage passed")
+    test_public_api_reads_blocks_and_uniform_data()
+    print("test_public_api_reads_blocks_and_uniform_data passed")
     test_extract_uniform_data()
     print("test_extract_uniform_data passed")
     test_uniform_layout_helpers()
