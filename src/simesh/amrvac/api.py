@@ -45,8 +45,9 @@ def read_uniform(
     """
     Read AMRVAC data on a user-facing uniform grid.
 
-    The returned array has shape ``(nx, ny, nz, nw)``. ``resolution`` must have
-    three entries. ``bounds`` may be ``(xmin, xmax)``; by default the full
+    The returned array has shape ``(nx, ny, nz, nw)``. For 2D datasets,
+    ``resolution`` may be ``(nx, ny)`` or ``(nx, ny, 1)`` and the returned
+    z-length is one. ``bounds`` may be ``(xmin, xmax)``; by default the full
     physical domain is sampled.
 
     ``interpolation="zero"`` preserves the previous piecewise-constant
@@ -60,7 +61,12 @@ def read_uniform(
     ds.load_data(field_indices=field_indices)
 
     nx = np.asarray(resolution, dtype=np.uint32)
-    if nx.shape != (3,):
+    if int(ds.ndim) == 2:
+        if nx.shape == (2,):
+            nx = np.array([nx[0], nx[1], 1], dtype=np.uint32)
+        elif nx.shape != (3,) or int(nx[2]) != 1:
+            raise ValueError(f"2D resolution must have shape (nx, ny) or (nx, ny, 1), got {resolution}")
+    elif nx.shape != (3,):
         raise ValueError(f"resolution must have three entries, got {resolution}")
 
     if bounds is None:

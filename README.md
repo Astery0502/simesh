@@ -28,6 +28,7 @@ In practice, the package is meant to serve as both:
   file
 - Resample AMR data onto uniform grids for analysis or downstream workflows
 - Export AMR data to VTK hierarchical box output
+- Work with Cartesian 2D AMRVAC data using a singleton-z array convention
 
 ## Architecture
 
@@ -148,6 +149,7 @@ from simesh.amrvac import read_blocks, read_uniform
 blocks = read_blocks(datfile, field_indices=[0, 1])
 ghosted = read_blocks(datfile, field_indices=[0, 1], ghost_width=2, include_ghosts=True)
 grid = read_uniform(datfile, resolution=(128, 128, 128), field_indices=[0])
+grid2d = read_uniform(datfile2d, resolution=(128, 128), field_indices=[0])
 smooth_grid = read_uniform(
     datfile,
     resolution=(128, 128, 128),
@@ -163,10 +165,11 @@ Choose the interpolation mode by intent and memory budget:
   native level-1 uniform data and remains useful for AMR data when you do not
   want to allocate ghost-cell storage.
 - `interpolation="linear"` performs trilinear resampling through the canonical
-  Cython ghost-cell path. Use it when you want smoother uniform-grid sampling
-  across AMR blocks and can afford `ghost_width > 0`. This path uses OpenMP
-  thread parallelism when the AMR extension was compiled with OpenMP; otherwise
-  it runs through the same code path without OpenMP threading.
+  Cython ghost-cell path for 3D data and bilinear resampling for Cartesian 2D
+  data. Use it when you want smoother uniform-grid sampling across AMR blocks
+  and can afford `ghost_width > 0`. This path uses OpenMP thread parallelism
+  when the AMR extension was compiled with OpenMP; otherwise it runs through
+  the same code path without OpenMP threading.
 - For purely uniform level-1 data sampled on its native full-domain grid, prefer
   the exact full-grid path through `open_dataset(...).uniform_full()`.
 
@@ -199,6 +202,10 @@ The canonical AMRVAC path uses three array layout names:
 - `datau`: compute-oriented uniform data with shape `(nw, nx, ny, nz)`
 - `sfc_data`: Morton/SFC block data with shape `(nleafs, nw, bx, by, bz)`
 
+Cartesian 2D data uses AMRVAC `ndim=2` metadata on disk and keeps `nz == 1`
+in these Python array layouts. For example, a 2D uniform field has shape
+`(nx, ny, 1, nw)` and 2D block data has shape `(nleafs, nw, bx, by, 1)`.
+
 Conversion helpers live in `simesh.amrvac.layouts`:
 
 ```python
@@ -210,7 +217,7 @@ default path and is not part of the current default test workflow.
 
 ## Limitations
 
-The current implementation is primarily targeted at ***Cartesian 3D AMR meshes***.
-Several code paths and tests also assume constant or simple physical boundary
-handling. If you need broader geometry or dimensional support, treat the current
-state as specialized rather than fully general.
+The current implementation is targeted at Cartesian 2D and Cartesian 3D AMR
+meshes. Several code paths and tests also assume constant or simple physical
+boundary handling. If you need broader geometry support, treat the current state
+as specialized rather than fully general.

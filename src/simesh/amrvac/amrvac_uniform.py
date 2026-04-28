@@ -31,19 +31,22 @@ def load_from_uniform(udata:np.ndarray, w_names:list[str], xmin:np.ndarray, xmax
     return ds
 
 
-def _build_uniform_level1_tree(domain_nx: np.ndarray, block_nx: np.ndarray):
+def _build_uniform_level1_tree(domain_nx: np.ndarray, block_nx: np.ndarray, ndim: int | None = None):
     """
     Build level-1 forest/tree metadata for a uniform grid.
     """
+    if ndim is None:
+        ndim = len(domain_nx)
     nblev1 = np.array(domain_nx // block_nx, dtype=np.uint32)
     nleafs = int(np.prod(nblev1))
     is_leaf = np.ones(nleafs, dtype=np.int32)
 
     morton2ig = np.zeros((nleafs, 3), dtype=np.uint32)
-    fill_morton_mapping3D(np.zeros(tuple(nblev1), dtype=np.uint32), morton2ig, *nblev1)
+    nblev1_3 = np.array([nblev1[0], nblev1[1], 1 if ndim == 2 else nblev1[2]], dtype=np.uint32)
+    fill_morton_mapping3D(np.zeros(tuple(nblev1_3), dtype=np.uint32), morton2ig, *nblev1_3)
 
     block_lvls = np.ones(nleafs, dtype=np.int32)
-    block_ixs = morton2ig.astype(np.int32) + 1
+    block_ixs = morton2ig[:, :ndim].astype(np.int32) + 1
     block_offsets = np.zeros(nleafs, dtype=np.int64)
 
     return is_leaf, (block_lvls, block_ixs, block_offsets)
@@ -61,29 +64,52 @@ def _sfc_data_from_uniform(udata: np.ndarray, block_nx: np.ndarray, xmin: np.nda
 
     if udata.ndim != 4:
         raise ValueError(f"udata must have shape (nx, ny, nz, nw), got {udata.shape}")
-    if len(block_nx) != 3:
-        raise ValueError(f"block_nx must have length 3, got {block_nx}")
-    if len(xmin) != 3 or len(xmax) != 3:
-        raise ValueError("xmin and xmax must have length 3")
+    if len(block_nx) not in (2, 3):
+        raise ValueError(f"block_nx must have length 2 or 3, got {block_nx}")
+    ndim = 2 if len(block_nx) == 2 else 3
+    if ndim == 2:
+        if udata.shape[2] != 1:
+            raise ValueError("2D uniform data must use singleton z, udata.shape[2] == 1")
+        if len(xmin) < 2 or len(xmax) < 2:
+            raise ValueError("2D xmin and xmax must have at least two entries")
+        block_nx_model = np.array(block_nx[:2], dtype=np.uint32)
+        domain_nx_model = np.array(udata.shape[:2], dtype=np.uint32)
+    else:
+        if len(block_nx) != 3:
+            raise ValueError(f"3D block_nx must have length 3, got {block_nx}")
+        if len(xmin) != 3 or len(xmax) != 3:
+            raise ValueError("3D xmin and xmax must have length 3")
+        block_nx_model = block_nx
+        domain_nx_model = np.array(udata.shape[:3], dtype=np.uint32)
 
-    domain_nx = np.array(udata.shape[:3], dtype=np.uint32)
     nfields = int(udata.shape[3])
 
-    if np.any(domain_nx % block_nx != 0):
-        raise ValueError(f"domain_nx must be divisible by block_nx, got {domain_nx} and {block_nx}")
+    if np.any(domain_nx_model % block_nx_model != 0):
+        raise ValueError(f"domain_nx must be divisible by block_nx, got {domain_nx_model} and {block_nx_model}")
 
-    nblev1 = np.array(domain_nx // block_nx, dtype=np.uint32)
-    nleafs = int(np.prod(nblev1))
+    nblev1 = np.array(domain_nx_model // block_nx_model, dtype=np.uint32)
+    nblev1_3 = np.array([nblev1[0], nblev1[1], 1 if ndim == 2 else nblev1[2]], dtype=np.uint32)
+    nleafs = int(np.prod(nblev1_3))
     is_leaf = np.ones(nleafs, dtype=np.int32)
 
-    forest = AMRForest(np.uint32(3), nblev1[0], nblev1[1], nblev1[2], is_leaf)
-    mesh = AMRMesh(np.uint32(3), block_nx, domain_nx, xmin, xmax, np.uint32(0), np.uint32(nfields), forest)
+    forest = AMRForest(np.uint32(ndim), nblev1_3[0], nblev1_3[1], nblev1_3[2], is_leaf)
+    mesh = AMRMesh(
+        np.uint32(ndim),
+        block_nx_model,
+        domain_nx_model,
+        np.asarray(xmin[:ndim], dtype=np.double),
+        np.asarray(xmax[:ndim], dtype=np.double),
+        np.uint32(0),
+        np.uint32(nfields),
+        forest,
+    )
 
     uniform_data = np.ascontiguousarray(udata_to_datau(udata), dtype=np.double)
-    sfc_data = np.zeros((nleafs, nfields, block_nx[0], block_nx[1], block_nx[2]), dtype=np.double)
+    bz = 1 if ndim == 2 else int(block_nx_model[2])
+    sfc_data = np.zeros((nleafs, nfields, block_nx_model[0], block_nx_model[1], bz), dtype=np.double)
     mesh.uniform_to_sfc(uniform_data, sfc_data)
 
-    return sfc_data
+    return sfc_data, ndim, domain_nx_model, block_nx_model
 
 
 def write_datfile_from_uniform(file_path: str, udata: np.ndarray, w_names: list[str],
@@ -99,24 +125,29 @@ def write_datfile_from_uniform(file_path: str, udata: np.ndarray, w_names: list[
     if len(w_names) != udata.shape[3]:
         raise ValueError(f"w_names length must match udata.shape[-1], {len(w_names)} != {udata.shape[3]}")
 
-    domain_nx = np.array(udata.shape[:3], dtype=np.int32)
     block_nx = np.asarray(block_nx, dtype=np.int32)
     xmin = np.asarray(xmin, dtype=np.double)
     xmax = np.asarray(xmax, dtype=np.double)
 
-    sfc_data = _sfc_data_from_uniform(udata, block_nx, xmin, xmax)
-    is_leaf, tree_info = _build_uniform_level1_tree(domain_nx, block_nx)
+    sfc_data, ndim, domain_nx_model, block_nx_model = _sfc_data_from_uniform(udata, block_nx, xmin, xmax)
+    domain_nx = np.asarray(domain_nx_model, dtype=np.int32)
+    block_nx_header = np.asarray(block_nx_model, dtype=np.int32)
+    is_leaf, tree_info = _build_uniform_level1_tree(domain_nx, block_nx_header, ndim=ndim)
 
     header = header_template.copy()
+    header["ndim"] = ndim
     header["nw"] = len(w_names)
     header["w_names"] = list(w_names)
     header["levmax"] = 1
     header["nleafs"] = int(sfc_data.shape[0])
     header["nparents"] = 0
-    header["xmin"] = xmin
-    header["xmax"] = xmax
+    header["xmin"] = xmin[:ndim]
+    header["xmax"] = xmax[:ndim]
     header["domain_nx"] = domain_nx
-    header["block_nx"] = block_nx
+    header["block_nx"] = block_nx_header
+    if ndim == 2:
+        header["periodic"] = np.asarray(header["periodic"][:2], dtype=bool)
+        header["geometry"] = "Cartesian_2D"
 
     if header_updates:
         header = update_header(header, **header_updates)

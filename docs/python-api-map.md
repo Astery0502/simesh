@@ -29,11 +29,16 @@ stateful dataset implementation, and `datio.py` as the canonical low-level
 AMRVAC format module.
 
 `read_uniform(..., interpolation="linear", ghost_width=1)` exposes the
-canonical Cython-backed trilinear interpolation path. Keep ``"zero"`` as the
-default for compatibility with the previous piecewise-constant behavior and as
-the low-memory path when ghost-cell storage is not wanted. For level-1 data
-sampled on the native full-domain grid, `uniform_full()` is the exact block
-placement path rather than a resampling path.
+canonical Cython-backed interpolation path: trilinear for 3D data and bilinear
+for Cartesian 2D data. Keep ``"zero"`` as the default for compatibility with
+the previous piecewise-constant behavior and as the low-memory path when
+ghost-cell storage is not wanted. For level-1 data sampled on the native
+full-domain grid, `uniform_full()` is the exact block placement path rather
+than a resampling path.
+
+Cartesian 2D files are represented with AMRVAC `ndim=2` metadata on disk, but
+the Python array API keeps the singleton-z convention. `read_uniform()` accepts
+2D resolutions as `(nx, ny)` or `(nx, ny, 1)` and returns `(nx, ny, 1, nw)`.
 
 OpenMP acceleration is exposed as build/runtime introspection rather than as a
 separate resampling API:
@@ -84,6 +89,9 @@ The canonical AMRVAC path uses three explicit layout conventions:
 - `udata`: user-facing uniform data with shape `(nx, ny, nz, nw)`
 - `datau`: compute-oriented uniform data with shape `(nw, nx, ny, nz)`
 - `sfc_data`: Morton/SFC block data with shape `(nleafs, nw, bx, by, bz)`
+
+For Cartesian 2D data, `nz` and `bz` are always one in Python arrays while
+AMRVAC headers and tree block indices remain two-dimensional.
 
 Helpers for converting between `udata` and `datau` live in:
 

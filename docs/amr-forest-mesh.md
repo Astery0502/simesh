@@ -11,7 +11,8 @@ neighbor connectivity, and ghost-cell operations.
 ### Forest
 
 The AMR hierarchy is represented as a forest of level-1 blocks. Each level-1
-block acts as the root of an octree in the 3D case.
+block acts as the root of an octree in the 3D case and as a quadtree stored in
+the first four octree child slots in the Cartesian 2D case.
 
 Key responsibilities of the forest layer:
 
@@ -82,6 +83,11 @@ behavior in the mesh layer.
 The mesh implementation allocates block storage with ghost cells and uses
 neighbor connectivity to fill those regions.
 
+For Cartesian 2D data, the mesh keeps a singleton physical z extent while the
+padded storage still has z ghost slots. Ghost exchange, restriction, and
+prolongation operate on the active x/y directions and pin data movement to the
+single interior z plane.
+
 Important operations in the legacy Python-side mesh include:
 
 - physical boundary fills
@@ -105,6 +111,10 @@ Each leaf block stores physical extents and cell spacing derived from:
 
 This bookkeeping allows later export, interpolation, and block placement on
 uniform grids.
+
+The Python AMRVAC API preserves a singleton-z array convention for Cartesian
+2D: uniform data is `(nx, ny, 1, nw)` and block data is
+`(nleafs, nw, bx, by, 1)`, even though the AMRVAC file metadata uses `ndim=2`.
 
 ## Dataset relationship
 

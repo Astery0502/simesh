@@ -62,10 +62,13 @@ class AMRVACDataSet(DataSet):
         self.geometry = header['geometry']
 
         # use nghostcells = 0
+        ng3 = np.uint32(1)
+        if int(self.ndim) == 3:
+            ng3 = np.uint32(self.domain_nx[2]//self.block_nx[2])
         self.forest = AMRForest(self.ndim, 
                                 np.uint32(self.domain_nx[0]//self.block_nx[0]), 
                                 np.uint32(self.domain_nx[1]//self.block_nx[1]), 
-                                np.uint32(self.domain_nx[2]//self.block_nx[2]), 
+                                ng3, 
                                 self.is_leaf)
         self.mesh = self._build_mesh()
 
@@ -90,6 +93,8 @@ class AMRVACDataSet(DataSet):
             field_indices = [int(i) for i in field_indices]
 
         data = read_blocks_sequential(self.sfile, field_indices)
+        if int(self.ndim) == 2:
+            data = data[:, :, :, :, np.newaxis]
         if self.ghost_width > 0:
             self.mesh = self._build_mesh(len(field_indices))
             self.mesh.load_interior_data(np.ascontiguousarray(data, dtype=np.double))
@@ -248,6 +253,15 @@ class AMRVACDataSet(DataSet):
         if xmax is None:
             xmax = self.physical_domain[1]
 
+        nx = np.asarray(nx, dtype=np.uint32)
+        if int(self.ndim) == 2:
+            if nx.shape == (2,):
+                nx = np.array([nx[0], nx[1], 1], dtype=np.uint32)
+            elif nx.shape != (3,) or int(nx[2]) != 1:
+                raise ValueError(f"2D resolution must have shape (nx, ny) or (nx, ny, 1), got {tuple(nx)}")
+        elif nx.shape != (3,):
+            raise ValueError(f"3D resolution must have three entries, got {tuple(nx)}")
+
         # Load all fields lazily if nothing is loaded yet.
         if self.data is None:
             self.load_data(None)
@@ -270,14 +284,14 @@ class AMRVACDataSet(DataSet):
             data_to_use = self.data
             n_fields = len(self.loaded_field_indices)
         
-        uniform_grid = np.zeros((n_fields, nx[0], nx[1], nx[2]), dtype=np.double)
+        uniform_grid = np.zeros((n_fields, int(nx[0]), int(nx[1]), int(nx[2])), dtype=np.double)
 
         interpolation = interpolation.lower()
         if interpolation in ("zero", "nearest", "piecewise_constant"):
             self.mesh.uniform_grid_zero_order(
                 data_to_use,
                 uniform_grid,
-                np.array(nx, dtype=np.uint32),
+                nx,
                 np.array(xmin, dtype=np.double),
                 np.array(xmax, dtype=np.double),
             )
@@ -290,7 +304,7 @@ class AMRVACDataSet(DataSet):
                 field_positions = np.array(loaded_columns, dtype=np.uint32)
             self.mesh.uniform_grid_linear(
                 uniform_grid,
-                np.array(nx, dtype=np.uint32),
+                nx,
                 np.array(xmin, dtype=np.double),
                 np.array(xmax, dtype=np.double),
                 field_positions,
@@ -329,10 +343,14 @@ class AMRVACDataSet(DataSet):
             data_to_use = self.data
             n_fields = len(self.loaded_field_indices)
 
-        uniform_grid = np.zeros((n_fields, *self.domain_nx), dtype=np.double)
+        if int(self.ndim) == 2:
+            uniform_shape = (n_fields, int(self.domain_nx[0]), int(self.domain_nx[1]), 1)
+        else:
+            uniform_shape = (n_fields, int(self.domain_nx[0]), int(self.domain_nx[1]), int(self.domain_nx[2]))
+        uniform_grid = np.zeros(uniform_shape, dtype=np.double)
         self.mesh.uniform_full_level1(data_to_use, uniform_grid)
 
-        expected_shape = (n_fields, int(self.domain_nx[0]), int(self.domain_nx[1]), int(self.domain_nx[2]))
+        expected_shape = uniform_shape
         assert uniform_grid.shape == expected_shape, \
             f"uniform_full result shape mismatch: {uniform_grid.shape} != {expected_shape}"
 
