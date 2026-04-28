@@ -14,10 +14,14 @@ The clean user-facing API is exported from:
 
 The main public functions are:
 
+- `datfile_to_vtk(path, output_path, field_indices=None)`
+- `load_from_uniform(udata, w_names, xmin, xmax, block_nx, **kwargs)`
+- `load_uniform_data(path, field_indices=None, return_geometry=True)`
 - `open_dataset(path, *, ghost_width=0)`
 - `read_blocks(path, *, field_indices=None, ghost_width=0, include_ghosts=False)`
 - `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0, interpolation="zero")`
 - `write_datfile(path, output_path, *, field_indices=None, ghost_width=0, overwrite=False)`
+- `write_datfile_from_uniform(path, udata, w_names, xmin, xmax, block_nx, overwrite=False, **header_updates)`
 
 The lower-level canonical Python modules live in:
 
@@ -39,6 +43,8 @@ than a resampling path.
 Cartesian 2D files are represented with AMRVAC `ndim=2` metadata on disk, but
 the Python array API keeps the singleton-z convention. `read_uniform()` accepts
 2D resolutions as `(nx, ny)` or `(nx, ny, 1)` and returns `(nx, ny, 1, nw)`.
+`load_from_uniform()` and `write_datfile_from_uniform()` use the same
+singleton-z convention for user-facing 2D uniform arrays.
 
 OpenMP acceleration is exposed as build/runtime introspection rather than as a
 separate resampling API:

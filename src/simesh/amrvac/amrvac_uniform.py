@@ -14,19 +14,69 @@ def load_from_uniform(udata:np.ndarray, w_names:list[str], xmin:np.ndarray, xmax
     """
     Load data from a user-facing uniform grid with shape (nx, ny, nz, nw).
     """
-    assert len(w_names) == udata.shape[-1]
-    if len(udata.shape) == 3 or udata.shape[-2] == 1:
-        ndim = 2
+    udata = np.asarray(udata, dtype=np.double)
+    if udata.ndim != 4:
+        raise ValueError(f"udata must have shape (nx, ny, nz, nw), got {udata.shape}")
+    if len(w_names) != udata.shape[-1]:
+        raise ValueError(f"w_names length must match udata.shape[-1], {len(w_names)} != {udata.shape[-1]}")
 
-    block_nx = np.array(block_nx).astype(np.uint32)
-    domain_nx = np.array(udata.shape[:3]).astype(np.uint32)
-    assert np.all(domain_nx % block_nx == 0), "domain_nx must be divisible by block_nx"
-    nblev1 = np.array(domain_nx // block_nx).astype(np.uint32)
+    sfc_data, ndim, domain_nx, block_nx = _sfc_data_from_uniform(udata, block_nx, xmin, xmax)
+    is_leaf, tree_info = _build_uniform_level1_tree(domain_nx, block_nx, ndim=ndim)
+    nblev1 = np.array(domain_nx // block_nx, dtype=np.uint32)
+    nblev1_3 = np.array([nblev1[0], nblev1[1], 1 if ndim == 2 else nblev1[2]], dtype=np.uint32)
 
-    is_leaf = np.ones(nblev1[0]*nblev1[1]*nblev1[2], dtype=np.int32)
-    forest = AMRForest(np.uint32(ndim), nblev1[0], nblev1[1], nblev1[2], is_leaf)
-    mesh = AMRMesh(ndim, block_nx, domain_nx, xmin, xmax, 0, len(w_names), forest)
-    ds = AMRVACDataSet(mesh)
+    forest = AMRForest(np.uint32(ndim), nblev1_3[0], nblev1_3[1], nblev1_3[2], is_leaf)
+    mesh = AMRMesh(
+        np.uint32(ndim),
+        block_nx,
+        domain_nx,
+        np.asarray(xmin, dtype=np.double)[:ndim],
+        np.asarray(xmax, dtype=np.double)[:ndim],
+        np.uint32(0),
+        np.uint32(len(w_names)),
+        forest,
+    )
+
+    header = header_template.copy()
+    header["ndim"] = ndim
+    header["nw"] = len(w_names)
+    header["w_names"] = list(w_names)
+    header["levmax"] = 1
+    header["nleafs"] = int(sfc_data.shape[0])
+    header["nparents"] = 0
+    header["xmin"] = np.asarray(xmin, dtype=np.double)[:ndim]
+    header["xmax"] = np.asarray(xmax, dtype=np.double)[:ndim]
+    header["domain_nx"] = domain_nx.astype(np.int32)
+    header["block_nx"] = block_nx.astype(np.int32)
+    if ndim == 2:
+        header["periodic"] = np.asarray(header["periodic"][:2], dtype=bool)
+        header["geometry"] = "Cartesian_2D"
+    if kwargs:
+        header = update_header(header, **kwargs)
+
+    ds = AMRVACDataSet.__new__(AMRVACDataSet)
+    ds.sfile = None
+    ds.ghost_width = 0
+    ds.ng = 0
+    ds.metadata = header.copy()
+    ds.is_leaf = is_leaf.copy().astype(np.int32)
+    ds.tree_info = tree_info
+    ds.ndim = np.uint32(ndim)
+    ds.ndir = np.uint32(header["ndir"])
+    ds.nw = np.uint32(len(w_names))
+    ds.wnames = list(w_names)
+    ds.nleafs = np.uint32(sfc_data.shape[0])
+    ds.nparents = np.uint32(0)
+    ds.levmax = np.uint32(1)
+    ds.block_nx = block_nx.astype(np.uint32)
+    ds.domain_nx = domain_nx.astype(np.uint32)
+    ds.physical_domain = np.array((header["xmin"], header["xmax"]))
+    ds.periodic = header["periodic"]
+    ds.geometry = header["geometry"]
+    ds.forest = forest
+    ds.mesh = mesh
+    ds.data = sfc_data
+    ds.loaded_field_indices = list(range(len(w_names)))
 
     return ds
 
@@ -219,9 +269,11 @@ def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.
     filename : str
         Output filename (should have .vtk extension)
     xmin : np.ndarray
-        Minimum coordinates of the domain, shape (3,)
+        Minimum coordinates of the domain, shape (3,), or shape (2,) for
+        singleton-z 2D data.
     xmax : np.ndarray, optional
-        Maximum coordinates of the domain, shape (3,). If not provided, unit spacing is assumed.
+        Maximum coordinates of the domain, shape (3,), or shape (2,) for
+        singleton-z 2D data. If not provided, unit spacing is assumed.
     """
 
     if os.path.exists(filename):
@@ -229,13 +281,19 @@ def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.
 
     assert len(udata.shape) == 4, f"udata must be a 4D array, but got {len(udata.shape)}"
     assert udata.shape[0] == len(w_names), f"w_names must be of size {udata.shape[0]}, but got {len(w_names)}"
-    assert len(xmin) == 3, f"xmin must have 3 elements, but got {len(xmin)}"
 
     nx, ny, nz = udata.shape[1:]
     nw = udata.shape[0]
+    xmin = np.asarray(xmin, dtype=np.double)
+    if len(xmin) == 2 and nz == 1:
+        xmin = np.array([xmin[0], xmin[1], 0.0], dtype=np.double)
+    assert len(xmin) == 3, f"xmin must have 3 elements, but got {len(xmin)}"
     
     # Compute spacing
     if xmax is not None:
+        xmax = np.asarray(xmax, dtype=np.double)
+        if len(xmax) == 2 and nz == 1:
+            xmax = np.array([xmax[0], xmax[1], 0.0], dtype=np.double)
         assert len(xmax) == 3, f"xmax must have 3 elements, but got {len(xmax)}"
         dx = (xmax[0] - xmin[0]) / (nx - 1) if nx > 1 else 1.0
         dy = (xmax[1] - xmin[1]) / (ny - 1) if ny > 1 else 1.0

@@ -186,6 +186,24 @@ ds.exchange_ghost_cells()
 ds.write_datfile("updated.dat")
 ```
 
+### Uniform data helpers
+
+Uniform-grid workflows are also available from the top-level AMRVAC namespace:
+
+```python
+from simesh.amrvac import (
+    datfile_to_vtk,
+    load_from_uniform,
+    load_uniform_data,
+    write_datfile_from_uniform,
+)
+
+ds = load_from_uniform(udata, w_names, xmin, xmax, block_nx)
+write_datfile_from_uniform("uniform.dat", udata, w_names, xmin, xmax, block_nx, overwrite=True)
+loaded, geometry = load_uniform_data("uniform.dat")
+datfile_to_vtk("uniform.dat", "uniform.vtk")
+```
+
 ### Low-level metadata access
 
 ```python
