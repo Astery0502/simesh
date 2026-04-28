@@ -5,11 +5,39 @@ from libc.stdlib cimport malloc, free
 from libc.stdint cimport uint32_t
 from libc.stddef cimport size_t
 from libc.math cimport ceil, floor
+from cython.parallel cimport prange
 
 import numpy as np
 
 from .forest cimport AMRForest
 from ..tree cimport treeptr
+
+
+cdef extern from *:
+    """
+    #ifdef _OPENMP
+    #define SIMESH_OPENMP_ENABLED 1
+    #define SIMESH_OPENMP_VERSION _OPENMP
+    #else
+    #define SIMESH_OPENMP_ENABLED 0
+    #define SIMESH_OPENMP_VERSION 0
+    #endif
+    """
+    int SIMESH_OPENMP_ENABLED
+    int SIMESH_OPENMP_VERSION
+
+
+def openmp_enabled():
+    """Return True when this extension was compiled with OpenMP support."""
+    return SIMESH_OPENMP_ENABLED != 0
+
+
+def openmp_build_info():
+    """Return OpenMP compile-time status for the AMR mesh extension."""
+    return {
+        "enabled": SIMESH_OPENMP_ENABLED != 0,
+        "openmp_version": SIMESH_OPENMP_VERSION,
+    }
 
 
 cdef inline double _abs_double(double value) noexcept nogil:
@@ -416,59 +444,109 @@ cdef class AMRMesh:
         double[:] xmin_new,
         double[:] xmax_new,
     ):
-        cdef uint32_t ileaf, idim
+        cdef Py_ssize_t ileaf
+        cdef uint32_t idim, ifield, nfields_out
         cdef double dx_uniform[3]
-        cdef int igmin[3]
-        cdef int igmax[3]
-        cdef uint32_t ix_uniform_in_block[3]
+        cdef double dx0, dx1, dx2
+        cdef double xmin0, xmin1, xmin2
+        cdef int igmin0, igmin1, igmin2
+        cdef int igmax0, igmax1, igmax2
+        cdef uint32_t ix0, ix1, ix2
         cdef int i, j, k
         cdef bint skip_leaf
 
         assert data.shape[0] == self.nleafs
         assert data.shape[1] == uniform_grid.shape[0]
+        nfields_out = <uint32_t>uniform_grid.shape[0]
 
         for idim in range(self.ndim):
             assert uniform_grid.shape[idim + 1] == nx[idim]
             dx_uniform[idim] = (xmax_new[idim] - xmin_new[idim]) / nx[idim]
 
-        for ileaf in range(self.nleafs):
+        if self.ndim != 3:
+            for ileaf in range(self.nleafs):
+                skip_leaf = False
+                for idim in range(self.ndim):
+                    igmin0 = <int>ceil((self.rnode[ileaf, idim] - xmin_new[idim]) / dx_uniform[idim] - 0.5)
+                    igmax0 = <int>floor((self.rnode[ileaf, idim + self.ndim] - xmin_new[idim]) / dx_uniform[idim] + 0.5)
+
+                    if igmin0 < 0:
+                        igmin0 = 0
+                    if igmax0 > <int>nx[idim]:
+                        igmax0 = <int>nx[idim]
+
+                    if igmin0 > igmax0:
+                        skip_leaf = True
+                        break
+                    if idim == 0:
+                        igmin1 = igmin0
+                        igmax1 = igmax0
+                    elif idim == 1:
+                        igmin2 = igmin0
+                        igmax2 = igmax0
+
+                if skip_leaf:
+                    continue
+
+                for i in range(igmin1, igmax1):
+                    ix0 = <uint32_t>floor(
+                        ((i + 0.5) * dx_uniform[0] + xmin_new[0] - self.rnode[ileaf, 0]) / self.rnode[ileaf, 2 * self.ndim]
+                    )
+                    for j in range(igmin2, igmax2):
+                        ix1 = <uint32_t>floor(
+                            ((j + 0.5) * dx_uniform[1] + xmin_new[1] - self.rnode[ileaf, 1]) / self.rnode[ileaf, 2 * self.ndim + 1]
+                        )
+                        for ifield in range(nfields_out):
+                            uniform_grid[ifield, i, j, 0] = data[ileaf, ifield, ix0, ix1, 0]
+            return
+
+        dx0 = dx_uniform[0]
+        dx1 = dx_uniform[1]
+        dx2 = dx_uniform[2]
+        xmin0 = xmin_new[0]
+        xmin1 = xmin_new[1]
+        xmin2 = xmin_new[2]
+
+        for ileaf in prange(self.nleafs, schedule="static", nogil=True):
             skip_leaf = False
-            for idim in range(self.ndim):
-                igmin[idim] = <int>ceil((self.rnode[ileaf, idim] - xmin_new[idim]) / dx_uniform[idim] - 0.5)
-                igmax[idim] = <int>floor((self.rnode[ileaf, idim + self.ndim] - xmin_new[idim]) / dx_uniform[idim] + 0.5)
+            igmin0 = <int>ceil((self.rnode[ileaf, 0] - xmin0) / dx0 - 0.5)
+            igmax0 = <int>floor((self.rnode[ileaf, 3] - xmin0) / dx0 + 0.5)
+            if igmin0 < 0:
+                igmin0 = 0
+            if igmax0 > <int>nx[0]:
+                igmax0 = <int>nx[0]
+            if igmin0 > igmax0:
+                skip_leaf = True
 
-                if igmin[idim] < 0:
-                    igmin[idim] = 0
-                if igmax[idim] > <int>nx[idim]:
-                    igmax[idim] = <int>nx[idim]
+            igmin1 = <int>ceil((self.rnode[ileaf, 1] - xmin1) / dx1 - 0.5)
+            igmax1 = <int>floor((self.rnode[ileaf, 4] - xmin1) / dx1 + 0.5)
+            if igmin1 < 0:
+                igmin1 = 0
+            if igmax1 > <int>nx[1]:
+                igmax1 = <int>nx[1]
+            if igmin1 > igmax1:
+                skip_leaf = True
 
-                if igmin[idim] > igmax[idim]:
-                    skip_leaf = True
-                    break
+            igmin2 = <int>ceil((self.rnode[ileaf, 2] - xmin2) / dx2 - 0.5)
+            igmax2 = <int>floor((self.rnode[ileaf, 5] - xmin2) / dx2 + 0.5)
+            if igmin2 < 0:
+                igmin2 = 0
+            if igmax2 > <int>nx[2]:
+                igmax2 = <int>nx[2]
+            if igmin2 > igmax2:
+                skip_leaf = True
 
             if skip_leaf:
                 continue
 
-            for i in range(igmin[0], igmax[0]):
-                for j in range(igmin[1], igmax[1]):
-                    for k in range(igmin[2], igmax[2]):
-                        ix_uniform_in_block[0] = <uint32_t>floor(
-                            ((i + 0.5) * dx_uniform[0] + xmin_new[0] - self.rnode[ileaf, 0]) / self.rnode[ileaf, 6]
-                        )
-                        ix_uniform_in_block[1] = <uint32_t>floor(
-                            ((j + 0.5) * dx_uniform[1] + xmin_new[1] - self.rnode[ileaf, 1]) / self.rnode[ileaf, 7]
-                        )
-                        ix_uniform_in_block[2] = <uint32_t>floor(
-                            ((k + 0.5) * dx_uniform[2] + xmin_new[2] - self.rnode[ileaf, 2]) / self.rnode[ileaf, 8]
-                        )
-
-                        uniform_grid[:, i, j, k] = data[
-                            ileaf,
-                            :,
-                            ix_uniform_in_block[0],
-                            ix_uniform_in_block[1],
-                            ix_uniform_in_block[2],
-                        ]
+            for i in range(igmin0, igmax0):
+                ix0 = <uint32_t>floor(((i + 0.5) * dx0 + xmin0 - self.rnode[ileaf, 0]) / self.rnode[ileaf, 6])
+                for j in range(igmin1, igmax1):
+                    ix1 = <uint32_t>floor(((j + 0.5) * dx1 + xmin1 - self.rnode[ileaf, 1]) / self.rnode[ileaf, 7])
+                    for k in range(igmin2, igmax2):
+                        ix2 = <uint32_t>floor(((k + 0.5) * dx2 + xmin2 - self.rnode[ileaf, 2]) / self.rnode[ileaf, 8])
+                        for ifield in range(nfields_out):
+                            uniform_grid[ifield, i, j, k] = data[ileaf, ifield, ix0, ix1, ix2]
 
     cpdef void uniform_grid_linear(
         self,
@@ -478,11 +556,14 @@ cdef class AMRMesh:
         double[:] xmax_new,
         uint32_t[:] field_positions,
     ):
-        cdef uint32_t ileaf, idim
+        cdef Py_ssize_t ileaf
+        cdef uint32_t idim
         cdef uint32_t ifield_out, ifield_src
         cdef double dx_uniform[3]
-        cdef int igmin[3]
-        cdef int igmax[3]
+        cdef double dx0, dx1, dx2
+        cdef double xmin0, xmin1, xmin2
+        cdef int igmin0, igmin1, igmin2
+        cdef int igmax0, igmax1, igmax2
         cdef int i, j, k
         cdef int i0, j0, k0
         cdef int i1, j1, k1
@@ -492,6 +573,7 @@ cdef class AMRMesh:
         cdef double c00, c01, c10, c11
         cdef double c0, c1
         cdef bint skip_leaf
+        cdef uint32_t nfields_out
 
         if self._data_ptr is NULL or self.ng == 0:
             raise ValueError("Linear uniform interpolation requires padded ghost-cell storage.")
@@ -499,54 +581,76 @@ cdef class AMRMesh:
             raise NotImplementedError("Linear uniform interpolation is currently implemented only for 3D meshes.")
 
         assert uniform_grid.shape[0] == field_positions.shape[0]
+        nfields_out = <uint32_t>field_positions.shape[0]
 
-        for ifield_out in range(<uint32_t>field_positions.shape[0]):
+        for ifield_out in range(nfields_out):
             assert field_positions[ifield_out] < self.nfields
 
         for idim in range(self.ndim):
             assert uniform_grid.shape[idim + 1] == nx[idim]
             dx_uniform[idim] = (xmax_new[idim] - xmin_new[idim]) / nx[idim]
 
-        for ileaf in range(self.nleafs):
+        dx0 = dx_uniform[0]
+        dx1 = dx_uniform[1]
+        dx2 = dx_uniform[2]
+        xmin0 = xmin_new[0]
+        xmin1 = xmin_new[1]
+        xmin2 = xmin_new[2]
+
+        for ileaf in prange(self.nleafs, schedule="static", nogil=True):
             skip_leaf = False
-            for idim in range(self.ndim):
-                igmin[idim] = <int>ceil((self.rnode[ileaf, idim] - xmin_new[idim]) / dx_uniform[idim] - 0.5)
-                igmax[idim] = <int>floor((self.rnode[ileaf, idim + self.ndim] - xmin_new[idim]) / dx_uniform[idim] + 0.5)
+            igmin0 = <int>ceil((self.rnode[ileaf, 0] - xmin0) / dx0 - 0.5)
+            igmax0 = <int>floor((self.rnode[ileaf, 3] - xmin0) / dx0 + 0.5)
+            if igmin0 < 0:
+                igmin0 = 0
+            if igmax0 > <int>nx[0]:
+                igmax0 = <int>nx[0]
+            if igmin0 > igmax0:
+                skip_leaf = True
 
-                if igmin[idim] < 0:
-                    igmin[idim] = 0
-                if igmax[idim] > <int>nx[idim]:
-                    igmax[idim] = <int>nx[idim]
+            igmin1 = <int>ceil((self.rnode[ileaf, 1] - xmin1) / dx1 - 0.5)
+            igmax1 = <int>floor((self.rnode[ileaf, 4] - xmin1) / dx1 + 0.5)
+            if igmin1 < 0:
+                igmin1 = 0
+            if igmax1 > <int>nx[1]:
+                igmax1 = <int>nx[1]
+            if igmin1 > igmax1:
+                skip_leaf = True
 
-                if igmin[idim] > igmax[idim]:
-                    skip_leaf = True
-                    break
+            igmin2 = <int>ceil((self.rnode[ileaf, 2] - xmin2) / dx2 - 0.5)
+            igmax2 = <int>floor((self.rnode[ileaf, 5] - xmin2) / dx2 + 0.5)
+            if igmin2 < 0:
+                igmin2 = 0
+            if igmax2 > <int>nx[2]:
+                igmax2 = <int>nx[2]
+            if igmin2 > igmax2:
+                skip_leaf = True
 
             if skip_leaf:
                 continue
 
-            for i in range(igmin[0], igmax[0]):
-                x = xmin_new[0] + (i + 0.5) * dx_uniform[0]
+            for i in range(igmin0, igmax0):
+                x = xmin0 + (i + 0.5) * dx0
                 gx = (x - self.rnode[ileaf, 0]) / self.rnode[ileaf, 6] - 0.5
                 i0 = <int>floor(gx) + <int>self.ng
                 i1 = i0 + 1
                 wx = gx - (i0 - <int>self.ng)
 
-                for j in range(igmin[1], igmax[1]):
-                    y = xmin_new[1] + (j + 0.5) * dx_uniform[1]
+                for j in range(igmin1, igmax1):
+                    y = xmin1 + (j + 0.5) * dx1
                     gy = (y - self.rnode[ileaf, 1]) / self.rnode[ileaf, 7] - 0.5
                     j0 = <int>floor(gy) + <int>self.ng
                     j1 = j0 + 1
                     wy = gy - (j0 - <int>self.ng)
 
-                    for k in range(igmin[2], igmax[2]):
-                        z = xmin_new[2] + (k + 0.5) * dx_uniform[2]
+                    for k in range(igmin2, igmax2):
+                        z = xmin2 + (k + 0.5) * dx2
                         gz = (z - self.rnode[ileaf, 2]) / self.rnode[ileaf, 8] - 0.5
                         k0 = <int>floor(gz) + <int>self.ng
                         k1 = k0 + 1
                         wz = gz - (k0 - <int>self.ng)
 
-                        for ifield_out in range(<uint32_t>field_positions.shape[0]):
+                        for ifield_out in range(nfields_out):
                             ifield_src = field_positions[ifield_out]
                             c00 = (
                                 self.data[ileaf, i0, j0, k0, ifield_src] * (1.0 - wz)
@@ -777,7 +881,7 @@ cdef class AMRMesh:
                         data_array[o1, o2, o3, ifield] = data_array[i1, i2, i3, ifield]
 
     cdef void coarsen_grid(self, uint32_t ileaf):
-        cdef uint32_t ixCo1, ixCo2, ixCo3
+        cdef int ixCo1, ixCo2, ixCo3
         cdef uint32_t ixFi1, ixFi2, ixFi3
         cdef uint32_t ifield
         cdef double sum_value
@@ -1131,20 +1235,22 @@ cdef class AMRMesh:
 
                     for ifield in range(self.nfields):
                         center_value = self.datac[ileaf, ixCo1, ixCo2, ixCo3, ifield]
-                        value = center_value
-                        value += _limited_slope(
-                            self.datac[ileaf, ixCo1 - 1, ixCo2, ixCo3, ifield],
-                            center_value,
-                            self.datac[ileaf, ixCo1 + 1, ixCo2, ixCo3, ifield],
-                        ) * eta1
-                        value += _limited_slope(
-                            self.datac[ileaf, ixCo1, ixCo2 - 1, ixCo3, ifield],
-                            center_value,
-                            self.datac[ileaf, ixCo1, ixCo2 + 1, ixCo3, ifield],
-                        ) * eta2
-                        value += _limited_slope(
-                            self.datac[ileaf, ixCo1, ixCo2, ixCo3 - 1, ifield],
-                            center_value,
-                            self.datac[ileaf, ixCo1, ixCo2, ixCo3 + 1, ifield],
-                        ) * eta3
+                        value = (
+                            center_value
+                            + _limited_slope(
+                                self.datac[ileaf, ixCo1 - 1, ixCo2, ixCo3, ifield],
+                                center_value,
+                                self.datac[ileaf, ixCo1 + 1, ixCo2, ixCo3, ifield],
+                            ) * eta1
+                            + _limited_slope(
+                                self.datac[ileaf, ixCo1, ixCo2 - 1, ixCo3, ifield],
+                                center_value,
+                                self.datac[ileaf, ixCo1, ixCo2 + 1, ixCo3, ifield],
+                            ) * eta2
+                            + _limited_slope(
+                                self.datac[ileaf, ixCo1, ixCo2, ixCo3 - 1, ifield],
+                                center_value,
+                                self.datac[ileaf, ixCo1, ixCo2, ixCo3 + 1, ifield],
+                            ) * eta3
+                        )
                         self.data[ileaf, ixFi1, ixFi2, ixFi3, ifield] = value

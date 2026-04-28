@@ -38,6 +38,37 @@ before running:
 PYTHONPATH=src python3 -m benchmarks.amrvac_scaling --profile large
 ```
 
+## OpenMP Thread Scaling
+
+OpenMP is not part of the default build. After building the AMR extensions with
+OpenMP, the thread benchmark compares the canonical ghost-cell/interpolation
+workflow over multiple mesh sizes and thread counts:
+
+```bash
+make build-amr-openmp
+PYTHONPATH=src OMP_DYNAMIC=FALSE python3 -m benchmarks.amr_openmp_threads \
+  --profile standard \
+  --threads 1,2,4,8 \
+  --repetitions 3 \
+  --warmups 1
+```
+
+If the build machine has no OpenMP implementation, keep using `make build-amr`
+and skip this benchmark. You can confirm the compiled status with:
+
+```bash
+PYTHONPATH=src python3 -c "from simesh.utils import openmp_build_info; print(openmp_build_info())"
+```
+
+For a quick local check:
+
+```bash
+make benchmark-openmp-threads
+```
+
+The report marks each thread result with speedup versus the matching 1-thread
+median and parallel efficiency, for example `1.40x / 70%`.
+
 ## Parameters
 
 The default block size is `(10, 10, 10)`. This differs from the earlier planning

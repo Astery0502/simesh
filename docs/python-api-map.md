@@ -35,6 +35,16 @@ the low-memory path when ghost-cell storage is not wanted. For level-1 data
 sampled on the native full-domain grid, `uniform_full()` is the exact block
 placement path rather than a resampling path.
 
+OpenMP acceleration is exposed as build/runtime introspection rather than as a
+separate resampling API:
+
+- `simesh.utils.openmp_enabled()`
+- `simesh.utils.openmp_build_info()`
+
+When the AMR extension is compiled with OpenMP, the Cython uniform-grid kernels
+use the same high-level AMRVAC calls and OpenMP thread count is controlled by
+standard runtime environment variables such as `OMP_NUM_THREADS`.
+
 ## Main objects behind the entrypoints
 
 ### Dataset

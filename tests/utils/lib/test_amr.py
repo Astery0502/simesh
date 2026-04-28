@@ -1,7 +1,12 @@
+import os
+
+os.environ.setdefault("OMP_NUM_THREADS", "2")
+
 import numpy as np
 
 from simesh.legacy.geometry.amr.amr_forest import AMRForest as LegacyAMRForest
 from simesh.legacy.meshes.amr_mesh import AMRMesh as LegacyAMRMesh
+from simesh.utils import openmp_build_info, openmp_enabled
 from simesh.utils.lib.amr.forest import AMRForest
 from simesh.utils.lib.amr.mesh import AMRMesh
 from simesh.utils.lib.amr.morton import fill_morton_mapping3D, pmorton3D
@@ -23,6 +28,14 @@ def interleave_bits(ign):
             bit_z = (ign[2] >> i) & 1
             answer |= (bit_x << (3 * i)) | (bit_y << (3 * i + 1)) | (bit_z << (3 * i + 2))
     return answer
+
+
+def test_openmp_build_info_is_available():
+    info = openmp_build_info()
+    assert isinstance(openmp_enabled(), bool)
+    assert isinstance(info["enabled"], bool)
+    assert isinstance(info["openmp_version"], int)
+    assert info["available"] is True
 
 
 def _level1_sfc_index(root_grid, coord):
@@ -314,6 +327,55 @@ def test_uniform_grid_linear_uses_ghost_cells():
     np.testing.assert_allclose(uniform_grid[1], expected + 10.0, rtol=1e-12, atol=1e-12)
 
 
+def test_uniform_grid_linear_respects_reordered_fields():
+    forest, mesh, _, block_nx = _mesh_pair(
+        np.ones(8, dtype=np.int32),
+        root_grid=(2, 2, 2),
+        nghost=1,
+        nfields=3,
+        block_nx=(4, 4, 4),
+    )
+    data = np.zeros((forest.nleafs, 3, *block_nx), dtype=np.double)
+
+    ix = np.arange(block_nx[0], dtype=np.double)[:, None, None]
+    iy = np.arange(block_nx[1], dtype=np.double)[None, :, None]
+    iz = np.arange(block_nx[2], dtype=np.double)[None, None, :]
+
+    for ileaf in range(int(forest.nleafs)):
+        x = mesh.rnode[ileaf, 0] + (ix + 0.5) * mesh.rnode[ileaf, 6]
+        y = mesh.rnode[ileaf, 1] + (iy + 0.5) * mesh.rnode[ileaf, 7]
+        z = mesh.rnode[ileaf, 2] + (iz + 0.5) * mesh.rnode[ileaf, 8]
+        base = x + 2.0 * y + 3.0 * z
+        data[ileaf, 0] = base
+        data[ileaf, 1] = base + 10.0
+        data[ileaf, 2] = base + 20.0
+
+    mesh.load_interior_data(data)
+    mesh.apply_ghost_cells()
+
+    xmin = np.array([0.25, 0.25, 0.25], dtype=np.double)
+    xmax = np.array([0.75, 0.75, 0.75], dtype=np.double)
+    nx = np.array([6, 6, 6], dtype=np.uint32)
+    uniform_grid = np.zeros((2, 6, 6, 6), dtype=np.double)
+
+    mesh.uniform_grid_linear(
+        uniform_grid,
+        nx,
+        xmin,
+        xmax,
+        np.array([2, 0], dtype=np.uint32),
+    )
+
+    dx = (xmax - xmin) / nx
+    x = xmin[0] + (np.arange(nx[0], dtype=np.double)[:, None, None] + 0.5) * dx[0]
+    y = xmin[1] + (np.arange(nx[1], dtype=np.double)[None, :, None] + 0.5) * dx[1]
+    z = xmin[2] + (np.arange(nx[2], dtype=np.double)[None, None, :] + 0.5) * dx[2]
+    expected = x + 2.0 * y + 3.0 * z
+
+    np.testing.assert_allclose(uniform_grid[0], expected + 20.0, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(uniform_grid[1], expected, rtol=1e-12, atol=1e-12)
+
+
 def test_uniform_full_level1():
     ng1 = ng2 = ng3 = 2
     is_leaf = np.ones(ng1 * ng2 * ng3, dtype=np.int32)
@@ -360,6 +422,31 @@ def test_getbc_matches_legacy_reference():
     assert np.allclose(mesh.padded_view(), legacy_mesh.data)
 
 
+def test_getbc_parallel_mixed_topology_matches_legacy():
+    root_grid = (4, 3, 2)
+    refined_coords = [(0, 0, 0), (1, 1, 0), (2, 1, 1)]
+    block_nx = (6, 4, 4)
+    nfields = 4
+    is_leaf = _forest_flags(root_grid, refined_coords)
+    forest, mesh, legacy_mesh, block_nx_array = _mesh_pair(
+        is_leaf,
+        root_grid=root_grid,
+        nghost=2,
+        nfields=nfields,
+        block_nx=block_nx,
+    )
+    data = _patterned_block_data(int(forest.nleafs), nfields, tuple(int(v) for v in block_nx_array), "quadratic")
+
+    mesh.load_interior_data(data)
+    _load_legacy_interior(legacy_mesh, data)
+
+    mesh.apply_ghost_cells()
+    legacy_mesh.getbc()
+
+    assert np.array_equal(mesh.interior_view(), data)
+    np.testing.assert_allclose(mesh.padded_view(), legacy_mesh.data, rtol=1e-12, atol=1e-12)
+
+
 def test_getbc_matches_legacy_across_topologies_and_patterns():
     cases = [
         ("uniform_level1", (2, 2, 2), [], 1, 2, (4, 4, 4)),
@@ -367,6 +454,7 @@ def test_getbc_matches_legacy_across_topologies_and_patterns():
         ("opposite_corner_refined", (2, 2, 2), [(1, 1, 1)], 2, 3, (4, 4, 4)),
         ("interior_refined", (3, 3, 3), [(1, 1, 1)], 2, 2, (4, 4, 4)),
         ("adjacent_refined", (3, 2, 2), [(0, 0, 0), (1, 0, 0)], 2, 2, (4, 4, 4)),
+        ("mixed_parallel_stress", (4, 3, 2), [(0, 0, 0), (1, 1, 0), (2, 1, 1)], 2, 4, (6, 4, 4)),
         ("uniform_wide_blocks", (2, 2, 2), [], 1, 2, (6, 4, 8)),
     ]
 
@@ -403,6 +491,8 @@ def test_getbc_matches_legacy_across_topologies_and_patterns():
 
 def run_tests():
     print("Running tests for amr submodule...")
+    test_openmp_build_info_is_available()
+    print("test_openmp_build_info_is_available passed")
     test_pmorton3D()
     print("test_pmorton3D passed")
     test_morton2D()
@@ -423,10 +513,14 @@ def run_tests():
     print("test_uniform_grid_zero_order passed")
     test_uniform_grid_linear_uses_ghost_cells()
     print("test_uniform_grid_linear_uses_ghost_cells passed")
+    test_uniform_grid_linear_respects_reordered_fields()
+    print("test_uniform_grid_linear_respects_reordered_fields passed")
     test_uniform_full_level1()
     print("test_uniform_full_level1 passed")
     test_getbc_matches_legacy_reference()
     print("test_getbc_matches_legacy_reference passed")
+    test_getbc_parallel_mixed_topology_matches_legacy()
+    print("test_getbc_parallel_mixed_topology_matches_legacy passed")
     test_getbc_matches_legacy_across_topologies_and_patterns()
     print("test_getbc_matches_legacy_across_topologies_and_patterns passed")
     print("All tests passed for amr submodule!")

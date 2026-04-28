@@ -68,6 +68,46 @@ pip install -e .
 - Cython ≥ 3.0 for source builds
 - JupyterLab and ipykernel are optional development dependencies
 
+#### Optional OpenMP acceleration
+
+OpenMP is optional and is not enabled by default. The default installation path
+builds the AMR Cython kernels without OpenMP compiler/linker flags, so it should
+work on systems that do not have an OpenMP runtime installed.
+
+To opt into OpenMP during installation:
+
+```bash
+SIMESH_OPENMP=1 pip install .
+```
+
+For editable development builds:
+
+```bash
+SIMESH_OPENMP=1 pip install -e .
+make build-amr-openmp
+```
+
+If your system has no OpenMP implementation, use the default build commands and
+do not set `SIMESH_OPENMP=1` or pass `--openmp`. On macOS, OpenMP usually
+requires installing `libomp` first, for example with Homebrew. On Linux, GCC
+usually provides OpenMP through `-fopenmp`.
+
+Check the compiled extension status from Python:
+
+```python
+from simesh.utils import openmp_build_info, openmp_enabled
+
+print(openmp_enabled())
+print(openmp_build_info())
+```
+
+When OpenMP is enabled, control runtime thread count with standard OpenMP
+environment variables, for example:
+
+```bash
+OMP_NUM_THREADS=4 OMP_DYNAMIC=FALSE python your_script.py
+```
+
 ## Development build and test
 
 Package installation compiles all Cython modules found under
@@ -87,6 +127,7 @@ Notes:
 
 - `make build` compiles all `.pyx` files under `src/simesh/utils/lib/`
 - `make build-amr` compiles only the `src/simesh/utils/lib/amr/` subtree
+- `make build-amr-openmp` rebuilds the AMR Cython subtree with OpenMP enabled
 - after editing `.pyx` files, rerun `make build` to rebuild extensions in place
 - `make clean` removes compiled extensions and generated packaging artifacts
 - `make test` rebuilds extensions and runs the script-based tests under `tests/`
@@ -123,7 +164,9 @@ Choose the interpolation mode by intent and memory budget:
   want to allocate ghost-cell storage.
 - `interpolation="linear"` performs trilinear resampling through the canonical
   Cython ghost-cell path. Use it when you want smoother uniform-grid sampling
-  across AMR blocks and can afford `ghost_width > 0`.
+  across AMR blocks and can afford `ghost_width > 0`. This path uses OpenMP
+  thread parallelism when the AMR extension was compiled with OpenMP; otherwise
+  it runs through the same code path without OpenMP threading.
 - For purely uniform level-1 data sampled on its native full-domain grid, prefer
   the exact full-grid path through `open_dataset(...).uniform_full()`.
 

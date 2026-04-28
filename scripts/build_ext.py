@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 import shutil
 
-def build_cython(group=None, clean=False):
+def build_cython(group=None, clean=False, openmp=False):
     root_dir = Path(__file__).parent.parent
     build_script = root_dir / 'build.py'  # Get absolute path to build.py
     
@@ -22,6 +22,8 @@ def build_cython(group=None, clean=False):
     cmd = [sys.executable, str(build_script), '--inplace']  # Use absolute path
     if group:
         cmd.extend(['--group', group])
+    if openmp:
+        cmd.append('--openmp')
     
     subprocess.run(cmd, cwd=str(root_dir), check=True)
 
@@ -30,6 +32,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--group', help='Specific subdirectory under src/simesh/utils/lib to compile')
     parser.add_argument('--clean', action='store_true', help='Clean before building')
+    parser.add_argument('--openmp', action='store_true', help='Build with OpenMP compiler and linker flags')
     args = parser.parse_args()
     
-    build_cython(args.group, args.clean)
+    build_cython(args.group, args.clean, args.openmp)
