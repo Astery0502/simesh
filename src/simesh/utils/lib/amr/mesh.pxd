@@ -49,11 +49,16 @@ cdef class AMRMesh:
         # physical boundary indices to help identify physical boundaries
         int[:,:] idphyb
 
+        # physical boundary condition mode per field and physical side
+        int[:,:] bc_type
+        int normal_velocity_field[3]
+
         # Store original pointers for deallocation
         double* _data_ptr
         double* _datac_ptr
         double* _rnode_ptr
         int* _idphyb_ptr
+        int* _bc_type_ptr
 
         # grid indices
         int ixGmin[3]
@@ -109,6 +114,8 @@ cdef class AMRMesh:
     cdef void _init_block_coordinates(self)
 
     cdef void _allocate_padded_storage(self)
+
+    cdef void _allocate_boundary_storage(self, object boundary_conditions, object normal_velocity_fields)
 
     cdef void _ensure_idphyb_storage(self)
 

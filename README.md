@@ -78,6 +78,7 @@ Start with the page that matches your role:
 
 ## Limits of the current user surface
 
-`simesh` currently targets Cartesian 2D and Cartesian 3D AMR meshes. Several
-paths and tests assume constant or simple physical boundary handling. Broader
-geometry support should be treated as outside the current stable user workflow.
+`simesh` currently targets Cartesian 2D and Cartesian 3D AMR meshes. Ghost-cell
+fills support continuous, symmetric, antisymmetric, and no-inflow physical
+boundary modes on those Cartesian meshes. Broader geometry support should be
+treated as outside the current stable user workflow.

@@ -111,6 +111,27 @@ def _mesh_2d(is_leaf, root_grid=(2, 2, 1), nghost=1, nfields=1, block_nx=(4, 4))
     return forest, mesh, block_nx
 
 
+def _level1_boundary_mesh(boundary_conditions=None, normal_velocity_fields=None, nfields=2):
+    forest = AMRForest(3, 1, 1, 1, np.ones(1, dtype=np.int32))
+    block_nx = np.array([4, 4, 4], dtype=np.uint32)
+    domain_nx = block_nx.copy()
+    xmin = np.array([0.0, 0.0, 0.0], dtype=np.double)
+    xmax = np.array([1.0, 1.0, 1.0], dtype=np.double)
+    mesh = AMRMesh(
+        3,
+        block_nx,
+        domain_nx,
+        xmin,
+        xmax,
+        np.uint32(2),
+        np.uint32(nfields),
+        forest,
+        boundary_conditions,
+        normal_velocity_fields,
+    )
+    return mesh, block_nx
+
+
 def _refined_fixture(nghost=2, nfields=1, block_nx=(4, 4, 4)):
     root_grid = (2, 2, 2)
     is_leaf = _forest_flags(root_grid, refined_coords=[(0, 0, 0)])
@@ -305,6 +326,64 @@ def test_mesh_load_interior_data_exposes_view():
 
     interior[0, 1, 0, 0, 0] = -7.0
     assert mesh.interior_view()[0, 1, 0, 0, 0] == -7.0
+
+
+def test_level1_physical_boundary_modes():
+    data = _sample_block_data(1, 2, (4, 4, 4))
+    modes = {"cont": 0, "symm": 1, "asymm": 2}
+
+    for mode, code in modes.items():
+        table = np.zeros((2, 6), dtype=np.int32)
+        table[0, 0] = code
+        mesh, _ = _level1_boundary_mesh(table)
+        mesh.load_interior_data(data)
+        mesh.apply_ghost_cells()
+        padded = mesh.padded_view()[0, :, :, :, 0]
+
+        if mode == "cont":
+            expected = np.stack([data[0, 0, 0], data[0, 0, 0]], axis=0)
+        elif mode == "symm":
+            expected = np.stack([data[0, 0, 1], data[0, 0, 0]], axis=0)
+        else:
+            expected = -np.stack([data[0, 0, 1], data[0, 0, 0]], axis=0)
+
+        np.testing.assert_allclose(padded[0:2, 2:6, 2:6], expected[:, :, :])
+
+
+def test_level1_noinflow_clips_normal_component():
+    data = _sample_block_data(1, 2, (4, 4, 4))
+    data[0, 1, :, :, :] = np.array([2.0, 1.0, -1.0, -2.0])[:, None, None]
+    table = np.zeros((2, 6), dtype=np.int32)
+    table[:, 0] = 3
+    table[:, 1] = 3
+
+    mesh, _ = _level1_boundary_mesh(table, np.array([1, -1, -1], dtype=np.int32))
+    mesh.load_interior_data(data)
+    mesh.apply_ghost_cells()
+    padded = mesh.padded_view()[0]
+
+    assert np.all(padded[0:2, 2:6, 2:6, 1] == 0.0)
+    assert np.all(padded[6:8, 2:6, 2:6, 1] == 0.0)
+    np.testing.assert_allclose(padded[0:2, 2:6, 2:6, 0], np.stack([data[0, 0, 0], data[0, 0, 0]]))
+    np.testing.assert_allclose(padded[6:8, 2:6, 2:6, 0], np.stack([data[0, 0, 3], data[0, 0, 3]]))
+
+
+def test_level1_physical_boundary_edge_and_corner_repeated_fills():
+    data = _sample_block_data(1, 1, (4, 4, 4))
+    table = np.zeros((1, 6), dtype=np.int32)
+    table[0, 0] = 1
+    table[0, 2] = 2
+    table[0, 4] = 1
+
+    mesh, _ = _level1_boundary_mesh(table, nfields=1)
+    mesh.load_interior_data(data)
+    mesh.apply_ghost_cells()
+    padded = mesh.padded_view()[0, :, :, :, 0]
+
+    assert padded[1, 1, 1] == -data[0, 0, 0, 0, 0]
+    assert padded[0, 1, 1] == -data[0, 0, 1, 0, 0]
+    assert padded[1, 0, 1] == -data[0, 0, 0, 1, 0]
+    assert padded[1, 1, 0] == -data[0, 0, 0, 0, 1]
 
 
 def test_uniform_grid_zero_order():
@@ -599,6 +678,12 @@ def run_tests():
     print("test_init_amr_mesh_with_ghost_storage passed")
     test_mesh_load_interior_data_exposes_view()
     print("test_mesh_load_interior_data_exposes_view passed")
+    test_level1_physical_boundary_modes()
+    print("test_level1_physical_boundary_modes passed")
+    test_level1_noinflow_clips_normal_component()
+    print("test_level1_noinflow_clips_normal_component passed")
+    test_level1_physical_boundary_edge_and_corner_repeated_fills()
+    print("test_level1_physical_boundary_edge_and_corner_repeated_fills passed")
     test_uniform_grid_zero_order()
     print("test_uniform_grid_zero_order passed")
     test_uniform_grid_linear_uses_ghost_cells()

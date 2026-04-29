@@ -1,4 +1,5 @@
 import numpy as np
+from .boundary import normalize_boundary_conditions
 from .datio import get_metadata, read_blocks_sequential
 from .datio import update_header, write_datfile_from_sfc
 from .dataset_base import DataSet
@@ -10,15 +11,32 @@ class AMRVACDataSet(DataSet):
     """
     AMRVAC specific implementation of DataSet.
     """
-    def __init__(self, sfile: str, ghost_width: int = 0):
+    def __init__(self, sfile: str, ghost_width: int = 0, boundary_conditions=None):
         self.ghost_width = int(ghost_width)
         if self.ghost_width < 0:
             raise ValueError("ghost_width must be non-negative")
+        self.boundary_conditions = boundary_conditions
         super().__init__(sfile)
 
-    def _build_mesh(self, nfields: int | None = None):
+    def _build_mesh(
+        self,
+        nfields: int | None = None,
+        field_indices: list[int] | None = None,
+        boundary_table=None,
+        normal_velocity_fields=None,
+    ):
         if nfields is None:
             nfields = int(self.nw)
+        if boundary_table is None or normal_velocity_fields is None:
+            if field_indices is None:
+                field_names = list(self.wnames[:nfields])
+            else:
+                field_names = [self.wnames[i] for i in field_indices]
+            boundary_table, normal_velocity_fields = normalize_boundary_conditions(
+                self.boundary_conditions,
+                field_names,
+                int(self.ndim),
+            )
 
         return AMRMesh(
             self.ndim,
@@ -29,6 +47,8 @@ class AMRVACDataSet(DataSet):
             np.uint32(self.ghost_width),
             np.uint32(nfields),
             self.forest,
+            boundary_table,
+            normal_velocity_fields,
         )
 
     def load_metadata(self):
@@ -82,7 +102,7 @@ class AMRVACDataSet(DataSet):
         print("Size of each block: {self.block_nx}")
         print("Maximum level: {self.levmax}")
 
-    def load_data(self, field_indices: list[int] = None):
+    def load_data(self, field_indices: list[int] = None, boundary_conditions=None):
         """
         Load the amr 1d managed block data from the data file
         Can reload the data if the field_indices are different
@@ -92,11 +112,28 @@ class AMRVACDataSet(DataSet):
         else:
             field_indices = [int(i) for i in field_indices]
 
+        if boundary_conditions is not None:
+            self.boundary_conditions = boundary_conditions
+
+        field_names = [self.wnames[i] for i in field_indices]
+        boundary_table, normal_velocity_fields = normalize_boundary_conditions(
+            self.boundary_conditions,
+            field_names,
+            int(self.ndim),
+        )
+        self.boundary_condition_table = boundary_table
+        self.normal_velocity_fields = normal_velocity_fields
+
         data = read_blocks_sequential(self.sfile, field_indices)
         if int(self.ndim) == 2:
             data = data[:, :, :, :, np.newaxis]
         if self.ghost_width > 0:
-            self.mesh = self._build_mesh(len(field_indices))
+            self.mesh = self._build_mesh(
+                len(field_indices),
+                field_indices,
+                boundary_table=boundary_table,
+                normal_velocity_fields=normal_velocity_fields,
+            )
             self.mesh.load_interior_data(np.ascontiguousarray(data, dtype=np.double))
             self.mesh.apply_ghost_cells()
             self.data = self.mesh.interior_view()
