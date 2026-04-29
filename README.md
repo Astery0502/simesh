@@ -23,6 +23,18 @@ The current public surface is focused on Cartesian 2D and Cartesian 3D AMR data.
 
 ## Start here
 
+Start with the native AMR block view when you want to inspect a snapshot without
+changing its adaptive structure:
+
+```python
+from simesh.amrvac import read_blocks
+
+blocks = read_blocks("snapshot.dat", field_indices=[0, 1])
+```
+
+Use a uniform grid only when your next step needs resampled data, such as
+plotting or analysis on a fixed Cartesian mesh:
+
 ```python
 from simesh.amrvac import read_uniform
 
@@ -33,19 +45,7 @@ grid = read_uniform(
 )
 ```
 
-The returned array uses user-facing uniform layout:
-
-```text
-(nx, ny, nz, nw)
-```
-
-For native AMR block data:
-
-```python
-from simesh.amrvac import read_blocks
-
-blocks = read_blocks("snapshot.dat", field_indices=[0, 1])
-```
+Uniform arrays use the user-facing layout `(nx, ny, nz, nw)`.
 
 ## Choose an interface
 
