@@ -21,6 +21,23 @@ extraction.
 
 The current public surface is focused on Cartesian 2D and Cartesian 3D AMR data.
 
+## Quick install
+
+Use Python 3.11 or newer. From the repository root:
+
+```bash
+pip install .
+```
+
+For editable local development:
+
+```bash
+pip install -e .
+```
+
+Source builds require NumPy and Cython; see `docs/installation.md` for the full
+install, build, and test workflow.
+
 ## Start here
 
 Start with the native AMR block view when you want to inspect a snapshot without
