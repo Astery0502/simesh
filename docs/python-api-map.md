@@ -5,6 +5,14 @@
 This document identifies the Python modules that are most relevant for user
 workflows and how they relate to the lower-level AMR implementation.
 
+For task-oriented user documentation, start with:
+
+- `README.md`
+- `docs/README.md`
+- `docs/user-guide.md`
+- `docs/2d-guide.md`
+- `docs/api-reference.md`
+
 ## Primary public entrypoints
 
 The clean user-facing API is exported from:
@@ -14,10 +22,14 @@ The clean user-facing API is exported from:
 
 The main public functions are:
 
+- `datfile_to_vtk(path, output_path, field_indices=None)`
+- `load_from_uniform(udata, w_names, xmin, xmax, block_nx, **kwargs)`
+- `load_uniform_data(path, field_indices=None, return_geometry=True)`
 - `open_dataset(path, *, ghost_width=0)`
 - `read_blocks(path, *, field_indices=None, ghost_width=0, include_ghosts=False)`
 - `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0, interpolation="zero")`
 - `write_datfile(path, output_path, *, field_indices=None, ghost_width=0, overwrite=False)`
+- `write_datfile_from_uniform(path, udata, w_names, xmin, xmax, block_nx, overwrite=False, **header_updates)`
 
 The lower-level canonical Python modules live in:
 
@@ -29,11 +41,18 @@ stateful dataset implementation, and `datio.py` as the canonical low-level
 AMRVAC format module.
 
 `read_uniform(..., interpolation="linear", ghost_width=1)` exposes the
-canonical Cython-backed trilinear interpolation path. Keep ``"zero"`` as the
-default for compatibility with the previous piecewise-constant behavior and as
-the low-memory path when ghost-cell storage is not wanted. For level-1 data
-sampled on the native full-domain grid, `uniform_full()` is the exact block
-placement path rather than a resampling path.
+canonical Cython-backed interpolation path: trilinear for 3D data and bilinear
+for Cartesian 2D data. Keep ``"zero"`` as the default for compatibility with
+the previous piecewise-constant behavior and as the low-memory path when
+ghost-cell storage is not wanted. For level-1 data sampled on the native
+full-domain grid, `uniform_full()` is the exact block placement path rather
+than a resampling path.
+
+Cartesian 2D files are represented with AMRVAC `ndim=2` metadata on disk, but
+the Python array API keeps the singleton-z convention. `read_uniform()` accepts
+2D resolutions as `(nx, ny)` or `(nx, ny, 1)` and returns `(nx, ny, 1, nw)`.
+`load_from_uniform()` and `write_datfile_from_uniform()` use the same
+singleton-z convention for user-facing 2D uniform arrays.
 
 OpenMP acceleration is exposed as build/runtime introspection rather than as a
 separate resampling API:
@@ -85,6 +104,9 @@ The canonical AMRVAC path uses three explicit layout conventions:
 - `datau`: compute-oriented uniform data with shape `(nw, nx, ny, nz)`
 - `sfc_data`: Morton/SFC block data with shape `(nleafs, nw, bx, by, bz)`
 
+For Cartesian 2D data, `nz` and `bz` are always one in Python arrays while
+AMRVAC headers and tree block indices remain two-dimensional.
+
 Helpers for converting between `udata` and `datau` live in:
 
 - `src/simesh/amrvac/layouts.py`
@@ -93,6 +115,9 @@ Helpers for converting between `udata` and `datau` live in:
 
 When adding new user-facing functions:
 
-- document them first in `README.md` if they are high-level
-- document them here if they are part of the intended Python API surface
+- document the workflow in `docs/user-guide.md` if users should choose it
+- document the function in `docs/api-reference.md` if it is part of the public
+  `simesh.amrvac` API
+- keep `README.md` as a short entry point with only high-level examples
+- document it here if it changes the intended Python API surface
 - document implementation details in one of the technical notes under `docs/`

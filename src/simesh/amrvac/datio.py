@@ -351,11 +351,19 @@ def extract_uniform_data(file_path: str, field_indices=None) -> tuple[np.ndarray
     block_nx = np.asarray(header["block_nx"], dtype=np.int32)
     block_ixs = np.asarray(tree_info[1], dtype=np.int32)
 
-    udata = np.zeros((*domain_nx, len(field_indices)), dtype=np.float64)
+    if int(header["ndim"]) == 2:
+        udata = np.zeros((domain_nx[0], domain_nx[1], 1, len(field_indices)), dtype=np.float64)
+    else:
+        udata = np.zeros((*domain_nx, len(field_indices)), dtype=np.float64)
     for ileaf, block_idx in enumerate(block_ixs):
-        x0, y0, z0 = (block_idx - 1) * block_nx
-        x1, y1, z1 = block_idx * block_nx
-        udata[x0:x1, y0:y1, z0:z1, :] = np.transpose(block_data[ileaf], (1, 2, 3, 0))
+        if int(header["ndim"]) == 2:
+            x0, y0 = (block_idx - 1) * block_nx
+            x1, y1 = block_idx * block_nx
+            udata[x0:x1, y0:y1, 0, :] = np.transpose(block_data[ileaf], (1, 2, 0))
+        else:
+            x0, y0, z0 = (block_idx - 1) * block_nx
+            x1, y1, z1 = block_idx * block_nx
+            udata[x0:x1, y0:y1, z0:z1, :] = np.transpose(block_data[ileaf], (1, 2, 3, 0))
 
     header_out = header.copy()
     header_out["nw"] = len(field_indices)
@@ -538,15 +546,20 @@ def _normalize_header_for_sfc_write(header: dict, data: np.ndarray) -> dict:
     if data.ndim != 5:
         raise ValueError(f"data must be a 5D array with shape (nleafs, nfields, bx, by, bz), got {data.shape}")
 
-    if int(header["ndim"]) != 3:
-        raise ValueError(f"Only 3D canonical AMRVAC writing is supported for now, got ndim={header['ndim']}")
-
     nleafs, nfields, bx, by, bz = data.shape
+    ndim = int(header["ndim"])
+    if ndim not in (2, 3):
+        raise ValueError(f"Only 2D and 3D canonical AMRVAC writing is supported for now, got ndim={header['ndim']}")
+    if ndim == 2 and bz != 1:
+        raise ValueError(f"2D AMRVAC writing expects singleton z block size, got bz={bz}")
 
     header_new = header.copy()
     header_new["nw"] = int(nfields)
     header_new["nleafs"] = int(nleafs)
-    header_new["block_nx"] = np.array([bx, by, bz], dtype=np.int32)
+    if ndim == 2:
+        header_new["block_nx"] = np.array([bx, by], dtype=np.int32)
+    else:
+        header_new["block_nx"] = np.array([bx, by, bz], dtype=np.int32)
 
     if "w_names" not in header_new:
         raise ValueError("header must contain 'w_names'")
@@ -701,7 +714,10 @@ def write_blocks(fi, data, ndim, offsets):
         fi.write(packed_data)
 
         fmt = ALIGN + np.prod(block_array.shape) * "d"
-        block_data = np.transpose(block_array, (0,3,2,1)).flatten()
+        if ndim == 2:
+            block_data = np.transpose(block_array[:, :, :, 0], (0, 2, 1)).flatten()
+        else:
+            block_data = np.transpose(block_array, (0,3,2,1)).flatten()
         packed_data = struct.pack(fmt, *block_data)
         fi.write(packed_data)
 

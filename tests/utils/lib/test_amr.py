@@ -59,6 +59,20 @@ def _forest_flags(root_grid, refined_coords=()):
     return np.array(flags, dtype=np.int32)
 
 
+def _forest_flags_2d(root_grid=(2, 2, 1), refined_coords=()):
+    refined_roots = {_level1_sfc_index(root_grid, coord) for coord in refined_coords}
+    flags = []
+
+    for isfc in range(np.prod(root_grid)):
+        if isfc in refined_roots:
+            flags.append(False)
+            flags.extend([True] * 4)
+        else:
+            flags.append(True)
+
+    return np.array(flags, dtype=np.int32)
+
+
 def _mesh_pair(is_leaf, root_grid=(2, 2, 2), nghost=2, nfields=1, block_nx=(4, 4, 4)):
     ng1, ng2, ng3 = root_grid
 
@@ -86,10 +100,37 @@ def _mesh_pair(is_leaf, root_grid=(2, 2, 2), nghost=2, nfields=1, block_nx=(4, 4
     return forest, mesh, legacy_mesh, block_nx
 
 
+def _mesh_2d(is_leaf, root_grid=(2, 2, 1), nghost=1, nfields=1, block_nx=(4, 4)):
+    ng1, ng2, ng3 = root_grid
+    forest = AMRForest(2, ng1, ng2, ng3, is_leaf)
+    block_nx = np.array(block_nx, dtype=np.uint32)
+    domain_nx = np.array([ng1, ng2], dtype=np.uint32) * block_nx
+    xmin = np.array([0.0, 0.0], dtype=np.double)
+    xmax = np.array([1.0, 1.0], dtype=np.double)
+    mesh = AMRMesh(2, block_nx, domain_nx, xmin, xmax, np.uint32(nghost), np.uint32(nfields), forest)
+    return forest, mesh, block_nx
+
+
 def _refined_fixture(nghost=2, nfields=1, block_nx=(4, 4, 4)):
     root_grid = (2, 2, 2)
     is_leaf = _forest_flags(root_grid, refined_coords=[(0, 0, 0)])
     return _mesh_pair(is_leaf, root_grid=root_grid, nghost=nghost, nfields=nfields, block_nx=block_nx)
+
+
+def _affine_block_data_2d(mesh, block_nx, nfields=1):
+    block_nx = (int(block_nx[0]), int(block_nx[1]), 1)
+    data = np.zeros((mesh.rnode.shape[0], nfields, *block_nx), dtype=np.double)
+    ix = np.arange(block_nx[0], dtype=np.double)[:, None]
+    iy = np.arange(block_nx[1], dtype=np.double)[None, :]
+
+    for ileaf in range(mesh.rnode.shape[0]):
+        x = mesh.rnode[ileaf, 0] + (ix + 0.5) * mesh.rnode[ileaf, 4]
+        y = mesh.rnode[ileaf, 1] + (iy + 0.5) * mesh.rnode[ileaf, 5]
+        base = x + 2.0 * y
+        for ifield in range(nfields):
+            data[ileaf, ifield, :, :, 0] = base + 10.0 * ifield
+
+    return data
 
 
 def _sample_block_data(nleafs, nfields, block_nx):
@@ -376,6 +417,55 @@ def test_uniform_grid_linear_respects_reordered_fields():
     np.testing.assert_allclose(uniform_grid[1], expected, rtol=1e-12, atol=1e-12)
 
 
+def test_2d_mesh_ghost_cells_and_bilinear_interpolation():
+    forest, mesh, block_nx = _mesh_2d(
+        np.ones(4, dtype=np.int32),
+        root_grid=(2, 2, 1),
+        nghost=1,
+        nfields=2,
+        block_nx=(4, 4),
+    )
+    data = _affine_block_data_2d(mesh, block_nx, nfields=2)
+
+    mesh.load_interior_data(data)
+    mesh.apply_ghost_cells()
+
+    assert np.asarray(forest.neighbor_type).shape == (4, 9)
+    assert mesh.padded_view().shape == (4, int(block_nx[0]) + 2, int(block_nx[1]) + 2, 3, 2)
+    assert np.array_equal(mesh.interior_view(), data)
+
+    xmin = np.array([0.125, 0.125], dtype=np.double)
+    xmax = np.array([0.875, 0.875], dtype=np.double)
+    nx = np.array([6, 6, 1], dtype=np.uint32)
+    uniform_grid = np.zeros((2, 6, 6, 1), dtype=np.double)
+    mesh.uniform_grid_linear(uniform_grid, nx, xmin, xmax, np.array([1, 0], dtype=np.uint32))
+
+    dx = (xmax - xmin) / nx[:2]
+    x = xmin[0] + (np.arange(nx[0], dtype=np.double)[:, None] + 0.5) * dx[0]
+    y = xmin[1] + (np.arange(nx[1], dtype=np.double)[None, :] + 0.5) * dx[1]
+    expected = x + 2.0 * y
+
+    np.testing.assert_allclose(uniform_grid[0, :, :, 0], expected + 10.0, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(uniform_grid[1, :, :, 0], expected, rtol=1e-12, atol=1e-12)
+
+
+def test_2d_refined_mesh_coarse_fine_ghost_cells():
+    is_leaf = _forest_flags_2d((2, 2, 1), refined_coords=[(0, 0, 0)])
+    forest, mesh, block_nx = _mesh_2d(is_leaf, root_grid=(2, 2, 1), nghost=2, nfields=1, block_nx=(4, 4))
+    data = _affine_block_data_2d(mesh, block_nx, nfields=1)
+
+    neighbor_type = np.asarray(forest.neighbor_type)
+    assert neighbor_type.shape == (7, 9)
+    assert np.any(neighbor_type == 2)
+    assert np.any(neighbor_type == 4)
+
+    mesh.load_interior_data(data)
+    mesh.apply_ghost_cells()
+
+    assert np.array_equal(mesh.interior_view(), data)
+    assert np.all(np.isfinite(mesh.padded_view()))
+
+
 def test_uniform_full_level1():
     ng1 = ng2 = ng3 = 2
     is_leaf = np.ones(ng1 * ng2 * ng3, dtype=np.int32)
@@ -515,6 +605,10 @@ def run_tests():
     print("test_uniform_grid_linear_uses_ghost_cells passed")
     test_uniform_grid_linear_respects_reordered_fields()
     print("test_uniform_grid_linear_respects_reordered_fields passed")
+    test_2d_mesh_ghost_cells_and_bilinear_interpolation()
+    print("test_2d_mesh_ghost_cells_and_bilinear_interpolation passed")
+    test_2d_refined_mesh_coarse_fine_ghost_cells()
+    print("test_2d_refined_mesh_coarse_fine_ghost_cells passed")
     test_uniform_full_level1()
     print("test_uniform_full_level1 passed")
     test_getbc_matches_legacy_reference()

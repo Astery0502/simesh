@@ -19,14 +19,19 @@ The canonical user workflows live under `src/simesh/amrvac/`.
 
 Important functions:
 
-- `amr_loader(...)`
-- `load_from_uarrays(...)`
-- `write_dat_metadata(...)`
-- `write_dat_field(...)`
+- `read_uniform(...)`
+- `read_blocks(...)`
+- `open_dataset(...)`
+- `load_from_uniform(...)`
+- `write_datfile(...)`
+- `write_datfile_from_uniform(...)`
+- `load_uniform_data(...)`
+- `datfile_to_vtk(...)`
 
 These functions are the most direct expression of the intended public API:
-users load AMRVAC files, construct datasets from arrays, inspect metadata, and
-write data back out in AMRVAC-compatible form.
+users load AMRVAC files, sample AMR data onto uniform grids, inspect metadata,
+construct datasets from arrays, and write data back out in AMRVAC-compatible
+form.
 
 ### 2. Dataset and mesh objects
 
@@ -93,7 +98,11 @@ treat `simesh.legacy` as preserved older code rather than the primary target.
 ## Recommended reading order
 
 1. `README.md`
-2. `docs/python-api-map.md`
-3. `docs/amrvac-dat-format.md`
-4. `docs/amr-forest-mesh.md`
-5. `docs/cython-build.md`
+2. `docs/README.md`
+3. `docs/user-guide.md`
+4. `docs/2d-guide.md` if working with Cartesian 2D data
+5. `docs/api-reference.md`
+6. `docs/python-api-map.md`
+7. `docs/amrvac-dat-format.md`
+8. `docs/amr-forest-mesh.md`
+9. `docs/cython-build.md`

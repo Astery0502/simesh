@@ -308,8 +308,8 @@ cdef class AMRMesh:
     cpdef void apply_ghost_cells(self):
         if self.ng == 0:
             return
-        if self.ndim != 3:
-            raise NotImplementedError("Ghost-cell exchange is currently implemented only for 3D meshes.")
+        if self.ndim != 2 and self.ndim != 3:
+            raise NotImplementedError("Ghost-cell exchange is currently implemented only for 2D and 3D meshes.")
         self.getbc()
 
     cdef void _init_block_coordinates(self):
@@ -341,18 +341,18 @@ cdef class AMRMesh:
         self.ngCo = (self.ng + 1) // 2
         self.interpolation_order = 2
 
-        for i in range(self.ndim):
+        for i in range(3):
             self.ixGmin[i] = 0
             self.ixGmax[i] = self.bsize[i] + 2 * self.ng - 1
             self.ixMmin[i] = self.ixGmin[i] + self.ng
             self.ixMmax[i] = self.ixGmax[i] - self.ng
 
             self.ixCoGmin[i] = 0
-            self.ixCoGmax[i] = self.bsize[i] // 2 + 2 * self.ng - 1
+            self.ixCoGmax[i] = self.bCosize[i] - 1
             self.ixCoMmin[i] = self.ixCoGmin[i] + self.ng
             self.ixCoMmax[i] = self.ixCoGmax[i] - self.ng
 
-        for i in range(self.ndim):
+        for i in range(3):
             for j in range(4):
                 self.ixS_srl_min[i][j][0] = self.ixMmin[i]
                 self.ixS_srl_min[i][j][1] = self.ixMmin[i]
@@ -368,7 +368,7 @@ cdef class AMRMesh:
                 self.ixR_srl_max[i][j][1] = self.ixMmax[i]
                 self.ixR_srl_max[i][j][2] = self.ixGmax[i]
 
-        for i in range(self.ndim):
+        for i in range(3):
             for j in range(3):
                 self.ixS_r_min[i][j][0] = self.ixCoMmin[i]
                 self.ixS_r_min[i][j][1] = self.ixCoMmin[i]
@@ -386,7 +386,7 @@ cdef class AMRMesh:
                 self.ixR_r_max[i][j][2] = self.ixMmax[i]
                 self.ixR_r_max[i][j][3] = self.ixGmax[i]
 
-        for i in range(self.ndim):
+        for i in range(3):
             for j in range(3):
                 self.ixS_p_min[i][j][0] = self.ixMmin[i] - (self.interpolation_order - 1)
                 self.ixS_p_min[i][j][1] = self.ixMmin[i] - (self.interpolation_order - 1)
@@ -406,7 +406,7 @@ cdef class AMRMesh:
                 self.ixR_p_max[i][j][2] = self.ixCoMmax[i] + (self.interpolation_order - 1)
                 self.ixR_p_max[i][j][3] = self.ixCoMmax[i] + self.ngCo + (self.interpolation_order - 1)
 
-        for i in range(self.ndim):
+        for i in range(3):
             self.ixS_srl_min[i][0][1] = self.ixGmin[i]
             self.ixS_srl_min[i][2][1] = self.ixMmin[i]
             self.ixS_srl_min[i][3][1] = self.ixGmin[i]
@@ -577,8 +577,8 @@ cdef class AMRMesh:
 
         if self._data_ptr is NULL or self.ng == 0:
             raise ValueError("Linear uniform interpolation requires padded ghost-cell storage.")
-        if self.ndim != 3:
-            raise NotImplementedError("Linear uniform interpolation is currently implemented only for 3D meshes.")
+        if self.ndim != 2 and self.ndim != 3:
+            raise NotImplementedError("Linear uniform interpolation is currently implemented only for 2D and 3D meshes.")
 
         assert uniform_grid.shape[0] == field_positions.shape[0]
         nfields_out = <uint32_t>field_positions.shape[0]
@@ -589,6 +589,63 @@ cdef class AMRMesh:
         for idim in range(self.ndim):
             assert uniform_grid.shape[idim + 1] == nx[idim]
             dx_uniform[idim] = (xmax_new[idim] - xmin_new[idim]) / nx[idim]
+
+        if self.ndim == 2:
+            dx0 = dx_uniform[0]
+            dx1 = dx_uniform[1]
+            xmin0 = xmin_new[0]
+            xmin1 = xmin_new[1]
+            k0 = self.ixMmin[2]
+
+            for ileaf in range(self.nleafs):
+                skip_leaf = False
+                igmin0 = <int>ceil((self.rnode[ileaf, 0] - xmin0) / dx0 - 0.5)
+                igmax0 = <int>floor((self.rnode[ileaf, 2] - xmin0) / dx0 + 0.5)
+                if igmin0 < 0:
+                    igmin0 = 0
+                if igmax0 > <int>nx[0]:
+                    igmax0 = <int>nx[0]
+                if igmin0 > igmax0:
+                    skip_leaf = True
+
+                igmin1 = <int>ceil((self.rnode[ileaf, 1] - xmin1) / dx1 - 0.5)
+                igmax1 = <int>floor((self.rnode[ileaf, 3] - xmin1) / dx1 + 0.5)
+                if igmin1 < 0:
+                    igmin1 = 0
+                if igmax1 > <int>nx[1]:
+                    igmax1 = <int>nx[1]
+                if igmin1 > igmax1:
+                    skip_leaf = True
+
+                if skip_leaf:
+                    continue
+
+                for i in range(igmin0, igmax0):
+                    x = xmin0 + (i + 0.5) * dx0
+                    gx = (x - self.rnode[ileaf, 0]) / self.rnode[ileaf, 4] - 0.5
+                    i0 = <int>floor(gx) + <int>self.ng
+                    i1 = i0 + 1
+                    wx = gx - (i0 - <int>self.ng)
+
+                    for j in range(igmin1, igmax1):
+                        y = xmin1 + (j + 0.5) * dx1
+                        gy = (y - self.rnode[ileaf, 1]) / self.rnode[ileaf, 5] - 0.5
+                        j0 = <int>floor(gy) + <int>self.ng
+                        j1 = j0 + 1
+                        wy = gy - (j0 - <int>self.ng)
+
+                        for ifield_out in range(nfields_out):
+                            ifield_src = field_positions[ifield_out]
+                            c0 = (
+                                self.data[ileaf, i0, j0, k0, ifield_src] * (1.0 - wy)
+                                + self.data[ileaf, i0, j1, k0, ifield_src] * wy
+                            )
+                            c1 = (
+                                self.data[ileaf, i1, j0, k0, ifield_src] * (1.0 - wy)
+                                + self.data[ileaf, i1, j1, k0, ifield_src] * wy
+                            )
+                            uniform_grid[ifield_out, i, j, 0] = c0 * (1.0 - wx) + c1 * wx
+            return
 
         dx0 = dx_uniform[0]
         dx1 = dx_uniform[1]
@@ -722,9 +779,13 @@ cdef class AMRMesh:
             )
 
     cdef inline uint32_t nindex(self, uint32_t n1, uint32_t n2, uint32_t n3) noexcept nogil:
+        if self.ndim == 2:
+            return n1 + n2 * 3
         return n1 + n2 * 3 + n3 * 3 * 3
 
     cdef inline uint32_t ncindex(self, uint32_t nc1, uint32_t nc2, uint32_t nc3) noexcept nogil:
+        if self.ndim == 2:
+            return nc1 + nc2 * 4
         return nc1 + nc2 * 4 + nc3 * 4 * 4
 
     cdef bint is_boundary(self, uint32_t ileaf, uint32_t[:,:] neighbor_type):
@@ -737,6 +798,7 @@ cdef class AMRMesh:
 
     cdef void getbc(self):
         cdef uint32_t ileaf, i, j, k
+        cdef uint32_t k_stop = 1 if self.ndim == 2 else 3
         cdef uint32_t[:,:] neighbor_type = self.forest.neighbor_type
         cdef bint isboundary
         cdef bint needs_coarse = self._has_coarse_or_fine_neighbors(neighbor_type)
@@ -760,7 +822,7 @@ cdef class AMRMesh:
                 isboundary = self.is_boundary(ileaf, neighbor_type)
                 for i in range(3):
                     for j in range(3):
-                        for k in range(3):
+                        for k in range(k_stop):
                             if neighbor_type[ileaf, self.nindex(i, j, k)] == 2 and isboundary:
                                 self.fill_coarse_boundary(ileaf, i, j, k, neighbor_type)
 
@@ -768,7 +830,7 @@ cdef class AMRMesh:
             self.identifyphysbound(ileaf, neighbor_type)
             for i in range(3):
                 for j in range(3):
-                    for k in range(3):
+                    for k in range(k_stop):
                         if neighbor_type[ileaf, self.nindex(i, j, k)] == 2:
                             self.bc_fill_restrict(ileaf, i, j, k)
                         elif neighbor_type[ileaf, self.nindex(i, j, k)] == 3:
@@ -778,7 +840,7 @@ cdef class AMRMesh:
             for ileaf in range(self.nleafs):
                 for i in range(3):
                     for j in range(3):
-                        for k in range(3):
+                        for k in range(k_stop):
                             if neighbor_type[ileaf, self.nindex(i, j, k)] == 4:
                                 self.bc_fill_prolong(ileaf, i, j, k)
 
@@ -798,6 +860,9 @@ cdef class AMRMesh:
             for i in range(self.ndim):
                 ixBmin[i] = self.ixGmin[i] + (self.ng if i != idim else 0)
                 ixBmax[i] = self.ixGmax[i] - (self.ng if i != idim else 0)
+            if self.ndim == 2:
+                ixBmin[2] = self.ixMmin[2]
+                ixBmax[2] = self.ixMmax[2]
 
             if (idim > 0) and neighbor_type[ileaf, self.nindex(0, 1, 1)] == 1:
                 ixBmin[0] = self.ixGmin[0]
@@ -835,6 +900,9 @@ cdef class AMRMesh:
             for i in range(self.ndim):
                 ixBmin[i] = self.ixGmin[i] + kmin[i] * self.ng
                 ixBmax[i] = self.ixGmax[i] - kmax[i] * self.ng
+            if self.ndim == 2:
+                ixBmin[2] = self.ixMmin[2]
+                ixBmax[2] = self.ixMmax[2]
 
             for iside in range(2):
                 i1 = 1 + (2 * iside - 1) * (idim == 0)
@@ -870,6 +938,11 @@ cdef class AMRMesh:
                 ixOmax[idir] = ixBmax[idir] if idir != idim else ixBmin[idir] - 1 + self.ng
                 ixImin[idir] = ixOmin[idir] if idir != idim else ixOmax[idir] + 1
                 ixImax[idir] = ixOmax[idir] if idir != idim else ixOmax[idir] + 2
+        if self.ndim == 2:
+            ixOmin[2] = ixBmin[2]
+            ixOmax[2] = ixBmax[2]
+            ixImin[2] = ixBmin[2]
+            ixImax[2] = ixBmax[2]
 
         for o1 in range(ixOmin[0], ixOmax[0] + 1):
             i1 = o1 if idim != 0 else ixImin[0]
@@ -886,6 +959,24 @@ cdef class AMRMesh:
         cdef uint32_t ifield
         cdef double sum_value
         cdef double CoFiratio = 0.125
+
+        if self.ndim == 2:
+            CoFiratio = 0.25
+            ixCo3 = self.ixCoMmin[2]
+            ixFi3 = self.ixMmin[2]
+            for ixCo1 in range(self.ixCoMmin[0], self.ixCoMmax[0] + 1):
+                ixFi1 = (ixCo1 - self.ixCoMmin[0]) * 2 + self.ixMmin[0]
+                for ixCo2 in range(self.ixCoMmin[1], self.ixCoMmax[1] + 1):
+                    ixFi2 = (ixCo2 - self.ixCoMmin[1]) * 2 + self.ixMmin[1]
+                    for ifield in range(self.nfields):
+                        sum_value = (
+                            self.data[ileaf, ixFi1, ixFi2, ixFi3, ifield]
+                            + self.data[ileaf, ixFi1 + 1, ixFi2, ixFi3, ifield]
+                            + self.data[ileaf, ixFi1, ixFi2 + 1, ixFi3, ifield]
+                            + self.data[ileaf, ixFi1 + 1, ixFi2 + 1, ixFi3, ifield]
+                        ) * CoFiratio
+                        self.datac[ileaf, ixCo1, ixCo2, ixCo3, ifield] = sum_value
+            return
 
         for ixCo1 in range(self.ixCoMmin[0], self.ixCoMmax[0] + 1):
             ixFi1 = (ixCo1 - self.ixCoMmin[0]) * 2 + self.ixMmin[0]
@@ -923,6 +1014,9 @@ cdef class AMRMesh:
             for i in range(self.ndim):
                 ixBmin[i] = self.ixCoGmin[i] + (self.ng if i != idim else 0)
                 ixBmax[i] = self.ixCoGmax[i] - (self.ng if i != idim else 0)
+            if self.ndim == 2:
+                ixBmin[2] = self.ixCoMmin[2]
+                ixBmax[2] = self.ixCoMmax[2]
 
             if (idim > 0) and neighbor_type[ileaf, self.nindex(0, 1, 1)] == 1:
                 ixBmin[0] = self.ixCoGmin[0]
@@ -1053,6 +1147,11 @@ cdef class AMRMesh:
             ixSmax[i] = self.ixS_srl_max[i][iibs[i] + 1][iis[i]]
             ixRmin[i] = self.ixR_srl_min[i][iibs[i] + 1][n_is[i]]
             ixRmax[i] = self.ixR_srl_max[i][iibs[i] + 1][n_is[i]]
+        if self.ndim == 2:
+            ixSmin[2] = self.ixMmin[2]
+            ixSmax[2] = self.ixMmax[2]
+            ixRmin[2] = self.ixMmin[2]
+            ixRmax[2] = self.ixMmax[2]
 
         self.copy_data_to_data(ileaf, <uint32_t>ineighbor, ixSmin, ixSmax, ixRmin)
 
@@ -1094,6 +1193,11 @@ cdef class AMRMesh:
             ixSmax[i] = self.ixS_r_max[i][iibs[i] + 1][iis[i]]
             ixRmin[i] = self.ixR_r_min[i][iibs[i] + 1][n_incs[i]]
             ixRmax[i] = self.ixR_r_max[i][iibs[i] + 1][n_incs[i]]
+        if self.ndim == 2:
+            ixSmin[2] = self.ixCoMmin[2]
+            ixSmax[2] = self.ixCoMmax[2]
+            ixRmin[2] = self.ixMmin[2]
+            ixRmax[2] = self.ixMmax[2]
 
         self.copy_datac_to_data(ileaf, <uint32_t>ineighbor, ixSmin, ixSmax, ixRmin)
 
@@ -1125,6 +1229,9 @@ cdef class AMRMesh:
         ic2_stop = 2 - (<int>i2) // 2 + 1
         ic3_start = 1 + (2 - <int>i3) // 2
         ic3_stop = 2 - (<int>i3) // 2 + 1
+        if self.ndim == 2:
+            ic3_start = 0
+            ic3_stop = 1
 
         for ic3 in range(ic3_start, ic3_stop):
             inc3 = 2 * (<int>i3 - 1) + ic3
@@ -1155,15 +1262,21 @@ cdef class AMRMesh:
                         ixSmax[d] = self.ixS_p_max[d][iibs[d] + 1][incs[d]]
                         ixRmin[d] = self.ixR_p_min[d][iibs[d] + 1][n_incs[d]]
                         ixRmax[d] = self.ixR_p_max[d][iibs[d] + 1][n_incs[d]]
+                    if self.ndim == 2:
+                        ixSmin[2] = self.ixMmin[2]
+                        ixSmax[2] = self.ixMmax[2]
+                        ixRmin[2] = self.ixCoMmin[2]
+                        ixRmax[2] = self.ixCoMmax[2]
 
                     self.copy_data_to_datac(ileaf, <uint32_t>ineighbor, ixSmin, ixSmax, ixRmin)
 
     cdef void gc_prolong(self, uint32_t ileaf, uint32_t[:,:] neighbor_type):
         cdef uint32_t i1, i2, i3
+        cdef uint32_t k_stop = 1 if self.ndim == 2 else 3
 
         for i1 in range(3):
             for i2 in range(3):
-                for i3 in range(3):
+                for i3 in range(k_stop):
                     if neighbor_type[ileaf, self.nindex(i1, i2, i3)] == 2:
                         self.bc_prolong(ileaf, i1, i2, i3)
 
@@ -1186,14 +1299,22 @@ cdef class AMRMesh:
         iibs[1] = self.idphyb[ileaf, 1]
         iibs[2] = self.idphyb[ileaf, 2]
 
-        for i in range(3):
+        for i in range(self.ndim):
             ixFimin[i] = self.ixR_srl_min[i][iibs[i] + 1][iis[i]]
             ixFimax[i] = self.ixR_srl_max[i][iibs[i] + 1][iis[i]]
-            dxFi[i] = self.rnode[ileaf, 6 + i]
+            dxFi[i] = self.rnode[ileaf, 2 * self.ndim + i]
             dxCo[i] = 2.0 * dxFi[i]
             invdxCo[i] = 1.0 / dxCo[i]
             xFimin[i] = self.rnode[ileaf, i] - self.ng * dxFi[i]
             xComin[i] = self.rnode[ileaf, i] - self.ng * dxCo[i]
+        if self.ndim == 2:
+            ixFimin[2] = self.ixMmin[2]
+            ixFimax[2] = self.ixMmax[2]
+            dxFi[2] = 1.0
+            dxCo[2] = 1.0
+            invdxCo[2] = 1.0
+            xFimin[2] = 0.0
+            xComin[2] = 0.0
 
         self.interpolation_linear(ileaf, ixFimin, ixFimax, dxFi, xFimin, dxCo, invdxCo, xComin)
 
@@ -1216,6 +1337,38 @@ cdef class AMRMesh:
         cdef double eta1, eta2, eta3
         cdef double value
         cdef double center_value
+
+        if self.ndim == 2:
+            ixFi3 = self.ixMmin[2]
+            ixCo3 = self.ixCoMmin[2]
+            for ixFi1 in range(ixFimin[0], ixFimax[0] + 1):
+                xFi1 = xFimin[0] + (ixFi1 + 0.5) * dxFi[0]
+                ixCo1 = <int>((xFi1 - xComin[0]) * invdxCo[0])
+                xCo1 = xComin[0] + (ixCo1 + 0.5) * dxCo[0]
+                eta1 = (xFi1 - xCo1) * invdxCo[0]
+                for ixFi2 in range(ixFimin[1], ixFimax[1] + 1):
+                    xFi2 = xFimin[1] + (ixFi2 + 0.5) * dxFi[1]
+                    ixCo2 = <int>((xFi2 - xComin[1]) * invdxCo[1])
+                    xCo2 = xComin[1] + (ixCo2 + 0.5) * dxCo[1]
+                    eta2 = (xFi2 - xCo2) * invdxCo[1]
+
+                    for ifield in range(self.nfields):
+                        center_value = self.datac[ileaf, ixCo1, ixCo2, ixCo3, ifield]
+                        value = (
+                            center_value
+                            + _limited_slope(
+                                self.datac[ileaf, ixCo1 - 1, ixCo2, ixCo3, ifield],
+                                center_value,
+                                self.datac[ileaf, ixCo1 + 1, ixCo2, ixCo3, ifield],
+                            ) * eta1
+                            + _limited_slope(
+                                self.datac[ileaf, ixCo1, ixCo2 - 1, ixCo3, ifield],
+                                center_value,
+                                self.datac[ileaf, ixCo1, ixCo2 + 1, ixCo3, ifield],
+                            ) * eta2
+                        )
+                        self.data[ileaf, ixFi1, ixFi2, ixFi3, ifield] = value
+            return
 
         for ixFi1 in range(ixFimin[0], ixFimax[0] + 1):
             xFi1 = xFimin[0] + (ixFi1 + 0.5) * dxFi[0]

@@ -105,6 +105,15 @@ stages.
 
 ## Construction from arrays
 
+The canonical user-facing construction helpers are:
+
+- `load_from_uniform(...)`
+- `write_datfile_from_uniform(...)`
+
+Both live under `simesh.amrvac` and accept user-facing uniform arrays with shape
+`(nx, ny, nz, nw)`. For Cartesian 2D data, `nz` is one in Python arrays while
+the written AMRVAC metadata remains two-dimensional.
+
 The repository also contains legacy Python-first AMRVAC construction helpers
 under `src/simesh/legacy/frontends/amrvac/`. Those are preserved as reference
 and fallback code rather than the canonical current path.
@@ -113,6 +122,6 @@ and fallback code rather than the canonical current path.
 
 - The implementation is specialized toward current supported use cases rather
   than a broad AMRVAC compatibility matrix.
-- Several code paths assume Cartesian 3D data.
+- The public user surface currently targets Cartesian 2D and Cartesian 3D data.
 - Staggered support exists in the low-level parser, but not every higher-level
   workflow appears equally mature.

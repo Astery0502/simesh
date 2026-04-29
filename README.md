@@ -1,216 +1,83 @@
 # simesh
 
-`simesh` is a Python/Cython toolkit for working with AMRVAC-style adaptive mesh
-refinement (AMR) data. The current canonical implementation is centered on
-`src/simesh/amrvac/` and `src/simesh/utils/`.
+`simesh` is a Python/Cython toolkit for reading, writing, and sampling
+AMRVAC-style adaptive mesh refinement (AMR) data.
 
-The project follows a two-layer design:
+The user-facing API lives in `simesh.amrvac`. It gives Python users direct
+functions for AMRVAC `.dat` files and NumPy arrays, while the compiled AMR layer
+handles forest connectivity, Morton ordering, ghost cells, and uniform-grid
+extraction.
 
-- Python provides the user-facing interfaces for loading datasets, creating new
-  datasets from NumPy arrays, inspecting metadata, and exporting results.
-- Cython-backed AMR data structures and kernels provide the fast path for
-  forest connectivity, Morton ordering, mesh bookkeeping, and uniform-grid
-  extraction.
+## Core user capabilities
 
-In practice, the package is meant to serve as both:
+- Read AMRVAC `.dat` snapshots into Python arrays
+- Extract native AMR block data in SFC/Morton order
+- Resample AMR data onto uniform grids for analysis or plotting
+- Open mutable dataset objects for metadata, block edits, and write-back
+- Create AMRVAC datasets from NumPy uniform-grid arrays
+- Write AMRVAC `.dat` files from existing datasets or NumPy arrays
+- Export level-1 uniform AMRVAC data to VTK legacy output
+- Work with Cartesian 2D data through a singleton-z Python convention
 
-- an AMRVAC `.dat` reader/writer
-- an AMR mesh manipulation library for block-structured simulation data
+The current public surface is focused on Cartesian 2D and Cartesian 3D AMR data.
 
-## Core capabilities
-
-- Load AMRVAC `.dat` files into Python-accessible dataset and mesh objects
-- Parse and write AMRVAC metadata, forest structure, tree information, and
-  block field data
-- Represent the AMR hierarchy through octree/forest-based data structures
-- Manipulate block data with ghost-cell handling and AMR neighbor connectivity
-- Build datasets directly from uniform NumPy arrays without an existing input
-  file
-- Resample AMR data onto uniform grids for analysis or downstream workflows
-- Export AMR data to VTK hierarchical box output
-
-## Architecture
-
-- `src/simesh/amrvac/`: canonical AMRVAC-facing dataset and file-format modules
-- `src/simesh/utils/lib/`: Cython source tree; all `.pyx` files under this
-  directory are compiled during package build, with `.pxd` files used as
-  headers/interfaces
-- `src/simesh/utils/configurations.py`: utilities for generating synthetic or
-  physically motivated field configurations
-- `src/simesh/legacy/`: preserved Python-first implementation path kept as
-  legacy/reference
-- `archive/src_old/`: archived historical code kept outside the installable
-  package tree
-
-## Installation
-
-The supported install path is `pip`/`setuptools`-based. Cython extensions are
-compiled automatically during installation, including editable installs.
-
-### Using pip
-
-```bash
-git clone https://github.com/Astery0502/simesh.git
-cd simesh
-pip install .
-```
-
-For editable local development:
-
-```bash
-pip install -e .
-```
-
-#### Requirements
-
-- Python ≥ 3.11
-- NumPy ≥ 1.23.5
-- Cython ≥ 3.0 for source builds
-- JupyterLab and ipykernel are optional development dependencies
-
-#### Optional OpenMP acceleration
-
-OpenMP is optional and is not enabled by default. The default installation path
-builds the AMR Cython kernels without OpenMP compiler/linker flags, so it should
-work on systems that do not have an OpenMP runtime installed.
-
-To opt into OpenMP during installation:
-
-```bash
-SIMESH_OPENMP=1 pip install .
-```
-
-For editable development builds:
-
-```bash
-SIMESH_OPENMP=1 pip install -e .
-make build-amr-openmp
-```
-
-If your system has no OpenMP implementation, use the default build commands and
-do not set `SIMESH_OPENMP=1` or pass `--openmp`. On macOS, OpenMP usually
-requires installing `libomp` first, for example with Homebrew. On Linux, GCC
-usually provides OpenMP through `-fopenmp`.
-
-Check the compiled extension status from Python:
+## Start here
 
 ```python
-from simesh.utils import openmp_build_info, openmp_enabled
+from simesh.amrvac import read_uniform
 
-print(openmp_enabled())
-print(openmp_build_info())
-```
-
-When OpenMP is enabled, control runtime thread count with standard OpenMP
-environment variables, for example:
-
-```bash
-OMP_NUM_THREADS=4 OMP_DYNAMIC=FALSE python your_script.py
-```
-
-## Development build and test
-
-Package installation compiles all Cython modules found under
-`src/simesh/utils/lib/`.
-
-For local development:
-
-```bash
-pip install -e .
-make build
-make build-amr
-make test
-make benchmark-smoke
-```
-
-Notes:
-
-- `make build` compiles all `.pyx` files under `src/simesh/utils/lib/`
-- `make build-amr` compiles only the `src/simesh/utils/lib/amr/` subtree
-- `make build-amr-openmp` rebuilds the AMR Cython subtree with OpenMP enabled
-- after editing `.pyx` files, rerun `make build` to rebuild extensions in place
-- `make clean` removes compiled extensions and generated packaging artifacts
-- `make test` rebuilds extensions and runs the script-based tests under `tests/`
-- tests follow the package structure, for example `tests/utils/lib/` for Cython AMR internals and `tests/amrvac/` for canonical AMRVAC dataset behavior
-- `make benchmark-smoke` runs a tiny AMRVAC performance-report smoke test; see
-  `docs/performance-benchmarks.md` for full scaling reports
-
-## Usage
-
-The canonical code path uses `simesh.amrvac` for AMRVAC datasets and
-`simesh.utils.lib` for compiled internals.
-
-### Read AMRVAC data
-
-```python
-from simesh.amrvac import read_blocks, read_uniform
-
-blocks = read_blocks(datfile, field_indices=[0, 1])
-ghosted = read_blocks(datfile, field_indices=[0, 1], ghost_width=2, include_ghosts=True)
-grid = read_uniform(datfile, resolution=(128, 128, 128), field_indices=[0])
-smooth_grid = read_uniform(
-    datfile,
+grid = read_uniform(
+    "snapshot.dat",
     resolution=(128, 128, 128),
     field_indices=[0],
-    ghost_width=1,
-    interpolation="linear",
 )
 ```
 
-Choose the interpolation mode by intent and memory budget:
+The returned array uses user-facing uniform layout:
 
-- `interpolation="zero"` is the default low-memory path. It is exact for
-  native level-1 uniform data and remains useful for AMR data when you do not
-  want to allocate ghost-cell storage.
-- `interpolation="linear"` performs trilinear resampling through the canonical
-  Cython ghost-cell path. Use it when you want smoother uniform-grid sampling
-  across AMR blocks and can afford `ghost_width > 0`. This path uses OpenMP
-  thread parallelism when the AMR extension was compiled with OpenMP; otherwise
-  it runs through the same code path without OpenMP threading.
-- For purely uniform level-1 data sampled on its native full-domain grid, prefer
-  the exact full-grid path through `open_dataset(...).uniform_full()`.
-
-Use `open_dataset()` when you need a stateful object, for example to mutate
-block data and refresh ghost cells before writing:
-
-```python
-from simesh.amrvac import open_dataset
-
-ds = open_dataset(datfile, ghost_width=2)
-ds.load_data(field_indices=[0, 1])
-ds.blocks()[:, 0] *= 1.01
-ds.exchange_ghost_cells()
-ds.write_datfile("updated.dat")
+```text
+(nx, ny, nz, nw)
 ```
 
-### Low-level metadata access
+For native AMR block data:
 
 ```python
-from simesh.amrvac.datio import get_metadata
+from simesh.amrvac import read_blocks
 
-header, forest, tree = get_metadata(datfile)
+blocks = read_blocks("snapshot.dat", field_indices=[0, 1])
 ```
 
-### Array Layouts
+## Choose an interface
 
-The canonical AMRVAC path uses three array layout names:
+| Goal | Start with |
+| --- | --- |
+| Read AMR data on a uniform grid | `read_uniform(...)` |
+| Read native AMR block data | `read_blocks(...)` |
+| Keep a mutable dataset open | `open_dataset(...)` |
+| Build a dataset from NumPy data | `load_from_uniform(...)` |
+| Write NumPy data to `.dat` | `write_datfile_from_uniform(...)` |
+| Copy or subset an existing `.dat` file | `write_datfile(...)` |
+| Load level-1 data as uniform data | `load_uniform_data(...)` |
+| Convert level-1 data to VTK | `datfile_to_vtk(...)` |
 
-- `udata`: user-facing uniform data with shape `(nx, ny, nz, nw)`
-- `datau`: compute-oriented uniform data with shape `(nw, nx, ny, nz)`
-- `sfc_data`: Morton/SFC block data with shape `(nleafs, nw, bx, by, bz)`
+## Documentation
 
-Conversion helpers live in `simesh.amrvac.layouts`:
+Start with the page that matches your role:
 
-```python
-from simesh.amrvac.layouts import datau_to_udata, udata_to_datau
-```
+- `docs/README.md`: documentation index by audience and task
+- `docs/installation.md`: install, editable builds, tests, and OpenMP
+- `docs/user-guide.md`: user workflows and examples
+- `docs/2d-guide.md`: Cartesian 2D singleton-z behavior
+- `docs/api-reference.md`: public `simesh.amrvac` API reference
+- `docs/python-api-map.md`: public API map for maintainers
+- `docs/architecture.md`: project layout and implementation layers
+- `docs/amrvac-dat-format.md`: AMRVAC `.dat` format notes
+- `docs/amr-forest-mesh.md`: AMR forest, mesh, and ghost-cell notes
+- `docs/cython-build.md`: Cython extension build details
+- `docs/performance-benchmarks.md`: benchmark workflow
 
-Legacy Python-only code is preserved under `simesh.legacy`, but it is not the
-default path and is not part of the current default test workflow.
+## Limits of the current user surface
 
-## Limitations
-
-The current implementation is primarily targeted at ***Cartesian 3D AMR meshes***.
-Several code paths and tests also assume constant or simple physical boundary
-handling. If you need broader geometry or dimensional support, treat the current
-state as specialized rather than fully general.
+`simesh` currently targets Cartesian 2D and Cartesian 3D AMR meshes. Several
+paths and tests assume constant or simple physical boundary handling. Broader
+geometry support should be treated as outside the current stable user workflow.

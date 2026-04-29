@@ -3,11 +3,19 @@ import tempfile
 
 import numpy as np
 
-from simesh.amrvac import open_dataset, read_blocks, read_uniform
+from simesh.amrvac import (
+    datfile_to_vtk,
+    load_from_uniform,
+    load_uniform_data,
+    open_dataset,
+    read_blocks,
+    read_uniform,
+    write_datfile,
+    write_datfile_from_uniform,
+)
 from simesh.amrvac.amrvac_dataset import AMRVACDataSet
 from simesh.amrvac.datio import extract_uniform_data
 from simesh.amrvac.layouts import datau_to_udata, udata_to_datau
-from simesh.amrvac.amrvac_uniform import datfile_to_vtk, load_uniform_data, write_datfile_from_uniform
 
 
 def _uniform_input(domain_nx=(4, 4, 4), nw=7):
@@ -202,6 +210,65 @@ def test_public_api_reads_blocks_and_uniform_data():
             os.remove(path)
 
 
+def test_public_api_2d_singleton_z_roundtrip():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp_out:
+        output_path = tmp_out.name
+
+    try:
+        os.remove(output_path)
+        udata = _uniform_input(domain_nx=(4, 4, 1), nw=3)
+        write_datfile_from_uniform(
+            path,
+            udata,
+            [f"w{i}" for i in range(udata.shape[-1])],
+            xmin=np.array([0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = open_dataset(path, ghost_width=1)
+        assert int(ds.ndim) == 2
+        assert np.array_equal(ds.domain_nx, np.array([4, 4], dtype=np.uint32))
+        assert np.array_equal(ds.block_nx, np.array([2, 2], dtype=np.uint32))
+
+        ds.load_data(field_indices=[0, 2])
+        assert ds.blocks().shape == (4, 2, 2, 2, 1)
+        assert ds.blocks(include_ghosts=True).shape == (4, 2, 4, 4, 3)
+
+        blocks = read_blocks(path, field_indices=[0, 2])
+        ghosted = read_blocks(path, field_indices=[0, 2], ghost_width=1, include_ghosts=True)
+        grid = read_uniform(path, resolution=(4, 4), field_indices=[1])
+        linear_grid = read_uniform(
+            path,
+            resolution=(4, 4),
+            field_indices=[1],
+            ghost_width=1,
+            interpolation="linear",
+        )
+
+        assert blocks.shape == (4, 2, 2, 2, 1)
+        assert ghosted.shape == (4, 2, 4, 4, 3)
+        assert grid.shape == (4, 4, 1, 1)
+        assert np.array_equal(grid[..., 0], udata[..., 1])
+        assert np.array_equal(linear_grid[..., 0], udata[..., 1])
+
+        write_datfile(path, output_path, field_indices=[0, 2], overwrite=True)
+        rewritten = open_dataset(output_path)
+        rewritten_grid = rewritten.uniform_full()
+        expected = np.transpose(udata[..., [0, 2]], (3, 0, 1, 2))
+        assert int(rewritten.ndim) == 2
+        assert rewritten_grid.shape == expected.shape
+        assert np.array_equal(rewritten_grid, expected)
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+
 def test_extract_uniform_data():
     with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
         path = tmp.name
@@ -278,6 +345,32 @@ def test_load_uniform_data():
             os.remove(path)
 
 
+def test_load_from_uniform_2d_and_3d():
+    udata_3d = _uniform_input(domain_nx=(4, 4, 4), nw=3)
+    ds_3d = load_from_uniform(
+        udata_3d,
+        [f"w{i}" for i in range(udata_3d.shape[-1])],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    assert int(ds_3d.ndim) == 3
+    assert np.array_equal(ds_3d.uniform_full(), udata_to_datau(udata_3d))
+
+    udata_2d = _uniform_input(domain_nx=(4, 4, 1), nw=3)
+    ds_2d = load_from_uniform(
+        udata_2d,
+        [f"w{i}" for i in range(udata_2d.shape[-1])],
+        xmin=np.array([0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2], dtype=np.int32),
+    )
+    assert int(ds_2d.ndim) == 2
+    assert np.array_equal(ds_2d.domain_nx, np.array([4, 4], dtype=np.uint32))
+    assert np.array_equal(ds_2d.block_nx, np.array([2, 2], dtype=np.uint32))
+    assert np.array_equal(ds_2d.uniform_full(), udata_to_datau(udata_2d))
+
+
 def test_dataset_getitem_returns_udata_layout():
     with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
         path = tmp.name
@@ -339,6 +432,41 @@ def test_datfile_to_vtk():
             os.remove(vtk_path)
 
 
+def test_datfile_to_vtk_2d_singleton_z():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as dat_tmp:
+        dat_path = dat_tmp.name
+    with tempfile.NamedTemporaryFile(suffix=".vtk", delete=False) as vtk_tmp:
+        vtk_path = vtk_tmp.name
+
+    try:
+        os.remove(vtk_path)
+        udata = _uniform_input(domain_nx=(4, 4, 1), nw=3)
+        write_datfile_from_uniform(
+            dat_path,
+            udata,
+            [f"w{i}" for i in range(udata.shape[-1])],
+            xmin=np.array([0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        datfile_to_vtk(dat_path, vtk_path, field_indices=[1])
+
+        vtk = _read_structured_points_vtk(vtk_path)
+
+        assert vtk["dims"] == (4, 4, 1)
+        assert np.allclose(vtk["origin"], np.array([0.0, 0.0, 0.0]))
+        assert np.allclose(vtk["spacing"], np.array([1.0 / 3.0, 1.0 / 3.0, 1.0]))
+        assert set(vtk["fields"]) == {"w1"}
+        assert np.array_equal(vtk["fields"]["w1"], udata[..., 1])
+    finally:
+        if os.path.exists(dat_path):
+            os.remove(dat_path)
+        if os.path.exists(vtk_path):
+            os.remove(vtk_path)
+
+
 def run_tests():
     print("Running tests for AMRVAC dataset...")
     test_dataset_uniform_full()
@@ -347,16 +475,22 @@ def run_tests():
     print("test_dataset_ghost_mode_uses_mesh_storage passed")
     test_public_api_reads_blocks_and_uniform_data()
     print("test_public_api_reads_blocks_and_uniform_data passed")
+    test_public_api_2d_singleton_z_roundtrip()
+    print("test_public_api_2d_singleton_z_roundtrip passed")
     test_extract_uniform_data()
     print("test_extract_uniform_data passed")
     test_uniform_layout_helpers()
     print("test_uniform_layout_helpers passed")
     test_load_uniform_data()
     print("test_load_uniform_data passed")
+    test_load_from_uniform_2d_and_3d()
+    print("test_load_from_uniform_2d_and_3d passed")
     test_dataset_getitem_returns_udata_layout()
     print("test_dataset_getitem_returns_udata_layout passed")
     test_datfile_to_vtk()
     print("test_datfile_to_vtk passed")
+    test_datfile_to_vtk_2d_singleton_z()
+    print("test_datfile_to_vtk_2d_singleton_z passed")
     print("All tests passed for AMRVAC dataset!")
 
 
