@@ -83,6 +83,16 @@ behavior in the mesh layer.
 The mesh implementation allocates block storage with ghost cells and uses
 neighbor connectivity to fill those regions.
 
+Physical boundary fills use per-loaded-field boundary modes supplied by the
+AMRVAC dataset layer. The default mode is continuous fill, which copies the
+nearest interior value into physical ghost cells. The mesh also supports
+symmetric reflection, antisymmetric reflection, and no-inflow clipping for the
+loaded normal velocity or momentum component.
+
+The public `simesh.amrvac` API accepts boundary modes as user-facing strings or
+mappings. `src/simesh/amrvac/boundary.py` normalizes those inputs to an integer
+table before constructing `src/simesh/utils/lib/amr/mesh.pyx`.
+
 For Cartesian 2D data, the mesh keeps a singleton physical z extent while the
 padded storage still has z ghost slots. Ghost exchange, restriction, and
 prolongation operate on the active x/y directions and pin data movement to the

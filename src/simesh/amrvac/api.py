@@ -21,14 +21,14 @@ __all__ = [
 ]
 
 
-def open_dataset(path: str, *, ghost_width: int = 0) -> AMRVACDataSet:
+def open_dataset(path: str, *, ghost_width: int = 0, boundary_conditions=None) -> AMRVACDataSet:
     """
     Open an AMRVAC dataset for stateful workflows.
 
     Data is loaded lazily. Use ``read_blocks()`` or ``read_uniform()`` when you
     only need arrays and do not need to keep the dataset object.
     """
-    return AMRVACDataSet(path, ghost_width=ghost_width)
+    return AMRVACDataSet(path, ghost_width=ghost_width, boundary_conditions=boundary_conditions)
 
 
 def read_blocks(
@@ -37,6 +37,7 @@ def read_blocks(
     field_indices: list[int] | None = None,
     ghost_width: int = 0,
     include_ghosts: bool = False,
+    boundary_conditions=None,
 ) -> np.ndarray:
     """
     Read AMRVAC block data in SFC layout.
@@ -45,7 +46,7 @@ def read_blocks(
     With ``include_ghosts=True`` and ``ghost_width > 0``, returns
     ``(nleafs, nw, bx + 2g, by + 2g, bz + 2g)``.
     """
-    ds = open_dataset(path, ghost_width=ghost_width)
+    ds = open_dataset(path, ghost_width=ghost_width, boundary_conditions=boundary_conditions)
     ds.load_data(field_indices=field_indices)
     return np.asarray(ds.blocks(include_ghosts=include_ghosts)).copy()
 
@@ -58,6 +59,7 @@ def read_uniform(
     field_indices: list[int] | None = None,
     ghost_width: int = 0,
     interpolation: str = "zero",
+    boundary_conditions=None,
 ) -> np.ndarray:
     """
     Read AMRVAC data on a user-facing uniform grid.
@@ -74,7 +76,7 @@ def read_uniform(
     ``ghost_width > 0``. For level-1 data sampled on its native full-domain
     grid, use ``open_dataset(...).uniform_full()`` for exact block placement.
     """
-    ds = open_dataset(path, ghost_width=ghost_width)
+    ds = open_dataset(path, ghost_width=ghost_width, boundary_conditions=boundary_conditions)
     ds.load_data(field_indices=field_indices)
 
     nx = np.asarray(resolution, dtype=np.uint32)
@@ -111,6 +113,7 @@ def write_datfile(
     field_indices: list[int] | None = None,
     ghost_width: int = 0,
     overwrite: bool = False,
+    boundary_conditions=None,
 ) -> dict:
     """
     Write an AMRVAC ``.dat`` file from an existing file.
@@ -119,6 +122,6 @@ def write_datfile(
     used for in-memory exchange when ``ghost_width > 0`` but are not written to
     the output file.
     """
-    ds = open_dataset(path, ghost_width=ghost_width)
+    ds = open_dataset(path, ghost_width=ghost_width, boundary_conditions=boundary_conditions)
     ds.load_data(field_indices=field_indices)
     return ds.write_datfile(output_path, overwrite=overwrite)

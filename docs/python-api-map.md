@@ -25,10 +25,10 @@ The main public functions are:
 - `datfile_to_vtk(path, output_path, field_indices=None)`
 - `load_from_uniform(udata, w_names, xmin, xmax, block_nx, **kwargs)`
 - `load_uniform_data(path, field_indices=None, return_geometry=True)`
-- `open_dataset(path, *, ghost_width=0)`
-- `read_blocks(path, *, field_indices=None, ghost_width=0, include_ghosts=False)`
-- `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0, interpolation="zero")`
-- `write_datfile(path, output_path, *, field_indices=None, ghost_width=0, overwrite=False)`
+- `open_dataset(path, *, ghost_width=0, boundary_conditions=None)`
+- `read_blocks(path, *, field_indices=None, ghost_width=0, include_ghosts=False, boundary_conditions=None)`
+- `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0, interpolation="zero", boundary_conditions=None)`
+- `write_datfile(path, output_path, *, field_indices=None, ghost_width=0, overwrite=False, boundary_conditions=None)`
 - `write_datfile_from_uniform(path, udata, w_names, xmin, xmax, block_nx, overwrite=False, **header_updates)`
 
 The lower-level canonical Python modules live in:
@@ -47,6 +47,14 @@ the previous piecewise-constant behavior and as the low-memory path when
 ghost-cell storage is not wanted. For level-1 data sampled on the native
 full-domain grid, `uniform_full()` is the exact block placement path rather
 than a resampling path.
+
+Physical boundary modes for ghost-cell fills are normalized in
+`src/simesh/amrvac/boundary.py` before being passed to the Cython mesh. The
+public AMRVAC helpers accept `boundary_conditions` as a single mode string, a
+field-name mapping, a nested field/side mapping, or an integer table with shape
+`(loaded_field_count, 2 * ndim)`. The supported modes are `cont`, `symm`,
+`asymm`, and `noinflow`. The `noinflow` mode requires the corresponding normal
+velocity or momentum field to be included in the loaded field set.
 
 Cartesian 2D files are represented with AMRVAC `ndim=2` metadata on disk, but
 the Python array API keeps the singleton-z convention. `read_uniform()` accepts

@@ -210,6 +210,88 @@ def test_public_api_reads_blocks_and_uniform_data():
             os.remove(path)
 
 
+def test_boundary_condition_normalization_api():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        udata = _uniform_input(domain_nx=(4, 4, 4), nw=3)
+        write_datfile_from_uniform(
+            path,
+            udata,
+            ["rho", "m1", "e"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = open_dataset(path, ghost_width=1, boundary_conditions="symm")
+        ds.load_data(field_indices=[2, 0])
+        assert np.array_equal(ds.mesh.boundary_conditions, np.full((2, 6), 1, dtype=np.int32))
+
+        ds = open_dataset(path, ghost_width=1, boundary_conditions={"e": "asymm", "rho": "cont"})
+        ds.load_data(field_indices=[2, 0])
+        expected = np.array([[2, 2, 2, 2, 2, 2], [0, 0, 0, 0, 0, 0]], dtype=np.int32)
+        assert np.array_equal(ds.mesh.boundary_conditions, expected)
+
+        ds = open_dataset(path, ghost_width=1, boundary_conditions={"e": {"xlo": "asymm", "zhi": "symm"}})
+        ds.load_data(field_indices=[2, 0])
+        expected = np.zeros((2, 6), dtype=np.int32)
+        expected[0, 0] = 2
+        expected[0, 5] = 1
+        assert np.array_equal(ds.mesh.boundary_conditions, expected)
+
+        ds = open_dataset(path, ghost_width=1, boundary_conditions={"rho": {"xlo": "noinflow"}})
+        ds.load_data(field_indices=[0, 1])
+        assert np.array_equal(ds.mesh.boundary_conditions[0], np.array([3, 0, 0, 0, 0, 0], dtype=np.int32))
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_boundary_condition_validation_api():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        udata = _uniform_input(domain_nx=(4, 4, 1), nw=2)
+        write_datfile_from_uniform(
+            path,
+            udata,
+            ["rho", "m1"],
+            xmin=np.array([0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        cases = [
+            ({"rho": "bad"}, "Unknown boundary condition mode"),
+            ({"rho": {"zlo": "cont"}}, "Invalid boundary side"),
+            ({"missing": "cont"}, "Unknown boundary condition field"),
+            (np.zeros((2, 4), dtype=np.int32), "must have shape"),
+            ({"rho": {"xlo": "noinflow"}}, "requires a loaded normal velocity"),
+        ]
+
+        for boundary_conditions, message in cases:
+            try:
+                read_blocks(
+                    path,
+                    field_indices=[0],
+                    ghost_width=1,
+                    include_ghosts=True,
+                    boundary_conditions=boundary_conditions,
+                )
+            except ValueError as exc:
+                assert message in str(exc)
+            else:
+                raise AssertionError(f"Expected ValueError containing {message!r}")
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
 def test_public_api_2d_singleton_z_roundtrip():
     with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
         path = tmp.name
@@ -475,6 +557,10 @@ def run_tests():
     print("test_dataset_ghost_mode_uses_mesh_storage passed")
     test_public_api_reads_blocks_and_uniform_data()
     print("test_public_api_reads_blocks_and_uniform_data passed")
+    test_boundary_condition_normalization_api()
+    print("test_boundary_condition_normalization_api passed")
+    test_boundary_condition_validation_api()
+    print("test_boundary_condition_validation_api passed")
     test_public_api_2d_singleton_z_roundtrip()
     print("test_public_api_2d_singleton_z_roundtrip passed")
     test_extract_uniform_data()

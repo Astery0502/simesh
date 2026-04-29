@@ -13,6 +13,12 @@ from .forest cimport AMRForest
 from ..tree cimport treeptr
 
 
+cdef int BC_CONT = 0
+cdef int BC_SYMM = 1
+cdef int BC_ASYMM = 2
+cdef int BC_NOINFLOW = 3
+
+
 cdef extern from *:
     """
     #ifdef _OPENMP
@@ -37,6 +43,16 @@ def openmp_build_info():
     return {
         "enabled": SIMESH_OPENMP_ENABLED != 0,
         "openmp_version": SIMESH_OPENMP_VERSION,
+    }
+
+
+def boundary_mode_codes():
+    """Return integer codes used by AMRMesh physical boundary conditions."""
+    return {
+        "cont": BC_CONT,
+        "symm": BC_SYMM,
+        "asymm": BC_ASYMM,
+        "noinflow": BC_NOINFLOW,
     }
 
 
@@ -85,6 +101,8 @@ cdef class AMRMesh:
         uint32_t nghostcells,
         uint32_t nfields,
         AMRForest forest,
+        object boundary_conditions=None,
+        object normal_velocity_fields=None,
     ):
 
         cdef uint32_t i
@@ -107,6 +125,9 @@ cdef class AMRMesh:
         self._datac_ptr = NULL
         self._rnode_ptr = NULL
         self._idphyb_ptr = NULL
+        self._bc_type_ptr = NULL
+        for i in range(3):
+            self.normal_velocity_field[i] = -1
 
         rnode_data = <double*>malloc(self.nleafs * 9 * sizeof(double))
         for i in range(self.nleafs * 9):
@@ -138,6 +159,7 @@ cdef class AMRMesh:
 
         self._init_block_gridindex()
         self._init_block_coordinates()
+        self._allocate_boundary_storage(boundary_conditions, normal_velocity_fields)
 
         if self.ng > 0:
             self._allocate_padded_storage()
@@ -155,6 +177,9 @@ cdef class AMRMesh:
         if self._idphyb_ptr is not NULL:
             free(self._idphyb_ptr)
 
+        if self._bc_type_ptr is not NULL:
+            free(self._bc_type_ptr)
+
     def __getattr__(self, name):
         if name == "data":
             if self._data_ptr is NULL:
@@ -168,7 +193,54 @@ cdef class AMRMesh:
             if self._idphyb_ptr is NULL:
                 return None
             return np.asarray(self.idphyb)
+        if name == "boundary_conditions":
+            if self._bc_type_ptr is NULL:
+                return None
+            return np.asarray(self.bc_type)
         raise AttributeError(name)
+
+    cdef void _allocate_boundary_storage(self, object boundary_conditions, object normal_velocity_fields):
+        cdef size_t nvalues = <size_t>self.nfields * 2 * self.ndim
+        cdef size_t i
+        cdef uint32_t ifield, iside, idim
+        cdef int* bc_data
+        cdef object bc_array
+        cdef object velocity_array
+
+        bc_data = <int*>malloc(nvalues * sizeof(int))
+        if bc_data is NULL:
+            raise MemoryError()
+        for i in range(nvalues):
+            bc_data[i] = BC_CONT
+
+        self.bc_type = <int[:self.nfields, :2 * self.ndim]>bc_data
+        self._bc_type_ptr = bc_data
+
+        if boundary_conditions is not None:
+            bc_array = np.asarray(boundary_conditions, dtype=np.int32)
+            if bc_array.shape != (int(self.nfields), 2 * int(self.ndim)):
+                raise ValueError(
+                    "boundary_conditions must have shape "
+                    f"({int(self.nfields)}, {2 * int(self.ndim)}), got {bc_array.shape}"
+                )
+            for ifield in range(self.nfields):
+                for iside in range(2 * self.ndim):
+                    if bc_array[ifield, iside] < BC_CONT or bc_array[ifield, iside] > BC_NOINFLOW:
+                        raise ValueError(f"unknown boundary condition code: {bc_array[ifield, iside]}")
+                    self.bc_type[ifield, iside] = bc_array[ifield, iside]
+
+        if normal_velocity_fields is not None:
+            velocity_array = np.asarray(normal_velocity_fields, dtype=np.int32)
+            if velocity_array.shape != (int(self.ndim),):
+                raise ValueError(
+                    f"normal_velocity_fields must have shape ({int(self.ndim)},), got {velocity_array.shape}"
+                )
+            for idim in range(self.ndim):
+                if velocity_array[idim] < -1 or velocity_array[idim] >= self.nfields:
+                    raise ValueError(
+                        f"normal_velocity_fields entries must be -1 or loaded field positions, got {velocity_array[idim]}"
+                    )
+                self.normal_velocity_field[idim] = velocity_array[idim]
 
     cdef void _allocate_padded_storage(self):
         cdef uint32_t bgsize0 = self.bsize[0] + 2 * self.ng
@@ -919,6 +991,8 @@ cdef class AMRMesh:
         cdef int ixImax[3]
         cdef uint32_t idir
         cdef int i1, i2, i3, o1, o2, o3, ifield
+        cdef int side_index, mode
+        cdef double value
         cdef double[:,:,:,:] data_array
 
         if is_coarse:
@@ -945,13 +1019,62 @@ cdef class AMRMesh:
             ixImax[2] = ixBmax[2]
 
         for o1 in range(ixOmin[0], ixOmax[0] + 1):
-            i1 = o1 if idim != 0 else ixImin[0]
+            if idim != 0:
+                i1 = o1
+            elif iside == 1:
+                i1 = ixImin[0]
+            else:
+                i1 = ixImin[0]
             for o2 in range(ixOmin[1], ixOmax[1] + 1):
-                i2 = o2 if idim != 1 else ixImin[1]
+                if idim != 1:
+                    i2 = o2
+                elif iside == 1:
+                    i2 = ixImin[1]
+                else:
+                    i2 = ixImin[1]
                 for o3 in range(ixOmin[2], ixOmax[2] + 1):
-                    i3 = o3 if idim != 2 else ixImin[2]
+                    if idim != 2:
+                        i3 = o3
+                    elif iside == 1:
+                        i3 = ixImin[2]
+                    else:
+                        i3 = ixImin[2]
                     for ifield in range(self.nfields):
-                        data_array[o1, o2, o3, ifield] = data_array[i1, i2, i3, ifield]
+                        side_index = 2 * idim + iside
+                        mode = self.bc_type[ifield, side_index]
+                        if mode == BC_SYMM or mode == BC_ASYMM:
+                            if idim == 0:
+                                if iside == 1:
+                                    i1 = ixImin[0] - (o1 - ixOmin[0])
+                                else:
+                                    i1 = ixImin[0] + (ixOmax[0] - o1)
+                            elif idim == 1:
+                                if iside == 1:
+                                    i2 = ixImin[1] - (o2 - ixOmin[1])
+                                else:
+                                    i2 = ixImin[1] + (ixOmax[1] - o2)
+                            else:
+                                if iside == 1:
+                                    i3 = ixImin[2] - (o3 - ixOmin[2])
+                                else:
+                                    i3 = ixImin[2] + (ixOmax[2] - o3)
+                        else:
+                            if idim == 0:
+                                i1 = ixImin[0]
+                            elif idim == 1:
+                                i2 = ixImin[1]
+                            else:
+                                i3 = ixImin[2]
+
+                        value = data_array[i1, i2, i3, ifield]
+                        if mode == BC_ASYMM:
+                            value = -value
+                        elif mode == BC_NOINFLOW and ifield == self.normal_velocity_field[idim]:
+                            if iside == 1 and value < 0.0:
+                                value = 0.0
+                            elif iside == 0 and value > 0.0:
+                                value = 0.0
+                        data_array[o1, o2, o3, ifield] = value
 
     cdef void coarsen_grid(self, uint32_t ileaf):
         cdef int ixCo1, ixCo2, ixCo3

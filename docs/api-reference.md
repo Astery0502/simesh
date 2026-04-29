@@ -18,7 +18,7 @@ from simesh.amrvac import read_uniform
 
 ## Public functions
 
-### `open_dataset(path, *, ghost_width=0)`
+### `open_dataset(path, *, ghost_width=0, boundary_conditions=None)`
 
 Open an AMRVAC `.dat` file as a stateful `AMRVACDataSet`.
 
@@ -34,7 +34,7 @@ ds.exchange_ghost_cells()
 ds.write_datfile("updated.dat", overwrite=True)
 ```
 
-### `read_blocks(path, *, field_indices=None, ghost_width=0, include_ghosts=False)`
+### `read_blocks(path, *, field_indices=None, ghost_width=0, include_ghosts=False, boundary_conditions=None)`
 
 Read native AMR block data in SFC/Morton order.
 
@@ -55,7 +55,7 @@ from simesh.amrvac import read_blocks
 blocks = read_blocks("snapshot.dat", field_indices=[0, 1])
 ```
 
-### `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0, interpolation="zero")`
+### `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0, interpolation="zero", boundary_conditions=None)`
 
 Read AMRVAC data onto a user-facing uniform grid.
 
@@ -90,7 +90,7 @@ Interpolation choices:
 `field_indices` are zero-based indices into the original file field list. The
 returned field axis follows the requested order.
 
-### `write_datfile(path, output_path, *, field_indices=None, ghost_width=0, overwrite=False)`
+### `write_datfile(path, output_path, *, field_indices=None, ghost_width=0, overwrite=False, boundary_conditions=None)`
 
 Write a `.dat` file from an existing `.dat` input. Use `field_indices` to write
 a subset of fields.
@@ -105,6 +105,57 @@ write_datfile(
     overwrite=True,
 )
 ```
+
+## Boundary conditions for ghost cells
+
+The `boundary_conditions` argument controls physical boundary fills when
+`ghost_width > 0`. It is accepted by `open_dataset()`, `read_blocks()`,
+`read_uniform()`, and `write_datfile()`.
+
+Supported modes:
+
+| Mode | Meaning |
+| --- | --- |
+| `"cont"` | Copy the nearest interior cell into the ghost region |
+| `"symm"` | Mirror interior cells across the physical boundary |
+| `"asymm"` | Mirror interior cells and flip the sign |
+| `"noinflow"` | Copy values, but clip inflow on the loaded normal velocity or momentum field |
+
+By default, all loaded fields and sides use `"cont"`.
+
+Accepted forms:
+
+```python
+# One mode for every loaded field and physical side.
+read_blocks("snapshot.dat", ghost_width=2, include_ghosts=True, boundary_conditions="symm")
+
+# Per-field modes. Field names refer to the loaded AMRVAC field names.
+read_blocks(
+    "snapshot.dat",
+    field_indices=[0, 1, 2],
+    ghost_width=2,
+    include_ghosts=True,
+    boundary_conditions={"rho": "cont", "m1": "noinflow"},
+)
+
+# Per-side modes for selected fields.
+read_blocks(
+    "snapshot.dat",
+    field_indices=[0, 1],
+    ghost_width=2,
+    include_ghosts=True,
+    boundary_conditions={"rho": {"xlo": "symm", "xhi": "asymm"}},
+)
+```
+
+Physical side names are `xlo`, `xhi`, `ylo`, `yhi` for 2D data, with `zlo`
+and `zhi` added for 3D data. Integer tables are also accepted with shape
+`(loaded_field_count, 2 * ndim)` and mode codes `0=cont`, `1=symm`,
+`2=asymm`, `3=noinflow`.
+
+`"noinflow"` requires the corresponding normal velocity or momentum field to
+be loaded. Recognized x-direction names include `m1`, `v1`, `u1`, `mom1`,
+`rho_v1`, `mx`, `vx`, `ux`, `momx`, and `rho_vx`, with matching y/z variants.
 
 ### `load_from_uniform(udata, w_names, xmin, xmax, block_nx, **header_updates)`
 
@@ -188,7 +239,7 @@ These methods are available on the object returned by `open_dataset()` or
 
 | Method or attribute | Purpose |
 | --- | --- |
-| `ds.load_data(field_indices=None)` | Load selected block fields |
+| `ds.load_data(field_indices=None, boundary_conditions=None)` | Load selected block fields |
 | `ds.blocks(include_ghosts=False)` | Return loaded block data |
 | `ds.exchange_ghost_cells()` | Refresh ghost cells after mutation |
 | `ds.uniform_grid(...)` | Sample loaded data into compute layout |

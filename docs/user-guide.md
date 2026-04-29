@@ -77,6 +77,42 @@ smooth_grid = read_uniform(
 )
 ```
 
+## Set physical boundary conditions
+
+When you request ghost-cell storage with `ghost_width > 0`, physical domain
+boundaries default to continuous fills. Pass `boundary_conditions` when you
+need a different physical boundary mode:
+
+```python
+ghosted = read_blocks(
+    "snapshot.dat",
+    field_indices=[0, 1, 2],
+    ghost_width=2,
+    include_ghosts=True,
+    boundary_conditions={
+        "rho": "symm",
+        "m1": {"xlo": "noinflow", "xhi": "noinflow"},
+    },
+)
+```
+
+Supported modes are:
+
+| Mode | Use when |
+| --- | --- |
+| `"cont"` | Ghost cells should copy the nearest interior value |
+| `"symm"` | Ghost cells should mirror values across the physical boundary |
+| `"asymm"` | Ghost cells should mirror values and flip the sign |
+| `"noinflow"` | The normal velocity or momentum component should be clipped to prevent inflow |
+
+You can pass one mode for every loaded field, a mapping from field name to
+mode, or a nested mapping from field name to side name. Side names are `xlo`,
+`xhi`, `ylo`, `yhi` in 2D and add `zlo`, `zhi` in 3D.
+
+`"noinflow"` requires the matching normal velocity or momentum field to be
+loaded. Common names such as `m1`, `v1`, `mx`, and `vx` are recognized for the
+x direction, with corresponding y and z names.
+
 ## Read block data
 
 Use `read_blocks()` when you want the native AMR block payload:
@@ -125,6 +161,9 @@ blocks[:, 0] *= 1.01
 ds.exchange_ghost_cells()
 ds.write_datfile("updated.dat", overwrite=True)
 ```
+
+You can pass `boundary_conditions` to `open_dataset()` or override them on
+`ds.load_data(...)` before refreshing ghost cells.
 
 Use `ds.uniform_grid(...)` when you need the lower-level compute-oriented
 layout:
