@@ -1,8 +1,7 @@
 import os
-import struct
 import numpy as np
 from simesh.amrvac.amrvac_dataset import AMRVACDataSet
-from simesh.amrvac.datio import extract_uniform_data, header_template, update_header, write_datfile_from_sfc
+from simesh.amrvac.datio import extract_uniform_data, header_template, update_header
 from simesh.amrvac.layouts import udata_to_datau
 from simesh.utils.lib.amr.forest import AMRForest
 from simesh.utils.lib.amr.mesh import AMRMesh
@@ -14,46 +13,72 @@ def load_from_uniform(udata:np.ndarray, w_names:list[str], xmin:np.ndarray, xmax
     """
     Load data from a user-facing uniform grid with shape (nx, ny, nz, nw).
     """
-    udata = np.asarray(udata, dtype=np.double)
+    udata = _validate_uniform_data_shape(udata, w_names)
+    sfc_data, ndim, domain_nx, block_nx, is_leaf, tree_info, forest, mesh = _sfc_data_from_uniform(
+        udata,
+        block_nx,
+        xmin,
+        xmax,
+    )
+    header = _uniform_header(
+        w_names,
+        ndim,
+        domain_nx,
+        block_nx,
+        np.asarray(xmin, dtype=np.double),
+        np.asarray(xmax, dtype=np.double),
+        int(sfc_data.shape[0]),
+        kwargs,
+    )
+    return _dataset_from_uniform_components(sfc_data, header, is_leaf, tree_info, forest, mesh)
+
+
+def _validate_uniform_data_shape(udata: np.ndarray, w_names: list[str]) -> np.ndarray:
+    udata = np.asarray(udata)
     if udata.ndim != 4:
         raise ValueError(f"udata must have shape (nx, ny, nz, nw), got {udata.shape}")
     if len(w_names) != udata.shape[-1]:
         raise ValueError(f"w_names length must match udata.shape[-1], {len(w_names)} != {udata.shape[-1]}")
+    return udata
 
-    sfc_data, ndim, domain_nx, block_nx = _sfc_data_from_uniform(udata, block_nx, xmin, xmax)
-    is_leaf, tree_info = _build_uniform_level1_tree(domain_nx, block_nx, ndim=ndim)
-    nblev1 = np.array(domain_nx // block_nx, dtype=np.uint32)
-    nblev1_3 = np.array([nblev1[0], nblev1[1], 1 if ndim == 2 else nblev1[2]], dtype=np.uint32)
 
-    forest = AMRForest(np.uint32(ndim), nblev1_3[0], nblev1_3[1], nblev1_3[2], is_leaf)
-    mesh = AMRMesh(
-        np.uint32(ndim),
-        block_nx,
-        domain_nx,
-        np.asarray(xmin, dtype=np.double)[:ndim],
-        np.asarray(xmax, dtype=np.double)[:ndim],
-        np.uint32(0),
-        np.uint32(len(w_names)),
-        forest,
-    )
-
+def _uniform_header(
+    w_names: list[str],
+    ndim: int,
+    domain_nx: np.ndarray,
+    block_nx: np.ndarray,
+    xmin: np.ndarray,
+    xmax: np.ndarray,
+    nleafs: int,
+    header_updates: dict | None = None,
+) -> dict:
     header = header_template.copy()
     header["ndim"] = ndim
     header["nw"] = len(w_names)
     header["w_names"] = list(w_names)
     header["levmax"] = 1
-    header["nleafs"] = int(sfc_data.shape[0])
+    header["nleafs"] = int(nleafs)
     header["nparents"] = 0
     header["xmin"] = np.asarray(xmin, dtype=np.double)[:ndim]
     header["xmax"] = np.asarray(xmax, dtype=np.double)[:ndim]
-    header["domain_nx"] = domain_nx.astype(np.int32)
-    header["block_nx"] = block_nx.astype(np.int32)
+    header["domain_nx"] = np.asarray(domain_nx, dtype=np.int32)
+    header["block_nx"] = np.asarray(block_nx, dtype=np.int32)
     if ndim == 2:
         header["periodic"] = np.asarray(header["periodic"][:2], dtype=bool)
         header["geometry"] = "Cartesian_2D"
-    if kwargs:
-        header = update_header(header, **kwargs)
+    if header_updates:
+        header = update_header(header, **header_updates)
+    return header
 
+
+def _dataset_from_uniform_components(
+    sfc_data: np.ndarray,
+    header: dict,
+    is_leaf: np.ndarray,
+    tree_info: tuple,
+    forest: AMRForest,
+    mesh: AMRMesh,
+) -> AMRVACDataSet:
     ds = AMRVACDataSet.__new__(AMRVACDataSet)
     ds.sfile = None
     ds.ghost_width = 0
@@ -61,23 +86,22 @@ def load_from_uniform(udata:np.ndarray, w_names:list[str], xmin:np.ndarray, xmax
     ds.metadata = header.copy()
     ds.is_leaf = is_leaf.copy().astype(np.int32)
     ds.tree_info = tree_info
-    ds.ndim = np.uint32(ndim)
+    ds.ndim = np.uint32(header["ndim"])
     ds.ndir = np.uint32(header["ndir"])
-    ds.nw = np.uint32(len(w_names))
-    ds.wnames = list(w_names)
-    ds.nleafs = np.uint32(sfc_data.shape[0])
-    ds.nparents = np.uint32(0)
-    ds.levmax = np.uint32(1)
-    ds.block_nx = block_nx.astype(np.uint32)
-    ds.domain_nx = domain_nx.astype(np.uint32)
+    ds.nw = np.uint32(header["nw"])
+    ds.wnames = list(header["w_names"])
+    ds.nleafs = np.uint32(header["nleafs"])
+    ds.nparents = np.uint32(header["nparents"])
+    ds.levmax = np.uint32(header["levmax"])
+    ds.block_nx = header["block_nx"].astype(np.uint32)
+    ds.domain_nx = header["domain_nx"].astype(np.uint32)
     ds.physical_domain = np.array((header["xmin"], header["xmax"]))
     ds.periodic = header["periodic"]
     ds.geometry = header["geometry"]
     ds.forest = forest
     ds.mesh = mesh
     ds.data = sfc_data
-    ds.loaded_field_indices = list(range(len(w_names)))
-
+    ds.loaded_field_indices = list(range(int(ds.nw)))
     return ds
 
 
@@ -137,10 +161,10 @@ def _sfc_data_from_uniform(udata: np.ndarray, block_nx: np.ndarray, xmin: np.nda
     if np.any(domain_nx_model % block_nx_model != 0):
         raise ValueError(f"domain_nx must be divisible by block_nx, got {domain_nx_model} and {block_nx_model}")
 
+    is_leaf, tree_info = _build_uniform_level1_tree(domain_nx_model, block_nx_model, ndim=ndim)
     nblev1 = np.array(domain_nx_model // block_nx_model, dtype=np.uint32)
     nblev1_3 = np.array([nblev1[0], nblev1[1], 1 if ndim == 2 else nblev1[2]], dtype=np.uint32)
-    nleafs = int(np.prod(nblev1_3))
-    is_leaf = np.ones(nleafs, dtype=np.int32)
+    nleafs = int(is_leaf.shape[0])
 
     forest = AMRForest(np.uint32(ndim), nblev1_3[0], nblev1_3[1], nblev1_3[2], is_leaf)
     mesh = AMRMesh(
@@ -159,7 +183,7 @@ def _sfc_data_from_uniform(udata: np.ndarray, block_nx: np.ndarray, xmin: np.nda
     sfc_data = np.zeros((nleafs, nfields, block_nx_model[0], block_nx_model[1], bz), dtype=np.double)
     mesh.uniform_to_sfc(uniform_data, sfc_data)
 
-    return sfc_data, ndim, domain_nx_model, block_nx_model
+    return sfc_data, ndim, domain_nx_model, block_nx_model, is_leaf, tree_info, forest, mesh
 
 
 def write_datfile_from_uniform(file_path: str, udata: np.ndarray, w_names: list[str],
@@ -169,40 +193,8 @@ def write_datfile_from_uniform(file_path: str, udata: np.ndarray, w_names: list[
     Write an AMRVAC .dat file from uniform data by first arranging it into
     canonical Morton/SFC-ordered blocks.
     """
-    udata = np.asarray(udata, dtype=np.double)
-    if udata.ndim != 4:
-        raise ValueError(f"udata must have shape (nx, ny, nz, nw), got {udata.shape}")
-    if len(w_names) != udata.shape[3]:
-        raise ValueError(f"w_names length must match udata.shape[-1], {len(w_names)} != {udata.shape[3]}")
-
-    block_nx = np.asarray(block_nx, dtype=np.int32)
-    xmin = np.asarray(xmin, dtype=np.double)
-    xmax = np.asarray(xmax, dtype=np.double)
-
-    sfc_data, ndim, domain_nx_model, block_nx_model = _sfc_data_from_uniform(udata, block_nx, xmin, xmax)
-    domain_nx = np.asarray(domain_nx_model, dtype=np.int32)
-    block_nx_header = np.asarray(block_nx_model, dtype=np.int32)
-    is_leaf, tree_info = _build_uniform_level1_tree(domain_nx, block_nx_header, ndim=ndim)
-
-    header = header_template.copy()
-    header["ndim"] = ndim
-    header["nw"] = len(w_names)
-    header["w_names"] = list(w_names)
-    header["levmax"] = 1
-    header["nleafs"] = int(sfc_data.shape[0])
-    header["nparents"] = 0
-    header["xmin"] = xmin[:ndim]
-    header["xmax"] = xmax[:ndim]
-    header["domain_nx"] = domain_nx
-    header["block_nx"] = block_nx_header
-    if ndim == 2:
-        header["periodic"] = np.asarray(header["periodic"][:2], dtype=bool)
-        header["geometry"] = "Cartesian_2D"
-
-    if header_updates:
-        header = update_header(header, **header_updates)
-
-    return write_datfile_from_sfc(file_path, sfc_data, header, is_leaf, tree_info, overwrite=overwrite)
+    ds = load_from_uniform(udata, w_names, xmin, xmax, block_nx, **header_updates)
+    return ds.write_datfile(file_path, overwrite=overwrite)
 
 
 def load_uniform_data(file_path: str, field_indices: list[int] | None = None,

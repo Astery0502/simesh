@@ -5,6 +5,14 @@
 This document identifies the Python modules that are most relevant for user
 workflows and how they relate to the lower-level AMR implementation.
 
+For task-oriented user documentation, start with:
+
+- `README.md`
+- `docs/README.md`
+- `docs/user-guide.md`
+- `docs/2d-guide.md`
+- `docs/api-reference.md`
+
 ## Primary public entrypoints
 
 The clean user-facing API is exported from:
@@ -107,6 +115,9 @@ Helpers for converting between `udata` and `datau` live in:
 
 When adding new user-facing functions:
 
-- document them first in `README.md` if they are high-level
-- document them here if they are part of the intended Python API surface
+- document the workflow in `docs/user-guide.md` if users should choose it
+- document the function in `docs/api-reference.md` if it is part of the public
+  `simesh.amrvac` API
+- keep `README.md` as a short entry point with only high-level examples
+- document it here if it changes the intended Python API surface
 - document implementation details in one of the technical notes under `docs/`
