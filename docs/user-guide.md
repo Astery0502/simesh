@@ -2,8 +2,20 @@
 
 ## Scope
 
-This guide is for users who want to load, sample, modify, or write AMRVAC-style
-data from Python. The main public namespace is:
+This guide is for users who want to load, inspect, sample, modify, or write
+AMRVAC-style data from Python. `simesh` operates on two main inputs:
+
+- AMRVAC `.dat` snapshots, including Cartesian 2D and Cartesian 3D AMR data
+- NumPy arrays that represent uniform Cartesian data
+
+The central distinction is native AMR data versus derived uniform-grid data.
+Native AMR block arrays preserve the adaptive block structure and SFC/Morton
+ordering from the file. Uniform arrays are regular Cartesian arrays for
+plotting, fixed-grid analysis, or downstream tools that do not understand AMR
+blocks. When refined AMR data is read through `read_uniform(...)`, the result is
+a sampled or interpolated view, not the exact native block representation.
+
+The main public namespace is:
 
 ```python
 import simesh.amrvac as amrvac
@@ -18,62 +30,119 @@ If you have not installed the package yet, see `docs/installation.md`.
 
 | Workflow | Start with | Returns or creates |
 | --- | --- | --- |
+| Inspect metadata, mutate blocks, or write back | `open_dataset(...)` | `AMRVACDataSet` |
+| Read native AMR block values | `read_blocks(...)` | `sfc_data`, `(nleafs, nw, bx, by, bz)` |
 | Sample AMR data onto a uniform grid | `read_uniform(...)` | `udata` array, `(nx, ny, nz, nw)` |
-| Inspect native AMR block values | `read_blocks(...)` | `sfc_data`, `(nleafs, nw, bx, by, bz)` |
-| Mutate block data and write it back | `open_dataset(...)` | `AMRVACDataSet` |
 | Build a dataset from NumPy data | `load_from_uniform(...)` | `AMRVACDataSet` |
 | Write NumPy data to AMRVAC `.dat` | `write_datfile_from_uniform(...)` | write summary dict |
 | Load level-1 data exactly as uniform data | `load_uniform_data(...)` | `udata`, optionally geometry |
 | Export level-1 data to VTK | `datfile_to_vtk(...)` | `.vtk` file |
 
-## Read a uniform grid
+## Work with a dataset object
 
-Use `read_uniform()` when you want analysis-ready data on a regular grid:
+Use `open_dataset()` when you need metadata, repeated operations, mutation, or
+manual ghost-cell refresh:
 
 ```python
-from simesh.amrvac import read_uniform
+from simesh.amrvac import open_dataset
 
-grid = read_uniform(
-    "snapshot.dat",
-    resolution=(128, 128, 128),
-    field_indices=[0, 1],
+ds = open_dataset("snapshot.dat", ghost_width=2)
+
+print(ds.wnames)
+print(ds.geometry)
+print(ds.domain_nx)
+print(ds.block_nx)
+print(ds.physical_domain)
+print(ds.periodic)
+
+ds.load_data(field_indices=[0, 1])
+blocks = ds.blocks()
+blocks[:, 0] *= 1.01
+
+ds.exchange_ghost_cells()
+ds.write_datfile("updated.dat", overwrite=True)
+```
+
+You can pass `boundary_conditions` to `open_dataset()` or override them on
+`ds.load_data(...)` before refreshing ghost cells.
+
+### Inspect mesh metadata
+
+Opening a dataset reads the file header and AMR tree metadata before loading
+the full block payload. Use these attributes to check the mesh before deciding
+whether to inspect blocks, sample a uniform grid, or write a modified file:
+
+| Attribute | Meaning |
+| --- | --- |
+| `ds.wnames` | Field names stored in the file |
+| `ds.geometry` | AMRVAC geometry label, such as `Cartesian_3D` |
+| `ds.domain_nx` | Full-domain cell counts in active dimensions |
+| `ds.block_nx` | Cell counts per AMR block |
+| `ds.physical_domain` | Domain bounds as `(xmin, xmax)` |
+| `ds.periodic` | Periodicity flags by active dimension |
+| `ds.nleafs` | Number of leaf blocks in the AMR forest |
+| `ds.levmax` | Maximum AMR refinement level in the file |
+
+For exact header values, inspect `ds.metadata`, which keeps the parsed AMRVAC
+header dictionary:
+
+```python
+print(ds.metadata["time"])
+print(ds.metadata["it"])
+print(ds.metadata["xmin"], ds.metadata["xmax"])
+```
+
+Use `ds.uniform_grid(...)` when you intentionally need the lower-level
+compute-oriented sampled uniform-grid layout:
+
+```python
+datau = ds.uniform_grid(
+    (128, 128, 128),
+    field_indices=[0],
+    interpolation="zero",
 )
 ```
 
-The returned array uses the user-facing `udata` layout:
+`ds.uniform_grid(...)` returns `datau` layout:
 
 ```text
-(nx, ny, nz, nw)
+(nw, nx, ny, nz)
 ```
 
-`field_indices` are zero-based indices into the file's original field list.
-When you pass a list, the output field axis follows that list order.
-
-Use `bounds=(xmin, xmax)` to sample a subdomain:
+Prefer the top-level `read_uniform()` helper when you want the user-facing
+`udata` layout directly. Convert lower-level `datau` to `udata` with:
 
 ```python
-grid = read_uniform(
-    "snapshot.dat",
-    resolution=(64, 64, 64),
-    bounds=([0.25, 0.25, 0.25], [0.75, 0.75, 0.75]),
-    field_indices=[0],
-)
+from simesh.amrvac.layouts import datau_to_udata
+
+udata = datau_to_udata(datau)
 ```
 
-Choose interpolation by intent:
+## Read block data
 
-| Mode | Use when |
-| --- | --- |
-| `interpolation="zero"` | You want the default low-memory, piecewise-constant path |
-| `interpolation="linear"` | You want smoother sampling and can open ghost-cell storage |
+Use `read_blocks()` when you want the native AMR block payload without opening a
+mutable dataset object:
 
 ```python
-smooth_grid = read_uniform(
+from simesh.amrvac import read_blocks
+
+blocks = read_blocks("snapshot.dat", field_indices=[0, 1])
+```
+
+The returned block array uses SFC/Morton block order:
+
+```text
+(nleafs, nw, bx, by, bz)
+```
+
+To include ghost-cell padded storage, request ghost cells explicitly:
+
+```python
+ghosted = read_blocks(
     "snapshot.dat",
-    resolution=(128, 128, 128),
-    field_indices=[0],
-    ghost_width=1,
-    interpolation="linear",
+    field_indices=[0, 1],
+    ghost_width=2,
+    include_ghosts=True,
 )
 ```
 
@@ -113,83 +182,62 @@ mode, or a nested mapping from field name to side name. Side names are `xlo`,
 loaded. Common names such as `m1`, `v1`, `mx`, and `vx` are recognized for the
 x direction, with corresponding y and z names.
 
-## Read block data
+## Sample a uniform grid
 
-Use `read_blocks()` when you want the native AMR block payload:
-
-```python
-from simesh.amrvac import read_blocks
-
-blocks = read_blocks("snapshot.dat", field_indices=[0, 1])
-```
-
-The returned block array uses SFC/Morton block order:
-
-```text
-(nleafs, nw, bx, by, bz)
-```
-
-To include ghost-cell padded storage, request ghost cells explicitly:
+Use `read_uniform()` when your next step needs data on a regular Cartesian grid,
+such as plotting or fixed-grid analysis:
 
 ```python
-ghosted = read_blocks(
+from simesh.amrvac import read_uniform
+
+grid = read_uniform(
     "snapshot.dat",
+    resolution=(128, 128, 128),
     field_indices=[0, 1],
-    ghost_width=2,
-    include_ghosts=True,
 )
 ```
 
-## Work with a dataset object
-
-Use `open_dataset()` when you need metadata, repeated operations, mutation, or
-manual ghost-cell refresh:
-
-```python
-from simesh.amrvac import open_dataset
-
-ds = open_dataset("snapshot.dat", ghost_width=2)
-ds.load_data(field_indices=[0, 1])
-
-print(ds.wnames)
-print(ds.domain_nx)
-print(ds.physical_domain)
-
-blocks = ds.blocks()
-blocks[:, 0] *= 1.01
-
-ds.exchange_ghost_cells()
-ds.write_datfile("updated.dat", overwrite=True)
-```
-
-You can pass `boundary_conditions` to `open_dataset()` or override them on
-`ds.load_data(...)` before refreshing ghost cells.
-
-Use `ds.uniform_grid(...)` when you need the lower-level compute-oriented
-layout:
-
-```python
-datau = ds.uniform_grid(
-    (128, 128, 128),
-    field_indices=[0],
-    interpolation="zero",
-)
-```
-
-`ds.uniform_grid(...)` returns `datau` layout:
+The returned array uses the user-facing `udata` layout:
 
 ```text
-(nw, nx, ny, nz)
+(nx, ny, nz, nw)
 ```
 
-Prefer the top-level `read_uniform()` helper when you want `udata` directly.
-Convert it to user-facing layout with:
+This is a representation change for refined AMR data: the adaptive blocks are
+sampled onto the requested grid. `field_indices` are zero-based indices into the
+file's original field list. When you pass a list, the output field axis follows
+that list order.
+
+Use `bounds=(xmin, xmax)` to sample a subdomain:
 
 ```python
-from simesh.amrvac.layouts import datau_to_udata
-
-udata = datau_to_udata(datau)
+grid = read_uniform(
+    "snapshot.dat",
+    resolution=(64, 64, 64),
+    bounds=([0.25, 0.25, 0.25], [0.75, 0.75, 0.75]),
+    field_indices=[0],
+)
 ```
+
+Choose interpolation by intent:
+
+| Mode | Use when |
+| --- | --- |
+| `interpolation="zero"` | You want the default low-memory, piecewise-constant sampling path |
+| `interpolation="linear"` | You want smoother sampling and can open ghost-cell storage |
+
+```python
+smooth_grid = read_uniform(
+    "snapshot.dat",
+    resolution=(128, 128, 128),
+    field_indices=[0],
+    ghost_width=1,
+    interpolation="linear",
+)
+```
+
+Use `load_uniform_data()` instead when the file is known to be level-1 and you
+want exact full-domain uniform placement rather than AMR resampling.
 
 ## Build or write from uniform NumPy data
 
@@ -267,10 +315,11 @@ from simesh.amrvac.layouts import datau_to_udata, udata_to_datau
 
 ## Common choices
 
-- Prefer `read_uniform()` for plotting, analysis, and downstream array tools.
-- Prefer `read_blocks()` when AMR block structure matters.
 - Prefer `open_dataset()` when you will mutate data or call multiple dataset
   methods.
+- Prefer `read_blocks()` when AMR block structure matters.
+- Prefer `read_uniform()` for plotting, analysis, and downstream array tools
+  that require regular grids.
 - Prefer `load_from_uniform()` when constructing an in-memory dataset before
   additional operations.
 - Prefer `write_datfile_from_uniform()` for direct NumPy-to-`.dat` output.
