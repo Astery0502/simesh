@@ -24,6 +24,12 @@ import simesh.amrvac as amrvac
 Most workflows should use the functions exported from `simesh.amrvac` instead
 of importing lower-level modules directly.
 
+Independent scientific helpers that do not read AMRVAC files live in:
+
+```python
+import simesh.tools as tools
+```
+
 If you have not installed the package yet, see `docs/installation.md`.
 
 ## Choose a workflow
@@ -37,6 +43,7 @@ If you have not installed the package yet, see `docs/installation.md`.
 | Write NumPy data to AMRVAC `.dat` | `write_datfile_from_uniform(...)` | write summary dict |
 | Load level-1 data exactly as uniform data | `load_uniform_data(...)` | `udata`, optionally geometry |
 | Export level-1 data to VTK | `datfile_to_vtk(...)` | `.vtk` file |
+| Build a potential field from bottom `b3` | `simesh.tools.potential_field_green(...)` | `bfield`, `(3, nx, ny, nz)` |
 
 ## Work with a dataset object
 
@@ -274,6 +281,39 @@ write_datfile_from_uniform(
 ```
 
 `block_nx` must divide the domain cell count exactly in every active dimension.
+
+## Build an independent potential field
+
+Use `potential_field_green()` when you already have a uniform bottom-face
+normal magnetic field and want a cell-centered Cartesian potential-field box.
+This tool does not read AMRVAC `.dat` files, create an AMR mesh, or return CT
+staggered face fields.
+
+```python
+import numpy as np
+from simesh.tools import potential_field_green
+
+b3_bottom = np.zeros((64, 64))
+b3_bottom[20:32, 24:40] = 1.0
+b3_bottom[36:48, 24:40] = -1.0
+
+bfield, geometry = potential_field_green(
+    b3_bottom,
+    xmin=[0.0, 0.0, 0.0],
+    xmax=[1.0, 1.0, 1.0],
+    nz=64,
+    backend="auto",
+)
+
+print(bfield.shape)          # (3, 64, 64, 64)
+print(geometry.domain_nx)    # (64, 64, 64)
+print(geometry.spacing)      # (dx, dy, dz)
+```
+
+`bfield[0]`, `bfield[1]`, and `bfield[2]` hold `b1`, `b2`, and `b3`
+respectively. By default, the helper subtracts the mean bottom flux before
+extrapolating and records that removed value in `geometry.removed_flux_mean`.
+Pass `balance_flux=False` to use the bottom array as given.
 
 ## Load level-1 uniform data directly
 

@@ -19,8 +19,9 @@ The clean user-facing API is exported from:
 
 - `src/simesh/amrvac/__init__.py`
 - `src/simesh/amrvac/api.py`
+- `src/simesh/tools/__init__.py`
 
-The main public functions are:
+The main AMRVAC public functions are:
 
 - `datfile_to_vtk(path, output_path, field_indices=None)`
 - `load_from_uniform(udata, w_names, xmin, xmax, block_nx, **kwargs)`
@@ -30,6 +31,15 @@ The main public functions are:
 - `read_uniform(path, *, resolution, bounds=None, field_indices=None, ghost_width=0, interpolation="zero", boundary_conditions=None)`
 - `write_datfile(path, output_path, *, field_indices=None, ghost_width=0, overwrite=False, boundary_conditions=None)`
 - `write_datfile_from_uniform(path, udata, w_names, xmin, xmax, block_nx, overwrite=False, **header_updates)`
+
+The independent scientific helper namespace `simesh.tools` currently exports:
+
+- `potential_field_green(b3_bottom, xmin, xmax, nz, *, backend="auto", balance_flux=True)`
+
+This helper works directly from NumPy-like arrays and does not require AMRVAC
+`.dat` files, AMR block structures, dataset objects, or CT staggered face
+fields. It returns a cell-centered magnetic field in component-first layout
+`(3, nx, ny, nz)` plus a `PotentialFieldGeometry` dataclass.
 
 The lower-level canonical Python modules live in:
 
@@ -98,10 +108,11 @@ default current API surface.
 
 ## Suggested public-API stance
 
-For now, it is safest to think of the public API in two layers:
+For now, it is safest to think of the public API in three layers:
 
 1. canonical AMRVAC-facing modules under `simesh.amrvac`
-2. lower-level Cython acceleration modules under `simesh.utils.lib` that should
+2. independent array-based scientific helpers under `simesh.tools`
+3. lower-level Cython acceleration modules under `simesh.utils.lib` that should
    usually stay behind the Python interface
 
 ## Array Layouts
@@ -111,6 +122,8 @@ The canonical AMRVAC path uses three explicit layout conventions:
 - `udata`: user-facing uniform data with shape `(nx, ny, nz, nw)`
 - `datau`: compute-oriented uniform data with shape `(nw, nx, ny, nz)`
 - `sfc_data`: Morton/SFC block data with shape `(nleafs, nw, bx, by, bz)`
+- `bfield`: independent potential-field output with shape `(3, nx, ny, nz)`,
+  where components are `b1`, `b2`, and `b3`
 
 For Cartesian 2D data, `nz` and `bz` are always one in Python arrays while
 AMRVAC headers and tree block indices remain two-dimensional.

@@ -6,10 +6,11 @@ main idea is to keep the native AMR block structure available while also
 offering uniform-grid sampling when a downstream tool needs regular Cartesian
 arrays.
 
-The user-facing API lives in `simesh.amrvac`. It gives Python users direct
-functions for AMRVAC `.dat` files and NumPy arrays, while the compiled AMR layer
-handles forest connectivity, Morton ordering, ghost cells, and uniform-grid
-extraction.
+The main AMRVAC user-facing API lives in `simesh.amrvac`. It gives Python users
+direct functions for AMRVAC `.dat` files and NumPy arrays, while the compiled
+AMR layer handles forest connectivity, Morton ordering, ghost cells, and
+uniform-grid extraction. Independent scientific helpers that do not require
+AMRVAC files or AMR meshes live in `simesh.tools`.
 
 ## What it works with
 
@@ -32,6 +33,8 @@ on the adaptive block structure directly.
 - Write AMRVAC `.dat` files from existing datasets or NumPy arrays
 - Export level-1 uniform AMRVAC data to VTK legacy output
 - Work with Cartesian 2D data through a singleton-z Python convention
+- Generate independent Cartesian helper fields through `simesh.tools`, such as
+  potential-field extrapolations from a bottom `b3` array
 
 ## Quick install
 
@@ -91,6 +94,29 @@ grid = read_uniform(
 This changes the representation from adaptive AMR blocks to a uniform array.
 The `interpolation` argument controls how AMR cell values are sampled.
 
+Use `potential_field_green(...)` when you have a uniform bottom-face magnetic
+field and want an independent cell-centered Cartesian potential-field box:
+
+```python
+import numpy as np
+from simesh.tools import potential_field_green
+
+b3_bottom = np.zeros((64, 64))
+b3_bottom[24:40, 24:40] = 1.0
+bfield, geometry = potential_field_green(
+    b3_bottom,
+    xmin=[0.0, 0.0, 0.0],
+    xmax=[1.0, 1.0, 1.0],
+    nz=64,
+)
+
+print(bfield.shape)  # (3, 64, 64, 64)
+print(geometry.spacing)
+```
+
+This helper is independent of AMRVAC file readers, AMR block objects, and
+solver-compatible CT staggered fields.
+
 ## Choose an interface
 
 | Goal | Start with |
@@ -103,6 +129,7 @@ The `interpolation` argument controls how AMR cell values are sampled.
 | Copy or subset an existing `.dat` file | `write_datfile(...)` |
 | Load level-1 data exactly as uniform data | `load_uniform_data(...)` |
 | Convert level-1 data to VTK | `datfile_to_vtk(...)` |
+| Build an independent potential field from bottom `b3` | `simesh.tools.potential_field_green(...)` |
 
 ## Documentation
 

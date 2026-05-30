@@ -1,10 +1,11 @@
-# Public AMRVAC API Reference
+# Public API Reference
 
 ## Scope
 
 This page summarizes the intended user-facing functions exported by
-`simesh.amrvac`. It is a compact reference for signatures and return shapes.
-For workflow guidance, read `docs/user-guide.md`.
+`simesh.amrvac` and the independent helpers exported by `simesh.tools`. It is a
+compact reference for signatures and return shapes. For workflow guidance, read
+`docs/user-guide.md`.
 
 ```python
 from simesh import amrvac
@@ -16,7 +17,13 @@ or:
 from simesh.amrvac import read_uniform
 ```
 
-## Public functions
+Independent tools are imported from:
+
+```python
+from simesh.tools import potential_field_green
+```
+
+## AMRVAC functions
 
 ### `open_dataset(path, *, ghost_width=0, boundary_conditions=None)`
 
@@ -257,6 +264,66 @@ These methods are available on the object returned by `open_dataset()` or
 | `udata` | `(nx, ny, nz, nw)` | Preferred user-facing uniform layout |
 | `datau` | `(nw, nx, ny, nz)` | Compute-oriented uniform layout |
 | `sfc_data` | `(nleafs, nw, bx, by, bz)` | Native block layout |
+
+## Independent tools
+
+### `potential_field_green(b3_bottom, xmin, xmax, nz, *, backend="auto", balance_flux=True)`
+
+Compute a Cartesian potential-field extrapolation from a uniform bottom-face
+normal magnetic field.
+
+This helper is independent of AMRVAC files, AMR meshes, dataset objects, and
+solver-compatible CT staggered face fields. It accepts a 2D bottom `b3` array on
+the lower `z = xmin[2]` face and returns cell-centered magnetic field samples
+inside the 3D box.
+
+Return value:
+
+```text
+(bfield, geometry)
+```
+
+`bfield` shape:
+
+```text
+(3, nx, ny, nz)
+```
+
+where `nx, ny = b3_bottom.shape`, `bfield[0]` is `b1`, `bfield[1]` is `b2`, and
+`bfield[2]` is `b3`.
+
+`geometry` is a frozen `PotentialFieldGeometry` dataclass with `xmin`, `xmax`,
+`domain_nx`, `dx`, `dy`, `dz`, `spacing`, `flux_balanced`, and
+`removed_flux_mean`. Use `geometry.cell_center_coordinates()` to reconstruct the
+1D cell-center coordinate arrays.
+
+Backends:
+
+| Backend | Meaning |
+| --- | --- |
+| `"auto"` | Use SciPy FFT convolution when available; otherwise use direct NumPy convolution |
+| `"fft"` | Require `scipy.signal.fftconvolve` |
+| `"direct"` | Use the direct NumPy convolution path |
+
+Example:
+
+```python
+import numpy as np
+from simesh.tools import potential_field_green
+
+b3_bottom = np.zeros((32, 32))
+b3_bottom[12:20, 12:20] = 1.0
+
+bfield, geometry = potential_field_green(
+    b3_bottom,
+    xmin=[0.0, 0.0, 0.0],
+    xmax=[1.0, 1.0, 1.0],
+    nz=32,
+)
+
+assert bfield.shape == (3, 32, 32, 32)
+print(geometry.domain_nx)
+```
 
 Helpers:
 
