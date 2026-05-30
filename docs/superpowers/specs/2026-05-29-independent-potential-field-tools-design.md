@@ -202,6 +202,58 @@ b3_bottom - mean(b3_bottom)
 This matches the decaying half-space convention for a finite computational
 box. The removed mean is recorded in `geometry`.
 
+## Discrete Correctness Checks
+
+For this first tool, "correctly generated" means correct relative to the
+documented discrete Green-function model, not exact compatibility with a CT
+solver stencil. The returned field is cell-centered and sampled from a
+midpoint-source Green kernel. Therefore, finite-difference divergence and curl
+checks are diagnostic convergence checks, not machine-zero invariants.
+
+Use these checks to judge the generated field:
+
+- Direct-sum reference: for small grids, compare the output against an
+  independently written explicit source-cell sum using the same midpoint
+  kernel, source area factor, cell-center coordinates, and optional flux
+  balancing. This is the strongest discrete implementation check because it
+  verifies indexing, signs, spacing, kernel normalization, and crop rules
+  without relying on the FFT backend.
+- Backend parity: compare FFT and direct convolution outputs against the same
+  discrete model. Parity only proves that both backends implement the same
+  convolution; it does not by itself prove the physics.
+- Interior divergence residual: compute a central-difference divergence on
+  interior cells only, excluding at least one cell from each boundary. Normalize
+  by a characteristic field-gradient scale, for example
+  `max(abs(B)) / min(dx, dy, dz)`. The relative residual should be small for
+  smooth balanced inputs and should decrease under grid refinement away from
+  the bottom source plane.
+- Interior curl residual: compute a central-difference curl with the same
+  interior mask and normalization. A potential field should have small
+  normalized curl, with refinement convergence away from the lower boundary.
+- Refinement convergence: repeat a smooth balanced test case at multiple
+  resolutions over the same physical box. Compare fields at common physical
+  locations or compare normalized divergence/curl residuals. The residuals
+  should decrease at roughly the order expected from the finite-difference
+  diagnostic and midpoint source approximation, except near boundaries and
+  sharp bottom-field features.
+- Symmetry and sign checks: use simple balanced sources with known symmetry,
+  such as a positive-negative pair. The generated field should preserve the
+  expected mirror symmetries, component parities, and sign orientation.
+- Height decay: for balanced compact sources, `b3` and horizontal field
+  magnitudes should weaken with height in an aggregate norm. This is a useful
+  smoke test, but it is weaker than the direct-sum and residual checks.
+
+Do not require `bfield[2, :, :, 0]` to equal `b3_bottom`. The input is a
+bottom-face normal field at `z = xmin[2]`, while the output is evaluated at the
+first cell-centered height `z = xmin[2] + 0.5 * dz`. With the midpoint kernel,
+the first layer is an extrapolated field above the boundary, not a copy of the
+boundary data.
+
+If a future tool needs a magnetic field that is exactly divergence-free under
+the AMRVAC CT divergence operator, it should produce staggered face fields and
+construct or correct them with the same discrete CT stencil. That is a
+different acceptance criterion from this independent cell-centered helper.
+
 ## Error Handling
 
 Error handling is narrow and explicit:
@@ -235,7 +287,12 @@ Required coverage:
 - `balance_flux=True` subtracts the bottom mean and records the removed value
 - direct and FFT backends agree within a tight tolerance when SciPy is
   installed
+- direct backend agrees with an explicit small-grid direct-sum reference
 - `backend="auto"` returns finite output
+- normalized interior divergence and curl residuals are small for a smooth
+  balanced source and decrease under a simple refinement check
+- symmetric balanced sources preserve expected component parity and sign
+  orientation
 - a compact balanced source produces finite fields and a weaker `b3` magnitude
   at higher layers than near the bottom
 
@@ -255,6 +312,196 @@ Update project docs only where the public surface changes:
 
 Do not expand AMRVAC file-format docs for this feature because the tool is not
 an AMRVAC reader or writer.
+
+## Implementation Phasing
+
+Implement this feature in separated phases. Only one phase should be completed
+in one agent turn. If a turn starts a phase, it should stop after that phase's
+success criteria are met and report the next handoff checkpoint instead of
+continuing into the next phase.
+
+### Phase 1: Public API and Geometry Shell
+
+Belongs in this phase:
+
+- create `src/simesh/tools/`
+- export `potential_field_green`
+- define the frozen geometry dataclass
+- implement input conversion and validation
+- infer `nx` and `ny` from `b3_bottom.shape`
+- compute `dx`, `dy`, and `dz`
+- record flux-balance metadata
+
+Explicitly not in this phase:
+
+- Green kernels
+- convolution
+- FFT acceleration
+- physical correctness tests
+
+Dependencies: none.
+
+Handoff checkpoint: the function signature, import path, validation behavior,
+and geometry fields are stable.
+
+Success criteria:
+
+- `from simesh.tools import potential_field_green` works
+- invalid inputs raise the specified errors
+- geometry records `xmin`, `xmax`, `domain_nx`, and spacing correctly
+
+Risk or ambiguity: geometry fields are described conceptually as enough
+information to reconstruct coordinates, so the implementation should choose a
+minimal clear field set.
+
+### Phase 2: Canonical Discrete Green Model and Direct Backend
+
+Belongs in this phase:
+
+- implement midpoint-source Green kernels
+- include the source area factor
+- implement direct NumPy convolution
+- fill component-first output `(3, nx, ny, nz)`
+- apply optional bottom-flux balancing before extrapolation
+- add small-grid direct-sum reference tests
+
+Explicitly not in this phase:
+
+- SciPy FFT backend
+- documentation expansion
+- AMRVAC, AMR mesh, or CT compatibility work
+
+Dependencies: Phase 1.
+
+Handoff checkpoint: the direct backend is the canonical numerical path and
+matches an independent explicit source-cell sum.
+
+Success criteria:
+
+- `backend="direct"` returns finite fields with the correct shape
+- signs, spacing, kernel normalization, crop rules, and mean-removal behavior
+  are covered by tests
+
+Risk or ambiguity: kernel normalization and crop/index conventions are the
+highest-risk details and should be pinned before acceleration is added.
+
+### Phase 3: Backend Dispatcher and FFT Acceleration
+
+Belongs in this phase:
+
+- add `backend="auto"`, `backend="fft"`, and `backend="direct"` dispatch
+- use SciPy `fftconvolve` when available
+- fall back to direct convolution for `backend="auto"` when SciPy is absent
+- raise `ImportError` only for forced `backend="fft"` when SciPy is absent
+- add backend parity tests
+
+Explicitly not in this phase:
+
+- a new physics model
+- a spectral potential-field solver
+- behavior differences between FFT and direct backends
+
+Dependencies: Phase 2.
+
+Handoff checkpoint: FFT and direct use the same kernels and crop rule.
+
+Success criteria:
+
+- direct and FFT outputs agree within a tight tolerance when SciPy is installed
+- `backend="auto"` works without requiring SciPy
+
+Risk or ambiguity: SciPy may be absent in some environments, so tests must skip
+or branch cleanly.
+
+### Phase 4: Scientific Diagnostic Tests
+
+Belongs in this phase:
+
+- add normalized interior divergence and curl residual tests
+- add a simple refinement trend check
+- add symmetry, component parity, and sign-orientation checks
+- add height-decay checks
+- add finite-output checks for compact balanced sources
+
+Explicitly not in this phase:
+
+- CT-stencil machine-zero divergence requirements
+- requiring `bfield[2, :, :, 0]` to equal `b3_bottom`
+
+Dependencies: Phases 2 and 3.
+
+Handoff checkpoint: the numerical implementation has physics-oriented
+regression coverage beyond shape checks and backend parity.
+
+Success criteria:
+
+- smooth balanced cases produce small normalized interior divergence and curl
+  residuals
+- residuals decrease under a simple refinement check
+- symmetry, sign, and height-decay checks pass
+
+Risk or ambiguity: the design gives qualitative thresholds, so exact tolerances
+need conservative calibration from observed behavior.
+
+### Phase 5: Public Documentation
+
+Belongs in this phase:
+
+- update `README.md`
+- update `docs/python-api-map.md`
+- update `docs/api-reference.md`
+- update `docs/user-guide.md`
+- include a compact example showing bottom-field input and `(3, nx, ny, nz)`
+  output
+
+Explicitly not in this phase:
+
+- AMRVAC `.dat` documentation
+- mesh or CT documentation
+- file export claims
+
+Dependencies: Phases 1 through 4 should be stable enough to document.
+
+Handoff checkpoint: the API and behavior are stable enough to document without
+expected churn.
+
+Success criteria:
+
+- docs show the import path, required arguments, output shape, and geometry
+  return value
+- docs state that the tool is independent of AMRVAC files and meshes
+
+Risk or ambiguity: avoid overpromising solver-compatible CT fields or exact
+boundary copying.
+
+### Phase 6: Final Integration Check
+
+Belongs in this phase:
+
+- run the focused tools tests
+- run the relevant existing test command
+- verify no file-system side effects happen inside `potential_field_green`
+- check the public import in an editable-install context
+
+Explicitly not in this phase:
+
+- feature expansion
+- unrelated AMRVAC or legacy refactors
+
+Dependencies: Phases 1 through 5.
+
+Handoff checkpoint: the implementation is ready to hand off as complete.
+
+Success criteria:
+
+- users can import `potential_field_green` from `simesh.tools`
+- the default backend works without requiring SciPy
+- FFT acceleration works when SciPy is available
+- focused tests and public docs are updated
+- all implementation success criteria in this design are satisfied
+
+Risk or ambiguity: the build or test environment may not include SciPy, so the
+final report should state exactly what was and was not verified.
 
 ## Success Criteria
 
