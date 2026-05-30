@@ -9,6 +9,7 @@ Read these when you want to use `simesh` from Python.
 | Install the package or set up development builds | `docs/installation.md` |
 | Choose the right public interface | `docs/user-guide.md` |
 | Work with Cartesian 2D data | `docs/2d-guide.md` |
+| Understand potential-field extrapolation equations | `docs/potential-field-tools.md` |
 | Look up public function signatures | `docs/api-reference.md` |
 
 ## Maintainer docs
