@@ -35,3 +35,8 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "heavy: optional long-running tests disabled by default unless explicitly enabled",
+]
