@@ -65,7 +65,10 @@ and the focused documents under `docs/` for detailed mechanics.
 
 - Supported package/build surface is `pip`/`setuptools` with `Cython`; do not
   assume Poetry, tox, nox, or a pytest-only workflow.
-- Use `pip install -e .` for editable local development.
+- Use `.venv/bin/python` for local test, build, and ad hoc Python commands.
+  The system `python3` may be older than the project's supported Python
+  version.
+- Use `.venv/bin/python -m pip install -e .` for editable local development.
 - Use `make build` to rebuild all compiled extensions after editing `.pyx`
   files.
 - Use `make build-amr` when iterating only on `src/simesh/utils/lib/amr/`.
