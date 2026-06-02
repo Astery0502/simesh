@@ -73,8 +73,10 @@ def read_uniform(
     behavior, is exact for native level-1 uniform data, and avoids allocating
     ghost-cell storage. ``interpolation="linear"`` uses trilinear interpolation
     from ghost-cell-padded mesh storage and therefore requires
-    ``ghost_width > 0``. For level-1 data sampled on its native full-domain
-    grid, use ``open_dataset(...).uniform_full()`` for exact block placement.
+    ``ghost_width > 0``. Refined datasets with coarse/fine interfaces require
+    ``ghost_width >= 2`` for limited prolongation. For level-1 data sampled on
+    its native full-domain grid, use ``open_dataset(...).uniform_full()`` for
+    exact block placement.
     """
     ds = open_dataset(path, ghost_width=ghost_width, boundary_conditions=boundary_conditions)
     ds.load_data(field_indices=field_indices)

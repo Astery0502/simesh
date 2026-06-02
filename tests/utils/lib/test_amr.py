@@ -545,6 +545,36 @@ def test_2d_refined_mesh_coarse_fine_ghost_cells():
     assert np.all(np.isfinite(mesh.padded_view()))
 
 
+def test_refined_mesh_rejects_single_ghost_cell_exchange():
+    forest, mesh, _, block_nx = _refined_fixture(nghost=1, nfields=1, block_nx=(4, 4, 4))
+    data = _sample_block_data(int(forest.nleafs), 1, tuple(int(v) for v in block_nx))
+    mesh.load_interior_data(data)
+
+    try:
+        mesh.apply_ghost_cells()
+    except ValueError as exc:
+        assert "ghost_width >= 2" in str(exc)
+    else:
+        raise AssertionError("fine/coarse ghost exchange should reject nghost=1")
+
+
+def test_level1_mesh_allows_single_ghost_cell_exchange():
+    forest, mesh, _, block_nx = _mesh_pair(
+        np.ones(8, dtype=np.int32),
+        root_grid=(2, 2, 2),
+        nghost=1,
+        nfields=1,
+        block_nx=(4, 4, 4),
+    )
+    data = _sample_block_data(int(forest.nleafs), 1, tuple(int(v) for v in block_nx))
+    mesh.load_interior_data(data)
+
+    mesh.apply_ghost_cells()
+
+    assert np.array_equal(mesh.interior_view(), data)
+    assert np.all(np.isfinite(mesh.padded_view()))
+
+
 def test_uniform_full_level1():
     ng1 = ng2 = ng3 = 2
     is_leaf = np.ones(ng1 * ng2 * ng3, dtype=np.int32)
@@ -580,6 +610,10 @@ def test_uniform_full_level1():
 
 def test_getbc_matches_legacy_reference():
     forest, mesh, legacy_mesh, block_nx = _refined_fixture(nghost=2, nfields=2, block_nx=(4, 4, 4))
+    neighbor_type = np.asarray(forest.neighbor_type)
+    assert np.any(neighbor_type == 2)
+    assert np.any(neighbor_type == 4)
+
     data = _sample_block_data(int(forest.nleafs), 2, tuple(int(v) for v in block_nx))
 
     mesh.load_interior_data(data)
@@ -694,6 +728,10 @@ def run_tests():
     print("test_2d_mesh_ghost_cells_and_bilinear_interpolation passed")
     test_2d_refined_mesh_coarse_fine_ghost_cells()
     print("test_2d_refined_mesh_coarse_fine_ghost_cells passed")
+    test_refined_mesh_rejects_single_ghost_cell_exchange()
+    print("test_refined_mesh_rejects_single_ghost_cell_exchange passed")
+    test_level1_mesh_allows_single_ghost_cell_exchange()
+    print("test_level1_mesh_allows_single_ghost_cell_exchange passed")
     test_uniform_full_level1()
     print("test_uniform_full_level1 passed")
     test_getbc_matches_legacy_reference()

@@ -382,6 +382,8 @@ cdef class AMRMesh:
             return
         if self.ndim != 2 and self.ndim != 3:
             raise NotImplementedError("Ghost-cell exchange is currently implemented only for 2D and 3D meshes.")
+        if self.ng < 2 and self._has_coarse_or_fine_neighbors(self.forest.neighbor_type):
+            raise ValueError("Fine/coarse ghost-cell exchange requires ghost_width >= 2.")
         self.getbc()
 
     cdef void _init_block_coordinates(self):
