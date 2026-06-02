@@ -238,10 +238,14 @@ smooth_grid = read_uniform(
     "snapshot.dat",
     resolution=(128, 128, 128),
     field_indices=[0],
-    ghost_width=1,
+    ghost_width=2,
     interpolation="linear",
 )
 ```
+
+Use `ghost_width=2` for refined datasets with coarse/fine interfaces; the
+limited prolongation stencil uses neighboring coarse cells. Level-1 or
+same-level-only ghost exchange can still use a single ghost cell.
 
 Use `load_uniform_data()` instead when the file is known to be level-1 and you
 want exact full-domain uniform placement rather than AMR resampling.
@@ -369,4 +373,6 @@ from simesh.amrvac.layouts import datau_to_udata, udata_to_datau
 - The stable user workflows target Cartesian 2D and Cartesian 3D data.
 - `load_uniform_data()` and `datfile_to_vtk()` are level-1 uniform-data
   conveniences.
-- Linear interpolation requires `ghost_width > 0`.
+- Linear interpolation requires ghost-cell storage. Refined datasets with
+  coarse/fine interfaces require `ghost_width >= 2`; level-1 and
+  same-level-only datasets can use `ghost_width=1`.

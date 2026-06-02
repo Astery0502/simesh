@@ -92,7 +92,9 @@ Interpolation choices:
 | `"zero"` | Piecewise-constant sampling; default low-memory path |
 | `"linear"` | Linear sampling through ghost-cell-padded mesh storage |
 
-`interpolation="linear"` requires `ghost_width > 0`.
+`interpolation="linear"` requires `ghost_width > 0`. Refined datasets with
+coarse/fine interfaces require `ghost_width >= 2` because limited prolongation
+uses neighboring coarse cells.
 
 `field_indices` are zero-based indices into the original file field list. The
 returned field axis follows the requested order.

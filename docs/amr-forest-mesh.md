@@ -83,6 +83,12 @@ behavior in the mesh layer.
 The mesh implementation allocates block storage with ghost cells and uses
 neighbor connectivity to fill those regions.
 
+Coarse/fine interfaces require at least two ghost cells. The limited
+prolongation stencil samples neighboring coarse-cell information, so refined
+meshes with coarse or fine neighbors reject ghost-cell exchange when
+`ghost_width < 2`. Level-1 and same-level-only meshes can still use a single
+ghost cell.
+
 Physical boundary fills use per-loaded-field boundary modes supplied by the
 AMRVAC dataset layer. The default mode is continuous fill, which copies the
 nearest interior value into physical ghost cells. The mesh also supports
