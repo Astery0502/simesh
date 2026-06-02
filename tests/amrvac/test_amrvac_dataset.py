@@ -1,5 +1,8 @@
 import os
 import tempfile
+import zlib
+from pathlib import Path
+from struct import pack
 
 import numpy as np
 
@@ -16,6 +19,13 @@ from simesh.amrvac import (
 from simesh.amrvac.amrvac_dataset import AMRVACDataSet
 from simesh.amrvac.datio import extract_uniform_data
 from simesh.amrvac.layouts import datau_to_udata, udata_to_datau
+
+
+HEAVY_AMRVAC_CURRENT_FIXTURE = Path("data/weno509_sub_0000.dat")
+HEAVY_AMRVAC_CURRENT_REPORT_DIR = Path("report/amrvac-current")
+HEAVY_AMRVAC_CURRENT_THRESHOLD = 300.0
+HEAVY_AMRVAC_CURRENT_EPSILON = np.finfo(np.double).eps
+HEAVY_AMRVAC_CURRENT_SMOOTHING_PASSES = 2
 
 
 def _uniform_input(domain_nx=(4, 4, 4), nw=7):
@@ -69,6 +79,294 @@ def _read_structured_points_vtk(path: str):
             "spacing": spacing,
             "fields": fields,
         }
+
+
+def _smooth_current_plane(values, passes):
+    smoothed = np.asarray(values, dtype=np.double).copy()
+    for _ in range(passes):
+        previous = smoothed.copy()
+        smoothed[1:-1, 1:-1] = (
+            0.25 * previous[1:-1, 1:-1]
+            + 0.125
+            * (
+                previous[:-2, 1:-1]
+                + previous[2:, 1:-1]
+                + previous[1:-1, :-2]
+                + previous[1:-1, 2:]
+            )
+            + 0.0625
+            * (
+                previous[:-2, :-2]
+                + previous[:-2, 2:]
+                + previous[2:, :-2]
+                + previous[2:, 2:]
+            )
+        )
+    return smoothed
+
+
+def _current_center_slice(bfield, spacing, smoothing_passes=0):
+    center_z = bfield.shape[3] // 2
+    if center_z == 0 or center_z == bfield.shape[3] - 1:
+        raise ValueError("Current-density validation needs at least three z samples.")
+
+    dx, dy, dz = spacing
+    bx = bfield[0]
+    by = bfield[1]
+    bz = bfield[2]
+
+    bx_slice = bx[:, :, center_z]
+    bx_zlo = bx[:, :, center_z - 1]
+    bx_zhi = bx[:, :, center_z + 1]
+    by_slice = by[:, :, center_z]
+    by_zlo = by[:, :, center_z - 1]
+    by_zhi = by[:, :, center_z + 1]
+    bz_slice = bz[:, :, center_z]
+
+    if smoothing_passes > 0:
+        bx_slice = _smooth_current_plane(bx_slice, smoothing_passes)
+        bx_zlo = _smooth_current_plane(bx_zlo, smoothing_passes)
+        bx_zhi = _smooth_current_plane(bx_zhi, smoothing_passes)
+        by_slice = _smooth_current_plane(by_slice, smoothing_passes)
+        by_zlo = _smooth_current_plane(by_zlo, smoothing_passes)
+        by_zhi = _smooth_current_plane(by_zhi, smoothing_passes)
+        bz_slice = _smooth_current_plane(bz_slice, smoothing_passes)
+
+    jx = np.gradient(bz_slice, dy, axis=1, edge_order=2) - (by_zhi - by_zlo) / (2.0 * dz)
+    jy = (bx_zhi - bx_zlo) / (2.0 * dz) - np.gradient(
+        bz_slice,
+        dx,
+        axis=0,
+        edge_order=2,
+    )
+    jz = np.gradient(by_slice, dx, axis=0, edge_order=2) - np.gradient(
+        bx_slice,
+        dy,
+        axis=1,
+        edge_order=2,
+    )
+
+    return center_z, np.sqrt(jx * jx + jy * jy + jz * jz)
+
+
+def _current_smoothness_metric(jmag_slice, spacing):
+    dx, dy = spacing[:2]
+    grad_x = np.gradient(jmag_slice, dx, axis=0, edge_order=2)
+    grad_y = np.gradient(jmag_slice, dy, axis=1, edge_order=2)
+    grad_mag = np.sqrt(grad_x * grad_x + grad_y * grad_y)
+
+    numerator = np.percentile(grad_mag, 99.0)
+    denominator = np.median(grad_mag) + HEAVY_AMRVAC_CURRENT_EPSILON
+    return float(numerator / denominator)
+
+
+def _write_grayscale_png(path, image, text_chunks=None):
+    text_chunks = text_chunks or {}
+    image = np.asarray(image, dtype=np.uint8)
+    height, width = image.shape
+
+    def chunk(chunk_type, payload):
+        return (
+            pack(">I", len(payload))
+            + chunk_type
+            + payload
+            + pack(">I", zlib.crc32(chunk_type + payload) & 0xFFFFFFFF)
+        )
+
+    raw = b"".join(b"\x00" + image[row].tobytes() for row in range(height))
+    payload = b"\x89PNG\r\n\x1a\n"
+    payload += chunk(b"IHDR", pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0))
+    for key, value in text_chunks.items():
+        payload += chunk(b"tEXt", key.encode("latin-1") + b"\x00" + str(value).encode("latin-1", errors="replace"))
+    payload += chunk(b"IDAT", zlib.compress(raw, level=9))
+    payload += chunk(b"IEND", b"")
+    path.write_bytes(payload)
+
+
+def _write_current_slice_png(path, jmag_slice, fixture_path, slice_index, metric, threshold):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    title = (
+        f"{fixture_path.name} center z={slice_index} "
+        f"smoothness={metric:.6g} threshold={threshold:.6g}"
+    )
+    try:
+        (path.parent / ".cache").mkdir(exist_ok=True)
+        (path.parent / ".matplotlib-cache").mkdir(exist_ok=True)
+        os.environ.setdefault("XDG_CACHE_HOME", str(path.parent / ".cache"))
+        os.environ.setdefault("MPLCONFIGDIR", str(path.parent / ".matplotlib-cache"))
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        finite = np.asarray(jmag_slice[np.isfinite(jmag_slice)])
+        if finite.size == 0:
+            image = np.zeros(jmag_slice.shape, dtype=np.uint8)
+        else:
+            lo, hi = np.percentile(finite, [1.0, 99.0])
+            if hi <= lo:
+                hi = lo + 1.0
+            image = np.clip((jmag_slice - lo) / (hi - lo), 0.0, 1.0)
+            image = (255.0 * image).astype(np.uint8)
+        _write_grayscale_png(
+            path,
+            image.T,
+            text_chunks={
+                "Title": title,
+                "Fixture": str(fixture_path),
+                "Smoothness": f"{metric:.12g}",
+                "Threshold": f"{threshold:.12g}",
+            },
+        )
+        return
+
+    fig, ax = plt.subplots(figsize=(8, 7), constrained_layout=True)
+    image = ax.imshow(jmag_slice.T, origin="lower", cmap="magma", aspect="equal")
+    ax.set_title(title)
+    ax.set_xlabel("x index")
+    ax.set_ylabel("y index")
+    cbar = fig.colorbar(image, ax=ax)
+    cbar.set_label("|J|")
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
+def _write_current_diagnostic_pngs(report_dir, jmag_slice, slice_index, metric):
+    try:
+        (report_dir / ".cache").mkdir(exist_ok=True)
+        (report_dir / ".matplotlib-cache").mkdir(exist_ok=True)
+        os.environ.setdefault("XDG_CACHE_HOME", str(report_dir / ".cache"))
+        os.environ.setdefault("MPLCONFIGDIR", str(report_dir / ".matplotlib-cache"))
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return []
+
+    log_path = report_dir / "current_center_z_log.png"
+    clipped_path = report_dir / "current_center_z_p95_clip.png"
+
+    fig, ax = plt.subplots(figsize=(8, 7), constrained_layout=True)
+    image = ax.imshow(np.log10(jmag_slice.T + 1e-12), origin="lower", cmap="magma", aspect="equal")
+    ax.set_title(f"log10 |J| center z={slice_index}, smoothness={metric:.6g}")
+    ax.set_xlabel("x index")
+    ax.set_ylabel("y index")
+    fig.colorbar(image, ax=ax, label="log10(|J|)")
+    fig.savefig(log_path, dpi=150)
+    plt.close(fig)
+
+    vmax = np.percentile(jmag_slice, 95.0)
+    fig, ax = plt.subplots(figsize=(8, 7), constrained_layout=True)
+    image = ax.imshow(jmag_slice.T, origin="lower", cmap="magma", aspect="equal", vmin=0.0, vmax=vmax)
+    ax.set_title(f"|J| center z={slice_index}, clipped at p95={vmax:.6g}")
+    ax.set_xlabel("x index")
+    ax.set_ylabel("y index")
+    fig.colorbar(image, ax=ax, label="|J|, p95 clipped")
+    fig.savefig(clipped_path, dpi=150)
+    plt.close(fig)
+
+    return [log_path, clipped_path]
+
+
+def _write_current_report(
+    path,
+    fixture_path,
+    resolution,
+    slice_index,
+    smoothing_passes,
+    metric,
+    threshold,
+    passed,
+    png_path,
+    diagnostic_paths,
+):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    relative_png = png_path.name
+    diagnostic_lines = "\n".join(f"- `{diagnostic_path.name}`" for diagnostic_path in diagnostic_paths)
+    if not diagnostic_lines:
+        diagnostic_lines = "- no additional diagnostic PNGs were generated"
+    result = "PASS" if passed else "FAIL"
+    content = f"""# AMRVAC Current Validation
+
+- fixture path: `{fixture_path}`
+- enable gate: `SIMESH_RUN_HEAVY_TESTS=1`
+- validation pipeline: open with `ghost_width=2`, load fields `[4, 5, 6]`, exchange ghost cells, sample `b1`, `b2`, and `b3` with linear interpolation, compute `J = curl(B)`, and measure the center `z` slice of `|J|`
+- uniform-grid resolution: `{tuple(int(value) for value in resolution)}`
+- selected slice: center `z` index `{slice_index}`
+- artifact-suppression smoothing passes: `{smoothing_passes}`
+- metric formula: `p99(|grad |J||) / (median(|grad |J||) + epsilon)`
+- measured metric value: `{metric:.12g}`
+- threshold: `{threshold:.12g}`
+- result: `{result}`
+- embedded PNG path: `{relative_png}`
+- additional diagnostic PNGs:
+{diagnostic_lines}
+
+![current center z]({relative_png})
+"""
+    path.write_text(content, encoding="utf-8")
+
+
+def test_heavy_amrvac_current_validation():
+    if os.environ.get("SIMESH_RUN_HEAVY_TESTS") != "1":
+        print("Skipping heavy AMRVAC current validation: set SIMESH_RUN_HEAVY_TESTS=1 to enable.")
+        return
+
+    fixture_path = HEAVY_AMRVAC_CURRENT_FIXTURE
+    if not fixture_path.exists():
+        print(f"Skipping heavy AMRVAC current validation: fixture not found at {fixture_path}.")
+        return
+
+    ds = open_dataset(str(fixture_path), ghost_width=2)
+    ds.load_data(field_indices=[4, 5, 6])
+    ds.exchange_ghost_cells()
+
+    resolution = ds.domain_nx.astype(np.int64) * (2 ** (int(ds.levmax) - 1))
+    bfield = ds.uniform_grid(resolution, field_indices=[4, 5, 6], interpolation="linear")
+    spacing = (ds.physical_domain[1] - ds.physical_domain[0]) / (resolution.astype(np.double) - 1.0)
+    slice_index, jmag_slice = _current_center_slice(
+        bfield,
+        spacing,
+        smoothing_passes=HEAVY_AMRVAC_CURRENT_SMOOTHING_PASSES,
+    )
+    metric = _current_smoothness_metric(jmag_slice, spacing)
+    passed = metric <= HEAVY_AMRVAC_CURRENT_THRESHOLD
+
+    png_path = HEAVY_AMRVAC_CURRENT_REPORT_DIR / "current_center_z.png"
+    report_path = HEAVY_AMRVAC_CURRENT_REPORT_DIR / "report.md"
+    _write_current_slice_png(
+        png_path,
+        jmag_slice,
+        fixture_path,
+        slice_index,
+        metric,
+        HEAVY_AMRVAC_CURRENT_THRESHOLD,
+    )
+    diagnostic_paths = _write_current_diagnostic_pngs(
+        HEAVY_AMRVAC_CURRENT_REPORT_DIR,
+        jmag_slice,
+        slice_index,
+        metric,
+    )
+    _write_current_report(
+        report_path,
+        fixture_path,
+        resolution,
+        slice_index,
+        HEAVY_AMRVAC_CURRENT_SMOOTHING_PASSES,
+        metric,
+        HEAVY_AMRVAC_CURRENT_THRESHOLD,
+        passed,
+        png_path,
+        diagnostic_paths,
+    )
+
+    assert passed, (
+        "Heavy AMRVAC current validation failed: "
+        f"smoothness metric {metric:.12g} exceeds threshold {HEAVY_AMRVAC_CURRENT_THRESHOLD:.12g}. "
+        f"See {report_path}."
+    )
 
 
 def test_dataset_uniform_full():
@@ -577,6 +875,8 @@ def run_tests():
     print("test_datfile_to_vtk passed")
     test_datfile_to_vtk_2d_singleton_z()
     print("test_datfile_to_vtk_2d_singleton_z passed")
+    test_heavy_amrvac_current_validation()
+    print("test_heavy_amrvac_current_validation passed or skipped")
     print("All tests passed for AMRVAC dataset!")
 
 

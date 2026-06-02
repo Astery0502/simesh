@@ -10,6 +10,7 @@ dist/
 .venv-smoke/
 .benchmark-data/
 benchmark-results/
+report/
 
 # cython compilation files excluded
 *.so
