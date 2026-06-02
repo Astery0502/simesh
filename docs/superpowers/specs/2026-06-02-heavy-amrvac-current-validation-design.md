@@ -30,7 +30,9 @@ directory is `report/amrvac-current/`, and `report/` should be ignored by git.
 
 The enabled validation pipeline is:
 
-1. Open `data/weno509_sub_0000.dat` with `ghost_width=1`.
+1. Open `data/weno509_sub_0000.dat` with `ghost_width=2`, because the refined
+   fixture has coarse/fine interfaces and limited prolongation needs two ghost
+   cells.
 2. Load original field indices `[4, 5, 6]`, corresponding to `b1`, `b2`, and
    `b3`.
 3. Call `exchange_ghost_cells()` to refresh ghost-cell storage explicitly.

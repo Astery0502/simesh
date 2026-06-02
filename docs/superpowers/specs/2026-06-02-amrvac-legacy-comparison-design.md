@@ -54,11 +54,13 @@ a clear message.
 
 The current path should:
 
-1. Open `data/weno509_sub_0000.dat` with `ghost_width=1`.
-2. Load magnetic fields `[4, 5, 6]`.
-3. Call `exchange_ghost_cells()`.
-4. Expose `blocks(include_ghosts=True)` for ghost-padded comparison.
-5. Compute a bounded linear `uniform_grid(...)` slice for interpolation
+1. Confirm that `ghost_width=1` is rejected for the refined fixture when
+   coarse/fine interfaces are present.
+2. Open `data/weno509_sub_0000.dat` with `ghost_width=2`.
+3. Load magnetic fields `[4, 5, 6]`.
+4. Call `exchange_ghost_cells()`.
+5. Expose `blocks(include_ghosts=True)` for ghost-padded comparison.
+6. Compute a bounded linear `uniform_grid(...)` slice for interpolation
    comparison.
 
 ## Legacy Path

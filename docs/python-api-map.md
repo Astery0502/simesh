@@ -50,13 +50,16 @@ Treat `api.py` as the first user-facing entrypoint, `amrvac_dataset.py` as the
 stateful dataset implementation, and `datio.py` as the canonical low-level
 AMRVAC format module.
 
-`read_uniform(..., interpolation="linear", ghost_width=1)` exposes the
-canonical Cython-backed interpolation path: trilinear for 3D data and bilinear
-for Cartesian 2D data. Keep ``"zero"`` as the default for compatibility with
-the previous piecewise-constant behavior and as the low-memory path when
-ghost-cell storage is not wanted. For level-1 data sampled on the native
-full-domain grid, `uniform_full()` is the exact block placement path rather
-than a resampling path.
+`read_uniform(..., interpolation="linear")` exposes the canonical
+Cython-backed interpolation path: trilinear for 3D data and bilinear for
+Cartesian 2D data. It requires ghost-cell storage. Use `ghost_width=1` only for
+level-1 or same-level-only meshes; refined meshes with coarse/fine interfaces
+require `ghost_width >= 2` for the limited prolongation stencil. Keep
+``"zero"`` as the default for compatibility with the previous
+piecewise-constant behavior and as the low-memory path when ghost-cell storage
+is not wanted. For level-1 data sampled on the native full-domain grid,
+`uniform_full()` is the exact block placement path rather than a resampling
+path.
 
 Physical boundary modes for ghost-cell fills are normalized in
 `src/simesh/amrvac/boundary.py` before being passed to the Cython mesh. The

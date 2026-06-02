@@ -46,6 +46,25 @@ Notes:
 - `make clean` removes compiled extensions and generated packaging artifacts
 - `make test` rebuilds extensions and runs the script-based tests under `tests/`
 
+### Optional heavy AMRVAC validation
+
+The AMRVAC dataset test script includes an optional real-data validation for
+the adaptive snapshot at `data/weno509_sub_0000.dat`. It opens the file with
+ghost cells, samples the magnetic field onto the full effective AMR resolution,
+computes `J = curl(B)`, and checks the center `z` slice of `|J|` for broad
+current-density ripples.
+
+This validation is disabled by default. Run it explicitly with:
+
+```bash
+SIMESH_RUN_HEAVY_TESTS=1 PYTHONPATH=src .venv/bin/python tests/amrvac/test_amrvac_dataset.py
+```
+
+`make test` remains default-safe because the heavy validation returns without
+reading the large fixture unless `SIMESH_RUN_HEAVY_TESTS=1` is set. If enabled,
+the fixture must exist at `data/weno509_sub_0000.dat`; diagnostics are written
+under `report/amrvac-current/`.
+
 ## Optional OpenMP acceleration
 
 OpenMP is optional and is not enabled by default. The default installation path

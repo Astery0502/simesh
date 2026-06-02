@@ -50,10 +50,13 @@ smooth_grid = read_uniform(
     "snapshot_2d.dat",
     resolution=(256, 256),
     field_indices=[0],
-    ghost_width=1,
+    ghost_width=2,
     interpolation="linear",
 )
 ```
+
+Use `ghost_width=2` for refined 2D datasets with coarse/fine interfaces.
+Level-1 or same-level-only 2D datasets can still use `ghost_width=1`.
 
 ## Read 2D block data
 
