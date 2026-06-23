@@ -73,6 +73,95 @@ ds.write_datfile("updated.dat", overwrite=True)
 You can pass `boundary_conditions` to `open_dataset()` or override them on
 `ds.load_data(...)` before refreshing ghost cells.
 
+### Register derived fields
+
+Use dataset-level derived fields when a quantity should be computed from loaded
+cell-centered fields but should not become an original `.dat` header field.
+Registration stores the recipe only. `materialize_fields(...)` computes the
+requested names and appends them to the loaded block-field axis.
+
+```python
+from simesh.amrvac import open_dataset
+
+ds = open_dataset("snapshot.dat")
+ds.load_data(field_indices=[0, 2])
+
+ds.register_derived(
+    "p",
+    lambda ctx: ctx.field("e") - 0.5 * ctx.field("rho"),
+    dependencies=["rho", "e"],
+)
+ds.materialize_fields(["p"])
+
+pressure_blocks = ds.blocks(field_names=["p"])
+pressure_grid = ds.uniform_grid((128, 128, 128), field_names=["p"])
+ds.write_datfile("pressure.dat", field_names=["p"], overwrite=True)
+```
+
+`field_indices` always refer to original file/header fields. Use `field_names`
+for loaded original fields and materialized derived fields. Passing both
+selectors to the same method raises `ValueError`.
+
+```python
+density_and_pressure = ds.blocks(field_names=["rho", "p"])
+ds.drop_derived_fields(["p"])
+```
+
+Recipes that need ghost-cell-padded data can request ghost support and read
+through `ctx.padded_field(...)`:
+
+```python
+ds = open_dataset("snapshot.dat", ghost_width=2)
+ds.load_data(field_indices=[0])
+
+ds.register_derived(
+    "rho_xlo",
+    lambda ctx: ctx.padded_field("rho")[:, 0:2, 1:3, 1:3],
+    dependencies=["rho"],
+    requires_ghosts=True,
+)
+ds.materialize_fields(["rho_xlo"])
+```
+
+The derived-field context resolves names against loaded field names.
+`ctx.field(name)` returns interior SFC block data with shape
+`(nleafs, bx, by, bz)`. `ctx.padded_field(name)` returns padded mesh storage
+with shape `(nleafs, bx + 2g, by + 2g, bz + 2g)` and requires ghost-cell
+storage. `ctx.spacing` returns per-leaf cell spacing with shape
+`(nleafs, ndim)`.
+
+Ghost-required derived fields fail clearly unless the dataset was opened with
+ghost storage and the loaded original fields can be exchanged through the
+existing mesh path. Materialized derived fields do not currently have a full
+ghost-cell exchange contract, so ghost-required recipes and derivative fields
+must depend on original loaded fields. Reloading data clears materialized
+derived columns but keeps registered recipes.
+
+For first-derivative stencil fields, use `register_derivative(...)`. Each
+registered name is one scalar output expressed as linear derivative terms:
+
+```python
+ds = open_dataset("snapshot.dat", ghost_width=2)
+ds.load_data(field_indices=[0, 1, 2])
+
+ds.register_derivative(
+    "j1",
+    terms=[
+        ("b3", "y", +1.0),
+        ("b2", "z", -1.0),
+    ],
+)
+ds.materialize_fields(["j1"])
+```
+
+Derivative terms have the form `(field_name, axis, coefficient)`, where
+`axis` is `"x"`, `"y"`, `"z"` or `0`, `1`, `2`. Field names must already be
+loaded field names. Derivative fields require `ghost_width >= 2`; requested
+derivative names in one `materialize_fields(...)` call are batched through the
+Cython central-difference backend. A materialized derivative field has valid
+interior values and `ghost_width - 1` valid ghost layers; the outermost
+derived-field ghost layer is left zero.
+
 ### Inspect mesh metadata
 
 Opening a dataset reads the file header and AMR tree metadata before loading
@@ -155,7 +244,7 @@ ghosted = read_blocks(
 
 ## Set physical boundary conditions
 
-When you request ghost-cell storage with `ghost_width > 0`, physical domain
+When you request ghost-cell storage with `ghost_width >= 2`, physical domain
 boundaries default to continuous fills. Pass `boundary_conditions` when you
 need a different physical boundary mode:
 
@@ -243,9 +332,8 @@ smooth_grid = read_uniform(
 )
 ```
 
-Use `ghost_width=2` for refined datasets with coarse/fine interfaces; the
-limited prolongation stencil uses neighboring coarse cells. Level-1 or
-same-level-only ghost exchange can still use a single ghost cell.
+Use `ghost_width >= 2` for ghost-cell storage. `ghost_width=1` is rejected
+during dataset construction.
 
 Use `load_uniform_data()` instead when the file is known to be level-1 and you
 want exact full-domain uniform placement rather than AMR resampling.
@@ -373,6 +461,6 @@ from simesh.amrvac.layouts import datau_to_udata, udata_to_datau
 - The stable user workflows target Cartesian 2D and Cartesian 3D data.
 - `load_uniform_data()` and `datfile_to_vtk()` are level-1 uniform-data
   conveniences.
-- Linear interpolation requires ghost-cell storage. Refined datasets with
-  coarse/fine interfaces require `ghost_width >= 2`; level-1 and
-  same-level-only datasets can use `ghost_width=1`.
+- Linear interpolation requires ghost-cell storage. Enabled ghost-cell storage
+  uses `ghost_width >= 2`; `ghost_width=1` is rejected during dataset
+  construction.

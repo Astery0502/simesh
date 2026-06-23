@@ -101,7 +101,8 @@ def _dataset_from_uniform_components(
     ds.forest = forest
     ds.mesh = mesh
     ds.data = sfc_data
-    ds.loaded_field_indices = list(range(int(ds.nw)))
+    ds._init_derived_fields()
+    ds._set_field_columns(ds._original_field_columns(range(int(ds.nw))))
     return ds
 
 

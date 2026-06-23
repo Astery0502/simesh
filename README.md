@@ -28,6 +28,7 @@ on the adaptive block structure directly.
 
 - Open AMRVAC `.dat` snapshots as mutable dataset objects
 - Read native AMR block data in SFC/Morton order
+- Register and materialize named derived fields on loaded dataset objects
 - Sample AMR data onto uniform grids for analysis or plotting
 - Create AMRVAC datasets from NumPy uniform-grid arrays
 - Write AMRVAC `.dat` files from existing datasets or NumPy arrays
@@ -67,6 +68,19 @@ print(ds.physical_domain)
 
 ds.load_data(field_indices=[0, 1])
 blocks = ds.blocks()
+```
+
+Stateful datasets can also register derived fields without treating them as
+original file fields:
+
+```python
+ds.register_derived(
+    "p",
+    lambda ctx: ctx.field("e") - 0.5 * ctx.field("rho"),
+    dependencies=["rho", "e"],
+)
+ds.materialize_fields(["p"])
+pressure = ds.blocks(field_names=["p"])
 ```
 
 Use `read_blocks(...)` when you only need the native AMR block payload without

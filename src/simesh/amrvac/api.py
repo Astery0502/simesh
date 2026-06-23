@@ -43,7 +43,7 @@ def read_blocks(
     Read AMRVAC block data in SFC layout.
 
     Returns interior data with shape ``(nleafs, nw, bx, by, bz)`` by default.
-    With ``include_ghosts=True`` and ``ghost_width > 0``, returns
+    With ``include_ghosts=True`` and ``ghost_width >= 2``, returns
     ``(nleafs, nw, bx + 2g, by + 2g, bz + 2g)``.
     """
     ds = open_dataset(path, ghost_width=ghost_width, boundary_conditions=boundary_conditions)
@@ -73,8 +73,7 @@ def read_uniform(
     behavior, is exact for native level-1 uniform data, and avoids allocating
     ghost-cell storage. ``interpolation="linear"`` uses trilinear interpolation
     from ghost-cell-padded mesh storage and therefore requires
-    ``ghost_width > 0``. Refined datasets with coarse/fine interfaces require
-    ``ghost_width >= 2`` for limited prolongation. For level-1 data sampled on
+    ``ghost_width >= 2``. For level-1 data sampled on
     its native full-domain grid, use ``open_dataset(...).uniform_full()`` for
     exact block placement.
     """
@@ -121,7 +120,7 @@ def write_datfile(
     Write an AMRVAC ``.dat`` file from an existing file.
 
     ``field_indices`` can be used to write a subset of fields. Ghost cells are
-    used for in-memory exchange when ``ghost_width > 0`` but are not written to
+    used for in-memory exchange when ``ghost_width >= 2`` but are not written to
     the output file.
     """
     ds = open_dataset(path, ghost_width=ghost_width, boundary_conditions=boundary_conditions)

@@ -39,6 +39,22 @@ def _uniform_input(domain_nx=(4, 4, 4), nw=7):
     return udata
 
 
+def _linear_field_input(domain_nx=(4, 4, 4)):
+    domain_nx = tuple(domain_nx)
+    udata = np.zeros((*domain_nx, 3), dtype=np.double)
+    spacing = np.array([1.0 / domain_nx[0], 1.0 / domain_nx[1], 1.0 / domain_nx[2]], dtype=np.double)
+
+    for ix, iy, iz in np.ndindex(*domain_nx):
+        x = (ix + 0.5) * spacing[0]
+        y = (iy + 0.5) * spacing[1]
+        z = (iz + 0.5) * spacing[2]
+        udata[ix, iy, iz, 0] = x
+        udata[ix, iy, iz, 1] = 2.0 * y
+        udata[ix, iy, iz, 2] = 5.0 * z
+
+    return udata
+
+
 def _read_structured_points_vtk(path: str):
     with open(path, "rb") as fh:
         assert fh.readline() == b"# vtk DataFile Version 2.0\n"
@@ -429,6 +445,959 @@ def test_dataset_uniform_full():
             os.remove(path)
 
 
+def test_dataset_loaded_field_names_track_loaded_columns():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        udata = _uniform_input(domain_nx=(4, 4, 4), nw=4)
+        write_datfile_from_uniform(
+            path,
+            udata,
+            ["rho", "m1", "m2", "e"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path)
+        assert ds.loaded_field_indices == [0, 1, 2, 3]
+        assert ds.loaded_field_names == ["rho", "m1", "m2", "e"]
+        assert [(column.name, column.source_kind, column.original_index) for column in ds._field_columns] == [
+            ("rho", "original", 0),
+            ("m1", "original", 1),
+            ("m2", "original", 2),
+            ("e", "original", 3),
+        ]
+        assert ds.derived_definitions == {}
+        assert ds.derived_field_names == []
+
+        ds.load_data(field_indices=[2, 0])
+        assert ds.loaded_field_indices == [2, 0]
+        assert ds.loaded_field_names == ["m2", "rho"]
+        assert [(column.name, column.source_kind, column.original_index) for column in ds._field_columns] == [
+            ("m2", "original", 2),
+            ("rho", "original", 0),
+        ]
+        assert ds._loaded_field_map() == {2: 0, 0: 1}
+        assert ds._loaded_field_name_map() == {"m2": 0, "rho": 1}
+        assert ds._columns_for_field_names(["rho", "m2"]) == [1, 0]
+
+        try:
+            ds._columns_for_field_names(["e"])
+        except ValueError as exc:
+            assert "not loaded" in str(exc)
+            assert "e" in str(exc)
+        else:
+            raise AssertionError("missing loaded field names should fail")
+
+        try:
+            ds._validate_field_selectors(field_indices=[0], field_names=["rho"])
+        except ValueError as exc:
+            assert "cannot both be supplied" in str(exc)
+        else:
+            raise AssertionError("mixed field selectors should fail")
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_registers_derived_recipes_without_materializing():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=3),
+        ["rho", "m1", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    original_shape = ds.data.shape
+
+    def pressure(_ctx):
+        raise AssertionError("register_derived should not compute fields")
+
+    ds.register_derived("p", pressure, dependencies=["rho", "e"])
+
+    definition = ds.derived_definitions["p"]
+    assert definition.func is pressure
+    assert definition.dependencies == ("rho", "e")
+    assert definition.requires_ghosts is False
+    assert ds.derived_field_names == []
+    assert ds.data.shape == original_shape
+    assert ds.loaded_field_names == ["rho", "m1", "e"]
+
+
+def test_dataset_registers_derived_recipe_replacements():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=3),
+        ["rho", "m1", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+
+    def first(_ctx):
+        return None
+
+    def second(_ctx):
+        return None
+
+    ds.register_derived("p", first, dependencies=["rho", "e"])
+    ds.register_derived("p", second, dependencies=["rho"], requires_ghosts=True)
+
+    definition = ds.derived_definitions["p"]
+    assert definition.func is second
+    assert definition.dependencies == ("rho",)
+    assert definition.requires_ghosts is True
+    assert ds.derived_field_names == []
+
+
+def test_dataset_rejects_invalid_derived_recipe_registration():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=3),
+        ["rho", "m1", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+
+    def recipe(_ctx):
+        return None
+
+    invalid_cases = [
+        ("", recipe, ["rho"], "non-empty string"),
+        (3, recipe, ["rho"], "non-empty string"),
+        ("rho", recipe, ["rho"], "collides"),
+        ("p", None, ["rho"], "callable"),
+        ("p", recipe, None, "dependencies"),
+        ("p", recipe, "rho", "dependencies"),
+        ("p", recipe, [0], "field names"),
+        ("p", recipe, [""], "field names"),
+    ]
+
+    for name, func, dependencies, expected_message in invalid_cases:
+        try:
+            ds.register_derived(name, func, dependencies=dependencies)
+        except ValueError as exc:
+            assert expected_message in str(exc)
+        else:
+            raise AssertionError(f"Invalid derived registration should fail: {name!r}")
+
+    assert ds.derived_definitions == {}
+    assert ds.derived_field_names == []
+
+
+def test_dataset_registers_derivative_recipes_without_materializing():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=3),
+        ["b1", "b2", "b3"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    original_shape = ds.data.shape
+
+    ds.register_derivative(
+        "j1",
+        [
+            ("b3", "y", 1),
+            ("b2", "z", -1),
+        ],
+    )
+
+    definition = ds.derived_definitions["j1"]
+    assert definition.dependencies == ("b3", "b2")
+    assert definition.requires_ghosts is True
+    assert [(term.field_name, term.axis, term.coefficient) for term in definition.terms] == [
+        ("b3", 1, 1.0),
+        ("b2", 2, -1.0),
+    ]
+    assert ds.derived_field_names == []
+    assert ds.data.shape == original_shape
+
+
+def test_dataset_rejects_invalid_derivative_recipe_registration():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=3),
+        ["rho", "m1", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+
+    invalid_cases = [
+        ("", [("rho", "x", 1.0)], "non-empty string"),
+        (3, [("rho", "x", 1.0)], "non-empty string"),
+        ("rho", [("rho", "x", 1.0)], "collides"),
+        ("drho", None, "terms"),
+        ("drho", [], "terms"),
+        ("drho", [("rho", "x")], "field_name, axis, coefficient"),
+        ("drho", [("", "x", 1.0)], "field names"),
+        ("drho", [("rho", "q", 1.0)], "invalid axis"),
+        ("drho", [("rho", 3, 1.0)], "invalid axis"),
+        ("drho", [("rho", "x", object())], "float64"),
+    ]
+
+    for name, terms, expected_message in invalid_cases:
+        try:
+            ds.register_derivative(name, terms)
+        except ValueError as exc:
+            assert expected_message in str(exc)
+        else:
+            raise AssertionError(f"invalid derivative recipe should fail: {name!r}")
+
+
+def test_dataset_materializes_arithmetic_derived_field():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=3),
+        ["rho", "m1", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+
+    expected = ds.data[:, 2, :, :, :] - 0.5 * ds.data[:, 0, :, :, :]
+    ds.register_derived(
+        "p",
+        lambda ctx: ctx.field("e") - 0.5 * ctx.field("rho"),
+        dependencies=["rho", "e"],
+    )
+    ds.materialize_fields(["p"])
+
+    assert ds.loaded_field_indices == [0, 1, 2]
+    assert ds.loaded_field_names == ["rho", "m1", "e", "p"]
+    assert ds.derived_field_names == ["p"]
+    assert [(column.name, column.source_kind, column.original_index, column.ghost_valid_layers) for column in ds._field_columns] == [
+        ("rho", "original", 0, 0),
+        ("m1", "original", 1, 0),
+        ("e", "original", 2, 0),
+        ("p", "derived", None, 0),
+    ]
+    assert ds.data.shape == (8, 4, 2, 2, 2)
+    assert np.array_equal(ds.data[:, 3, :, :, :], expected)
+
+    ds.materialize_fields(["p"])
+    assert ds.loaded_field_names == ["rho", "m1", "e", "p"]
+    assert ds.data.shape == (8, 4, 2, 2, 2)
+
+
+def test_dataset_materializes_single_derivative_from_cython_backend():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        write_datfile_from_uniform(
+            path,
+            _linear_field_input(domain_nx=(4, 4, 4)),
+            ["v1", "b2", "b3"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0, 1, 2])
+        ds.register_derivative("dvx_dx", [("v1", "x", 1.0)])
+        ds.materialize_fields(["dvx_dx"])
+
+        assert ds.loaded_field_names == ["v1", "b2", "b3", "dvx_dx"]
+        assert ds.derived_field_names == ["dvx_dx"]
+        assert ds.derived_field_ghost_valid_layers["dvx_dx"] == 1
+        assert [(column.name, column.source_kind, column.original_index, column.ghost_valid_layers) for column in ds._field_columns] == [
+            ("v1", "original", 0, 2),
+            ("b2", "original", 1, 2),
+            ("b3", "original", 2, 2),
+            ("dvx_dx", "derived", None, 1),
+        ]
+        derivative_grid = ds.uniform_full(field_names=["dvx_dx"])[0]
+        assert np.allclose(derivative_grid[1:-1, :, :], 1.0)
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_materializes_requested_current_component_only():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        write_datfile_from_uniform(
+            path,
+            _linear_field_input(domain_nx=(4, 4, 4)),
+            ["b1", "b2", "b3"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0, 1, 2])
+        ds.register_derivative("j1", [("b3", "y", 1.0), ("b2", "z", -1.0)])
+        ds.register_derivative("j2", [("b1", "z", 1.0), ("b3", "x", -1.0)])
+        ds.register_derivative("j3", [("b2", "x", 1.0), ("b1", "y", -1.0)])
+
+        ds.materialize_fields(["j1"])
+
+        assert ds.loaded_field_names == ["b1", "b2", "b3", "j1"]
+        assert ds.derived_field_names == ["j1"]
+        assert "j2" not in ds.loaded_field_names
+        assert "j3" not in ds.loaded_field_names
+        assert np.allclose(ds.uniform_full(field_names=["j1"])[0], 0.0)
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_derivative_materialization_uses_existing_ghost_exchange():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        write_datfile_from_uniform(
+            path,
+            _linear_field_input(domain_nx=(4, 4, 4)),
+            ["b1", "b2", "b3"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0, 1, 2])
+        original_exchange = ds.exchange_ghost_cells
+        exchange_count = {"value": 0}
+
+        def counted_exchange():
+            exchange_count["value"] += 1
+            original_exchange()
+
+        ds.exchange_ghost_cells = counted_exchange
+        ds.register_derivative("db1_dx", [("b1", "x", 1.0)])
+        ds.register_derivative("db2_dy", [("b2", "y", 1.0)])
+        ds.materialize_fields(["db1_dx", "db2_dy"])
+
+        assert exchange_count["value"] == 0
+        assert ds.loaded_field_names == ["b1", "b2", "b3", "db1_dx", "db2_dy"]
+        assert np.allclose(ds.uniform_full(field_names=["db1_dx"])[0, 1:-1, :, :], 1.0)
+        assert np.allclose(ds.uniform_full(field_names=["db2_dy"])[0, :, 1:-1, :], 2.0)
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_rejects_ghost_width_one_during_construction():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        write_datfile_from_uniform(
+            path,
+            _linear_field_input(domain_nx=(4, 4, 4)),
+            ["v1", "b2", "b3"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        try:
+            AMRVACDataSet(path, ghost_width=1, boundary_conditions="cont")
+        except ValueError as exc:
+            assert "ghost_width must be 0 or >= 2" in str(exc)
+        else:
+            raise AssertionError("ghost_width=1 should be rejected during construction")
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_rejects_derivative_materialization_with_missing_dependency():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=2),
+        ["rho", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    ds.register_derivative("db1_dx", [("b1", "x", 1.0)])
+
+    try:
+        ds.materialize_fields(["db1_dx"])
+    except ValueError as exc:
+        assert "dependencies are not loaded" in str(exc)
+        assert "b1" in str(exc)
+    else:
+        raise AssertionError("missing derivative dependencies should fail")
+
+
+def test_derivative_padded_output_leaves_outermost_ghost_layer_zero():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        write_datfile_from_uniform(
+            path,
+            _linear_field_input(domain_nx=(4, 4, 4)),
+            ["v1", "b2", "b3"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0, 1, 2])
+        ds.register_derivative("dvx_dx", [("v1", "x", 1.0)])
+        ds.materialize_fields(["dvx_dx"])
+
+        ghosted = ds.blocks(include_ghosts=True, field_names=["dvx_dx"])[:, 0]
+        assert np.isclose(ghosted.max(), 1.0)
+        assert np.all(ghosted[:, 0, :, :] == 0.0)
+        assert np.all(ghosted[:, -1, :, :] == 0.0)
+        assert np.all(ghosted[:, :, 0, :] == 0.0)
+        assert np.all(ghosted[:, :, -1, :] == 0.0)
+        assert np.all(ghosted[:, :, :, 0] == 0.0)
+        assert np.all(ghosted[:, :, :, -1] == 0.0)
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_ghost_exchange_does_not_fill_materialized_derived_fields():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        write_datfile_from_uniform(
+            path,
+            _linear_field_input(domain_nx=(4, 4, 4)),
+            ["v1", "b2", "b3"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0, 1, 2])
+        ds.register_derived("p", lambda ctx: ctx.field("v1") + 1.0, dependencies=["v1"])
+        ds.register_derivative("dvx_dx", [("v1", "x", 1.0)])
+        ds.materialize_fields(["p", "dvx_dx"])
+
+        ds.exchange_ghost_cells()
+
+        p_ghosted = ds.blocks(include_ghosts=True, field_names=["p"])[:, 0]
+        derivative_ghosted = ds.blocks(include_ghosts=True, field_names=["dvx_dx"])[:, 0]
+
+        assert np.all(p_ghosted[:, 0, :, :] == 0.0)
+        assert np.all(p_ghosted[:, -1, :, :] == 0.0)
+        assert np.all(p_ghosted[:, :, 0, :] == 0.0)
+        assert np.all(p_ghosted[:, :, -1, :] == 0.0)
+        assert np.all(p_ghosted[:, :, :, 0] == 0.0)
+        assert np.all(p_ghosted[:, :, :, -1] == 0.0)
+        assert np.all(derivative_ghosted[:, 0, :, :] == 0.0)
+        assert np.all(derivative_ghosted[:, -1, :, :] == 0.0)
+        assert np.all(derivative_ghosted[:, :, 0, :] == 0.0)
+        assert np.all(derivative_ghosted[:, :, -1, :] == 0.0)
+        assert np.all(derivative_ghosted[:, :, :, 0] == 0.0)
+        assert np.all(derivative_ghosted[:, :, :, -1] == 0.0)
+        assert ds.derived_field_ghost_valid_layers == {"p": 0, "dvx_dx": 1}
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_rejects_ghost_required_materialized_dependencies():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        write_datfile_from_uniform(
+            path,
+            _linear_field_input(domain_nx=(4, 4, 4)),
+            ["rho", "m2", "m3"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0, 1, 2])
+        ds.register_derived("rho2", lambda ctx: 2.0 * ctx.field("rho"), dependencies=["rho"])
+        ds.materialize_fields(["rho2"])
+        ds.register_derivative("drho2_dx", [("rho2", "x", 1.0)])
+
+        try:
+            ds.materialize_fields(["drho2_dx"])
+        except ValueError as exc:
+            assert "only original loaded fields" in str(exc)
+            assert "rho2" in str(exc)
+        else:
+            raise AssertionError("derivatives of materialized fields should fail without a ghost exchange contract")
+
+        ds.register_derived(
+            "rho2_xlo",
+            lambda ctx: ctx.padded_field("rho2")[:, 0:2, 1:3, 1:3],
+            dependencies=["rho2"],
+            requires_ghosts=True,
+        )
+        try:
+            ds.materialize_fields(["rho2_xlo"])
+        except ValueError as exc:
+            assert "only original loaded fields" in str(exc)
+            assert "rho2" in str(exc)
+        else:
+            raise AssertionError("ghost-required recipes should fail for materialized dependencies")
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_ghost_required_python_derived_uses_existing_ghost_exchange():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        write_datfile_from_uniform(
+            path,
+            _linear_field_input(domain_nx=(4, 4, 4)),
+            ["rho", "m2", "m3"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0, 1])
+        original_exchange = ds.exchange_ghost_cells
+        exchange_count = {"value": 0}
+
+        def counted_exchange():
+            exchange_count["value"] += 1
+            original_exchange()
+
+        ds.exchange_ghost_cells = counted_exchange
+        ds.register_derived(
+            "rho_xlo",
+            lambda ctx: ctx.padded_field("rho")[:, 0:2, 1:3, 1:3],
+            dependencies=["rho"],
+            requires_ghosts=True,
+        )
+        ds.register_derived(
+            "m2_xlo",
+            lambda ctx: ctx.padded_field("m2")[:, 0:2, 1:3, 1:3],
+            dependencies=["m2"],
+            requires_ghosts=True,
+        )
+        ds.materialize_fields(["rho_xlo", "m2_xlo"])
+
+        assert exchange_count["value"] == 0
+        assert ds.loaded_field_names == ["rho", "m2", "rho_xlo", "m2_xlo"]
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_padded_field_rejects_materialized_derived_fields():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        write_datfile_from_uniform(
+            path,
+            _uniform_input(domain_nx=(4, 4, 4), nw=1),
+            ["rho"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0])
+        ds.register_derived("rho2", lambda ctx: 2.0 * ctx.field("rho"), dependencies=["rho"])
+        ds.materialize_fields(["rho2"])
+
+        try:
+            ds._derived_context().padded_field("rho2")
+        except ValueError as exc:
+            assert "materialized derived field" in str(exc)
+            assert "ghost-cell exchange contract" in str(exc)
+        else:
+            raise AssertionError("padded_field should reject materialized derived fields")
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_selects_materialized_fields_by_name_through_blocks():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=3),
+        ["rho", "m1", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    expected_p = ds.data[:, 2, :, :, :] - ds.data[:, 0, :, :, :]
+    expected_rho = ds.data[:, 0, :, :, :].copy()
+    ds.register_derived(
+        "p",
+        lambda ctx: ctx.field("e") - ctx.field("rho"),
+        dependencies=["rho", "e"],
+    )
+    ds.materialize_fields(["p"])
+
+    selected = ds.blocks(field_names=["p", "rho"])
+
+    assert selected.shape == (8, 2, 2, 2, 2)
+    assert np.array_equal(selected[:, 0, :, :, :], expected_p)
+    assert np.array_equal(selected[:, 1, :, :, :], expected_rho)
+
+
+def test_dataset_selects_materialized_fields_by_name_through_uniform_paths():
+    udata = _uniform_input(domain_nx=(4, 4, 4), nw=3)
+    ds = load_from_uniform(
+        udata,
+        ["rho", "m1", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    expected_p = udata_to_datau(udata[..., 2:3])
+    expected_p[0] -= udata[..., 0]
+    ds.register_derived(
+        "p",
+        lambda ctx: ctx.field("e") - ctx.field("rho"),
+        dependencies=["rho", "e"],
+    )
+    ds.materialize_fields(["p"])
+
+    grid = ds.uniform_grid(ds.domain_nx, field_names=["p"])
+    full = ds.uniform_full(field_names=["p"])
+
+    assert grid.shape == (1, 4, 4, 4)
+    assert full.shape == (1, 4, 4, 4)
+    assert np.array_equal(grid, expected_p)
+    assert np.array_equal(full, expected_p)
+
+
+def test_dataset_rejects_mixed_downstream_field_selectors():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=2),
+        ["rho", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+
+    cases = [
+        lambda: ds.blocks(field_indices=[0], field_names=["rho"]),
+        lambda: ds.uniform_grid(ds.domain_nx, field_indices=[0], field_names=["rho"]),
+        lambda: ds.uniform_full(field_indices=[0], field_names=["rho"]),
+    ]
+    for call in cases:
+        try:
+            call()
+        except ValueError as exc:
+            assert "cannot both be supplied" in str(exc)
+        else:
+            raise AssertionError("mixed downstream field selectors should fail")
+
+
+def test_dataset_write_datfile_can_opt_in_to_materialized_field_names():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        ds = load_from_uniform(
+            _uniform_input(domain_nx=(4, 4, 4), nw=3),
+            ["rho", "m1", "e"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+        )
+        expected = ds.data[:, 2, :, :, :] - ds.data[:, 0, :, :, :]
+        ds.register_derived(
+            "p",
+            lambda ctx: ctx.field("e") - ctx.field("rho"),
+            dependencies=["rho", "e"],
+        )
+        ds.materialize_fields(["p"])
+
+        output_header = ds.write_datfile(path, field_names=["p"], overwrite=True)
+        rewritten = open_dataset(path)
+
+        assert output_header["nw"] == 1
+        assert output_header["w_names"] == ["p"]
+        assert rewritten.wnames == ["p"]
+        assert np.array_equal(rewritten.blocks(), expected[:, np.newaxis, :, :, :])
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_rejects_missing_derived_dependencies():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=3),
+        ["rho", "m1", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    ds.data = ds.data[:, [0, 1], :, :, :]
+    ds._set_field_columns(ds._original_field_columns([0, 1]))
+    ds.register_derived(
+        "p",
+        lambda ctx: ctx.field("e") - ctx.field("rho"),
+        dependencies=["rho", "e"],
+    )
+
+    try:
+        ds.materialize_fields(["p"])
+    except ValueError as exc:
+        assert "dependencies are not loaded" in str(exc)
+        assert "e" in str(exc)
+    else:
+        raise AssertionError("missing derived dependencies should fail")
+
+    assert ds.loaded_field_names == ["rho", "m1"]
+    assert ds.derived_field_names == []
+    assert ds.data.shape == (8, 2, 2, 2, 2)
+
+
+def test_dataset_rejects_invalid_derived_result_shape():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=2),
+        ["rho", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    ds.register_derived(
+        "p",
+        lambda ctx: ctx.field("e")[:, :-1, :, :],
+        dependencies=["e"],
+    )
+
+    try:
+        ds.materialize_fields(["p"])
+    except ValueError as exc:
+        assert "returned shape" in str(exc)
+        assert "expected" in str(exc)
+    else:
+        raise AssertionError("derived fields with invalid shape should fail")
+
+    assert ds.loaded_field_names == ["rho", "e"]
+    assert ds.derived_field_names == []
+
+
+def test_dataset_drops_materialized_derived_fields():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=2),
+        ["rho", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    original = ds.data.copy()
+    ds.register_derived("p", lambda ctx: ctx.field("e") + 1.0, dependencies=["e"])
+    ds.register_derived("q", lambda ctx: ctx.field("rho") + 2.0, dependencies=["rho"])
+    ds.materialize_fields(["p", "q"])
+
+    ds.drop_derived_fields(["p"])
+
+    assert ds.loaded_field_names == ["rho", "e", "q"]
+    assert ds.derived_field_names == ["q"]
+    assert np.array_equal(ds.data[:, :2, :, :, :], original)
+    assert np.array_equal(ds.data[:, 2, :, :, :], original[:, 0, :, :, :] + 2.0)
+
+    ds.drop_derived_fields("q")
+    assert ds.loaded_field_names == ["rho", "e"]
+    assert ds.derived_field_names == []
+    assert np.array_equal(ds.data, original)
+
+
+def test_dataset_drops_derived_fields_refreshes_ghost_storage():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        udata = _uniform_input(domain_nx=(4, 4, 4), nw=1)
+        write_datfile_from_uniform(
+            path,
+            udata,
+            ["rho"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0])
+        ds.register_derived("p", lambda ctx: ctx.field("rho") + 1.0, dependencies=["rho"])
+        ds.materialize_fields(["p"])
+        assert ds.blocks(include_ghosts=True).shape == (8, 2, 6, 6, 6)
+
+        ds.drop_derived_fields("p")
+
+        assert ds.loaded_field_names == ["rho"]
+        assert ds.derived_field_names == []
+        assert [(column.name, column.source_kind, column.original_index) for column in ds._field_columns] == [
+            ("rho", "original", 0),
+        ]
+        assert ds.blocks(include_ghosts=True).shape == (8, 1, 6, 6, 6)
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_reloads_clear_materialized_derived_fields():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        udata = _uniform_input(domain_nx=(4, 4, 4), nw=3)
+        write_datfile_from_uniform(
+            path,
+            udata,
+            ["rho", "m1", "e"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path)
+        ds.load_data(field_indices=[0, 2])
+        ds.register_derived("p", lambda ctx: ctx.field("e") + 1.0, dependencies=["e"])
+        ds.materialize_fields(["p"])
+        assert ds.loaded_field_names == ["rho", "e", "p"]
+        assert ds.derived_field_names == ["p"]
+
+        ds.load_data(field_indices=[1])
+
+        assert ds.loaded_field_indices == [1]
+        assert ds.loaded_field_names == ["m1"]
+        assert ds.derived_definitions["p"].dependencies == ("e",)
+        assert ds.derived_field_names == []
+        assert ds.data.shape == (8, 1, 2, 2, 2)
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_reregistering_derived_field_drops_materialized_result():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=2),
+        ["rho", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    ds.register_derived("p", lambda ctx: ctx.field("e") + 1.0, dependencies=["e"])
+    ds.materialize_fields(["p"])
+
+    ds.register_derived("p", lambda ctx: ctx.field("rho") + 2.0, dependencies=["rho"])
+
+    assert ds.loaded_field_names == ["rho", "e"]
+    assert ds.derived_field_names == []
+    ds.materialize_fields(["p"])
+    assert np.array_equal(ds.data[:, 2, :, :, :], ds.data[:, 0, :, :, :] + 2.0)
+
+
+def test_dataset_rejects_ghost_required_derived_field_without_ghost_storage():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=2),
+        ["rho", "e"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+    ds.register_derived(
+        "j1",
+        lambda ctx: ctx.field("rho"),
+        dependencies=["rho"],
+        requires_ghosts=True,
+    )
+
+    try:
+        ds.materialize_fields(["j1"])
+    except ValueError as exc:
+        assert "requires ghost cells" in str(exc)
+    else:
+        raise AssertionError("ghost-required derived fields should require ghost storage")
+
+
+def test_dataset_materializes_ghost_required_field_from_padded_data():
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
+        path = tmp.name
+
+    try:
+        udata = _uniform_input(domain_nx=(4, 4, 4), nw=2)
+        write_datfile_from_uniform(
+            path,
+            udata,
+            ["rho", "e"],
+            xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+            xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+            block_nx=np.array([2, 2, 2], dtype=np.int32),
+            overwrite=True,
+        )
+
+        ds = AMRVACDataSet(path, ghost_width=2, boundary_conditions="cont")
+        ds.load_data(field_indices=[0])
+        ds.data[0, 0, 0, 0, 0] = -123.0
+        ds.exchange_ghost_cells()
+        expected = ds._derived_context().padded_field("rho")[:, 1:3, 2:4, 2:4].copy()
+
+        def xlo_ghost(ctx):
+            padded = ctx.padded_field("rho")
+            assert padded.shape == (8, 6, 6, 6)
+            assert ctx.spacing.shape == (8, 3)
+            return padded[:, 1:3, 2:4, 2:4]
+
+        ds.register_derived(
+            "rho_xlo",
+            xlo_ghost,
+            dependencies=["rho"],
+            requires_ghosts=True,
+        )
+        ds.materialize_fields(["rho_xlo"])
+
+        assert ds.loaded_field_names == ["rho", "rho_xlo"]
+        assert ds.derived_field_names == ["rho_xlo"]
+        assert ds.data.shape == (8, 2, 2, 2, 2)
+        assert expected[0, 0, 0, 0] == -123.0
+        assert np.array_equal(ds.data[:, 1, :, :, :], expected)
+        assert ds.blocks(include_ghosts=True).shape == (8, 2, 6, 6, 6)
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_dataset_padded_field_requires_ghost_storage():
+    ds = load_from_uniform(
+        _uniform_input(domain_nx=(4, 4, 4), nw=1),
+        ["rho"],
+        xmin=np.array([0.0, 0.0, 0.0], dtype=np.double),
+        xmax=np.array([1.0, 1.0, 1.0], dtype=np.double),
+        block_nx=np.array([2, 2, 2], dtype=np.int32),
+    )
+
+    try:
+        ds._derived_context().padded_field("rho")
+    except ValueError as exc:
+        assert "requires ghost cells" in str(exc)
+    else:
+        raise AssertionError("padded_field should require ghost storage")
+
+
 def test_dataset_ghost_mode_uses_mesh_storage():
     with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as tmp:
         path = tmp.name
@@ -446,13 +1415,13 @@ def test_dataset_ghost_mode_uses_mesh_storage():
             overwrite=True,
         )
 
-        ds = AMRVACDataSet(path, ghost_width=1)
+        ds = AMRVACDataSet(path, ghost_width=2)
         ds.load_data(field_indices=[0, 2])
 
         padded = ds.mesh.padded_view()
         interior = ds.mesh.interior_view()
 
-        assert padded.shape == (8, 4, 4, 4, 2)
+        assert padded.shape == (8, 6, 6, 6, 2)
         assert ds.data.shape == (8, 2, 2, 2, 2)
         assert np.array_equal(ds.data, interior)
         assert np.shares_memory(ds.data, padded)
@@ -481,25 +1450,25 @@ def test_public_api_reads_blocks_and_uniform_data():
             overwrite=True,
         )
 
-        ds = open_dataset(path, ghost_width=1)
+        ds = open_dataset(path, ghost_width=2)
         assert ds.has_ghost_cells
         ds.load_data(field_indices=[0, 2])
         assert ds.blocks().shape == (8, 2, 2, 2, 2)
-        assert ds.blocks(include_ghosts=True).shape == (8, 2, 4, 4, 4)
+        assert ds.blocks(include_ghosts=True).shape == (8, 2, 6, 6, 6)
 
         blocks = read_blocks(path, field_indices=[0, 2])
-        ghosted = read_blocks(path, field_indices=[0, 2], ghost_width=1, include_ghosts=True)
+        ghosted = read_blocks(path, field_indices=[0, 2], ghost_width=2, include_ghosts=True)
         grid = read_uniform(path, resolution=(4, 4, 4), field_indices=[1])
         linear_grid = read_uniform(
             path,
             resolution=(4, 4, 4),
             field_indices=[1],
-            ghost_width=1,
+            ghost_width=2,
             interpolation="linear",
         )
 
         assert blocks.shape == (8, 2, 2, 2, 2)
-        assert ghosted.shape == (8, 2, 4, 4, 4)
+        assert ghosted.shape == (8, 2, 6, 6, 6)
         assert grid.shape == (4, 4, 4, 1)
         assert np.array_equal(grid[..., 0], udata[..., 1])
         assert np.array_equal(linear_grid[..., 0], udata[..., 1])
@@ -524,23 +1493,23 @@ def test_boundary_condition_normalization_api():
             overwrite=True,
         )
 
-        ds = open_dataset(path, ghost_width=1, boundary_conditions="symm")
+        ds = open_dataset(path, ghost_width=2, boundary_conditions="symm")
         ds.load_data(field_indices=[2, 0])
         assert np.array_equal(ds.mesh.boundary_conditions, np.full((2, 6), 1, dtype=np.int32))
 
-        ds = open_dataset(path, ghost_width=1, boundary_conditions={"e": "asymm", "rho": "cont"})
+        ds = open_dataset(path, ghost_width=2, boundary_conditions={"e": "asymm", "rho": "cont"})
         ds.load_data(field_indices=[2, 0])
         expected = np.array([[2, 2, 2, 2, 2, 2], [0, 0, 0, 0, 0, 0]], dtype=np.int32)
         assert np.array_equal(ds.mesh.boundary_conditions, expected)
 
-        ds = open_dataset(path, ghost_width=1, boundary_conditions={"e": {"xlo": "asymm", "zhi": "symm"}})
+        ds = open_dataset(path, ghost_width=2, boundary_conditions={"e": {"xlo": "asymm", "zhi": "symm"}})
         ds.load_data(field_indices=[2, 0])
         expected = np.zeros((2, 6), dtype=np.int32)
         expected[0, 0] = 2
         expected[0, 5] = 1
         assert np.array_equal(ds.mesh.boundary_conditions, expected)
 
-        ds = open_dataset(path, ghost_width=1, boundary_conditions={"rho": {"xlo": "noinflow"}})
+        ds = open_dataset(path, ghost_width=2, boundary_conditions={"rho": {"xlo": "noinflow"}})
         ds.load_data(field_indices=[0, 1])
         assert np.array_equal(ds.mesh.boundary_conditions[0], np.array([3, 0, 0, 0, 0, 0], dtype=np.int32))
     finally:
@@ -577,7 +1546,7 @@ def test_boundary_condition_validation_api():
                 read_blocks(
                     path,
                     field_indices=[0],
-                    ghost_width=1,
+                    ghost_width=2,
                     include_ghosts=True,
                     boundary_conditions=boundary_conditions,
                 )
@@ -609,28 +1578,28 @@ def test_public_api_2d_singleton_z_roundtrip():
             overwrite=True,
         )
 
-        ds = open_dataset(path, ghost_width=1)
+        ds = open_dataset(path, ghost_width=2)
         assert int(ds.ndim) == 2
         assert np.array_equal(ds.domain_nx, np.array([4, 4], dtype=np.uint32))
         assert np.array_equal(ds.block_nx, np.array([2, 2], dtype=np.uint32))
 
         ds.load_data(field_indices=[0, 2])
         assert ds.blocks().shape == (4, 2, 2, 2, 1)
-        assert ds.blocks(include_ghosts=True).shape == (4, 2, 4, 4, 3)
+        assert ds.blocks(include_ghosts=True).shape == (4, 2, 6, 6, 5)
 
         blocks = read_blocks(path, field_indices=[0, 2])
-        ghosted = read_blocks(path, field_indices=[0, 2], ghost_width=1, include_ghosts=True)
+        ghosted = read_blocks(path, field_indices=[0, 2], ghost_width=2, include_ghosts=True)
         grid = read_uniform(path, resolution=(4, 4), field_indices=[1])
         linear_grid = read_uniform(
             path,
             resolution=(4, 4),
             field_indices=[1],
-            ghost_width=1,
+            ghost_width=2,
             interpolation="linear",
         )
 
         assert blocks.shape == (4, 2, 2, 2, 1)
-        assert ghosted.shape == (4, 2, 4, 4, 3)
+        assert ghosted.shape == (4, 2, 6, 6, 5)
         assert grid.shape == (4, 4, 1, 1)
         assert np.array_equal(grid[..., 0], udata[..., 1])
         assert np.array_equal(linear_grid[..., 0], udata[..., 1])
@@ -849,34 +1818,55 @@ def test_datfile_to_vtk_2d_singleton_z():
 
 def run_tests():
     print("Running tests for AMRVAC dataset...")
-    test_dataset_uniform_full()
-    print("test_dataset_uniform_full passed")
-    test_dataset_ghost_mode_uses_mesh_storage()
-    print("test_dataset_ghost_mode_uses_mesh_storage passed")
-    test_public_api_reads_blocks_and_uniform_data()
-    print("test_public_api_reads_blocks_and_uniform_data passed")
-    test_boundary_condition_normalization_api()
-    print("test_boundary_condition_normalization_api passed")
-    test_boundary_condition_validation_api()
-    print("test_boundary_condition_validation_api passed")
-    test_public_api_2d_singleton_z_roundtrip()
-    print("test_public_api_2d_singleton_z_roundtrip passed")
-    test_extract_uniform_data()
-    print("test_extract_uniform_data passed")
-    test_uniform_layout_helpers()
-    print("test_uniform_layout_helpers passed")
-    test_load_uniform_data()
-    print("test_load_uniform_data passed")
-    test_load_from_uniform_2d_and_3d()
-    print("test_load_from_uniform_2d_and_3d passed")
-    test_dataset_getitem_returns_udata_layout()
-    print("test_dataset_getitem_returns_udata_layout passed")
-    test_datfile_to_vtk()
-    print("test_datfile_to_vtk passed")
-    test_datfile_to_vtk_2d_singleton_z()
-    print("test_datfile_to_vtk_2d_singleton_z passed")
-    test_heavy_amrvac_current_validation()
-    print("test_heavy_amrvac_current_validation passed or skipped")
+    tests = [
+        test_dataset_uniform_full,
+        test_dataset_loaded_field_names_track_loaded_columns,
+        test_dataset_registers_derived_recipes_without_materializing,
+        test_dataset_registers_derived_recipe_replacements,
+        test_dataset_rejects_invalid_derived_recipe_registration,
+        test_dataset_registers_derivative_recipes_without_materializing,
+        test_dataset_rejects_invalid_derivative_recipe_registration,
+        test_dataset_materializes_arithmetic_derived_field,
+        test_dataset_materializes_single_derivative_from_cython_backend,
+        test_dataset_materializes_requested_current_component_only,
+        test_dataset_derivative_materialization_uses_existing_ghost_exchange,
+        test_dataset_rejects_ghost_width_one_during_construction,
+        test_dataset_rejects_derivative_materialization_with_missing_dependency,
+        test_derivative_padded_output_leaves_outermost_ghost_layer_zero,
+        test_ghost_exchange_does_not_fill_materialized_derived_fields,
+        test_dataset_rejects_ghost_required_materialized_dependencies,
+        test_dataset_ghost_required_python_derived_uses_existing_ghost_exchange,
+        test_dataset_padded_field_rejects_materialized_derived_fields,
+        test_dataset_selects_materialized_fields_by_name_through_blocks,
+        test_dataset_selects_materialized_fields_by_name_through_uniform_paths,
+        test_dataset_rejects_mixed_downstream_field_selectors,
+        test_dataset_write_datfile_can_opt_in_to_materialized_field_names,
+        test_dataset_rejects_missing_derived_dependencies,
+        test_dataset_rejects_invalid_derived_result_shape,
+        test_dataset_drops_materialized_derived_fields,
+        test_dataset_drops_derived_fields_refreshes_ghost_storage,
+        test_dataset_reloads_clear_materialized_derived_fields,
+        test_dataset_reregistering_derived_field_drops_materialized_result,
+        test_dataset_rejects_ghost_required_derived_field_without_ghost_storage,
+        test_dataset_materializes_ghost_required_field_from_padded_data,
+        test_dataset_padded_field_requires_ghost_storage,
+        test_dataset_ghost_mode_uses_mesh_storage,
+        test_public_api_reads_blocks_and_uniform_data,
+        test_boundary_condition_normalization_api,
+        test_boundary_condition_validation_api,
+        test_public_api_2d_singleton_z_roundtrip,
+        test_extract_uniform_data,
+        test_uniform_layout_helpers,
+        test_load_uniform_data,
+        test_load_from_uniform_2d_and_3d,
+        test_dataset_getitem_returns_udata_layout,
+        test_datfile_to_vtk,
+        test_datfile_to_vtk_2d_singleton_z,
+        test_heavy_amrvac_current_validation,
+    ]
+    for test in tests:
+        test()
+        print(f"{test.__name__} passed")
     print("All tests passed for AMRVAC dataset!")
 
 
