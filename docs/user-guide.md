@@ -123,6 +123,13 @@ ds.register_derived(
 ds.materialize_fields(["rho_xlo"])
 ```
 
+The derived-field context resolves names against loaded field names.
+`ctx.field(name)` returns interior SFC block data with shape
+`(nleafs, bx, by, bz)`. `ctx.padded_field(name)` returns padded mesh storage
+with shape `(nleafs, bx + 2g, by + 2g, bz + 2g)` and requires ghost-cell
+storage. `ctx.spacing` returns per-leaf cell spacing with shape
+`(nleafs, ndim)`.
+
 Ghost-required derived fields fail clearly unless the dataset was opened with
 ghost storage and the loaded original fields can be exchanged through the
 existing mesh path. Materialized derived fields do not currently have a full

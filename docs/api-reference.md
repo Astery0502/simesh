@@ -299,6 +299,23 @@ These methods are available on the object returned by `open_dataset()` or
 loaded field columns by name, including materialized derived fields. Supplying
 both selector types to one method raises `ValueError`.
 
+## Derived field context
+
+Functions registered with `ds.register_derived(...)` receive a context object
+when `ds.materialize_fields(...)` computes them.
+
+| Context member | Purpose |
+| --- | --- |
+| `ctx.field(name)` | Return an interior loaded field with shape `(nleafs, bx, by, bz)` |
+| `ctx.padded_field(name)` | Return ghost-cell-padded storage with shape `(nleafs, bx + 2g, by + 2g, bz + 2g)` |
+| `ctx.spacing` | Return per-leaf cell spacing with shape `(nleafs, ndim)`, or `None` before mesh setup |
+
+Context lookups resolve `name` through loaded field names, not original file
+indices. `ctx.field(...)` can read original or already materialized loaded
+columns. `ctx.padded_field(...)` requires ghost-cell storage and currently only
+accepts original loaded fields, because materialized derived fields do not have
+a full ghost-cell exchange contract.
+
 ## Layout names
 
 | Name | Shape | Public use |
