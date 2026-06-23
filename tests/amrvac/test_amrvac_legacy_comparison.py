@@ -111,7 +111,31 @@ def _field_names(current_ds):
 
 
 def _evaluate_width_policy():
-    current_ds = open_dataset(str(FIXTURE_PATH), ghost_width=REJECTED_GHOST_WIDTH)
+    try:
+        current_ds = open_dataset(str(FIXTURE_PATH), ghost_width=REJECTED_GHOST_WIDTH)
+    except ValueError as exc:
+        message = str(exc)
+        passed = "ghost_width must be 0 or >= 2" in message
+        return {
+            "name": "Width-1 ghost policy check",
+            "status": "evaluated",
+            "ghost_width": REJECTED_GHOST_WIDTH,
+            "has_coarse_or_fine_interfaces": None,
+            "exception_type": type(exc).__name__,
+            "exception_message": message,
+            "passed": bool(passed),
+        }
+    except Exception as exc:
+        return {
+            "name": "Width-1 ghost policy check",
+            "status": "evaluated",
+            "ghost_width": REJECTED_GHOST_WIDTH,
+            "has_coarse_or_fine_interfaces": None,
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc),
+            "passed": False,
+        }
+
     neighbor_type = np.asarray(current_ds.forest.neighbor_type)
     has_coarse_or_fine = bool(np.any((neighbor_type == 2) | (neighbor_type == 4)))
 
@@ -121,7 +145,7 @@ def _evaluate_width_policy():
         message = str(exc)
         passed = has_coarse_or_fine and "ghost_width >= 2" in message
         return {
-            "name": "Width-1 refined ghost policy check",
+            "name": "Width-1 ghost policy check",
             "status": "evaluated",
             "ghost_width": REJECTED_GHOST_WIDTH,
             "has_coarse_or_fine_interfaces": has_coarse_or_fine,
@@ -131,7 +155,7 @@ def _evaluate_width_policy():
         }
     except Exception as exc:
         return {
-            "name": "Width-1 refined ghost policy check",
+            "name": "Width-1 ghost policy check",
             "status": "evaluated",
             "ghost_width": REJECTED_GHOST_WIDTH,
             "has_coarse_or_fine_interfaces": has_coarse_or_fine,
@@ -141,12 +165,12 @@ def _evaluate_width_policy():
         }
 
     return {
-        "name": "Width-1 refined ghost policy check",
+        "name": "Width-1 ghost policy check",
         "status": "evaluated",
         "ghost_width": REJECTED_GHOST_WIDTH,
         "has_coarse_or_fine_interfaces": has_coarse_or_fine,
         "exception_type": "none",
-        "exception_message": "refined ghost exchange accepted ghost_width=1",
+        "exception_message": "ghost_width=1 was accepted",
         "passed": False,
     }
 

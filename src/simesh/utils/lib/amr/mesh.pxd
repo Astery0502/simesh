@@ -147,6 +147,9 @@ cdef class AMRMesh:
     cpdef void uniform_grid_linear(self, double[:,:,:,:] uniform_grid, uint32_t[:] nx,
         double[:] xmin_new, double[:] xmax_new, uint32_t[:] field_positions)
 
+    cpdef void first_derivative_fields(self, double[:,:,:,:,:] output, uint32_t[:] term_output_positions,
+        uint32_t[:] term_field_positions, uint32_t[:] term_axes, double[:] term_coefficients)
+
     cpdef void uniform_full_level1(self, double[:,:,:,:,:] data, double[:,:,:,:] uniform_grid)
 
     cpdef void uniform_to_sfc(self, double[:,:,:,:] uniform_data, double[:,:,:,:,:] sfc_data)

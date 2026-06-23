@@ -804,6 +804,79 @@ cdef class AMRMesh:
                             c1 = c10 * (1.0 - wy) + c11 * wy
                             uniform_grid[ifield_out, i, j, k] = c0 * (1.0 - wx) + c1 * wx
 
+    cpdef void first_derivative_fields(
+        self,
+        double[:,:,:,:,:] output,
+        uint32_t[:] term_output_positions,
+        uint32_t[:] term_field_positions,
+        uint32_t[:] term_axes,
+        double[:] term_coefficients,
+    ):
+        cdef uint32_t nterms = <uint32_t>term_output_positions.shape[0]
+        cdef uint32_t iterm, iout, ifield, axis
+        cdef uint32_t ileaf, i, j, k
+        cdef uint32_t ix_min[3]
+        cdef uint32_t ix_max[3]
+        cdef double coefficient, inv_2dx, contribution
+
+        if self._data_ptr is NULL or self.ng < 2:
+            raise ValueError("First-derivative fields require padded mesh storage with at least two ghost cells.")
+        if term_field_positions.shape[0] != nterms or term_axes.shape[0] != nterms or term_coefficients.shape[0] != nterms:
+            raise ValueError("Derivative term arrays must have the same length.")
+        if output.shape[0] != self.nleafs:
+            raise ValueError("Derivative output leaf axis does not match mesh.")
+        if output.shape[1] != self.bsize[0] + 2 * self.ng:
+            raise ValueError("Derivative output x axis does not match padded mesh.")
+        if output.shape[2] != self.bsize[1] + 2 * self.ng:
+            raise ValueError("Derivative output y axis does not match padded mesh.")
+        if output.shape[3] != self.bsize[2] + 2 * self.ng:
+            raise ValueError("Derivative output z axis does not match padded mesh.")
+
+        output[...] = 0.0
+
+        for axis in range(3):
+            ix_min[axis] = 1
+            ix_max[axis] = <uint32_t>output.shape[axis + 1] - 2
+
+        if self.ndim == 2:
+            ix_min[2] = self.ixMmin[2]
+            ix_max[2] = self.ixMmax[2]
+
+        for iterm in range(nterms):
+            iout = term_output_positions[iterm]
+            ifield = term_field_positions[iterm]
+            axis = term_axes[iterm]
+            coefficient = term_coefficients[iterm]
+
+            if iout >= output.shape[4]:
+                raise ValueError("Derivative term output position is out of range.")
+            if ifield >= self.nfields:
+                raise ValueError("Derivative term field position is out of range.")
+            if axis >= self.ndim:
+                raise ValueError("Derivative term axis is out of range for mesh dimensionality.")
+
+            for ileaf in prange(self.nleafs, schedule="static", nogil=True):
+                inv_2dx = 0.5 / self.rnode[ileaf, 2 * self.ndim + axis]
+                for i in range(ix_min[0], ix_max[0] + 1):
+                    for j in range(ix_min[1], ix_max[1] + 1):
+                        for k in range(ix_min[2], ix_max[2] + 1):
+                            if axis == 0:
+                                contribution = (
+                                    self.data[ileaf, i + 1, j, k, ifield]
+                                    - self.data[ileaf, i - 1, j, k, ifield]
+                                ) * inv_2dx
+                            elif axis == 1:
+                                contribution = (
+                                    self.data[ileaf, i, j + 1, k, ifield]
+                                    - self.data[ileaf, i, j - 1, k, ifield]
+                                ) * inv_2dx
+                            else:
+                                contribution = (
+                                    self.data[ileaf, i, j, k + 1, ifield]
+                                    - self.data[ileaf, i, j, k - 1, ifield]
+                                ) * inv_2dx
+                            output[ileaf, i, j, k, iout] += coefficient * contribution
+
     cpdef void uniform_full_level1(self, double[:,:,:,:,:] data, double[:,:,:,:] uniform_grid):
         cdef uint32_t ileaf, idim
         cdef uint32_t nxg1[3]

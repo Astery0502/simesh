@@ -44,22 +44,52 @@ fields. It returns a cell-centered magnetic field in component-first layout
 The lower-level canonical Python modules live in:
 
 - `src/simesh/amrvac/amrvac_dataset.py`
+- `src/simesh/amrvac/derived_fields.py`
 - `src/simesh/amrvac/datio.py`
 
 Treat `api.py` as the first user-facing entrypoint, `amrvac_dataset.py` as the
-stateful dataset implementation, and `datio.py` as the canonical low-level
-AMRVAC format module.
+stateful dataset implementation, `derived_fields.py` as the dataset-derived
+field registration/materialization layer, and `datio.py` as the canonical
+low-level AMRVAC format module.
 
 `read_uniform(..., interpolation="linear")` exposes the canonical
 Cython-backed interpolation path: trilinear for 3D data and bilinear for
-Cartesian 2D data. It requires ghost-cell storage. Use `ghost_width=1` only for
-level-1 or same-level-only meshes; refined meshes with coarse/fine interfaces
-require `ghost_width >= 2` for the limited prolongation stencil. Keep
-``"zero"`` as the default for compatibility with the previous
-piecewise-constant behavior and as the low-memory path when ghost-cell storage
-is not wanted. For level-1 data sampled on the native full-domain grid,
+Cartesian 2D data. It requires ghost-cell storage. Enabled ghost-cell storage
+uses `ghost_width >= 2`; `ghost_width=1` is rejected during dataset
+construction. Keep ``"zero"`` as the default for compatibility with the
+previous piecewise-constant behavior and as the low-memory path when ghost-cell
+storage is not wanted. For level-1 data sampled on the native full-domain grid,
 `uniform_full()` is the exact block placement path rather than a resampling
 path.
+
+Stateful derived-variable workflows live on `AMRVACDataSet`, not on the
+file-level wrapper functions. Users register recipes with
+`ds.register_derived(...)`, explicitly compute them with
+`ds.materialize_fields(...)`, and remove materialized columns with
+`ds.drop_derived_fields(...)`. The materialized fields become loaded field
+columns in `ds.data` and can be selected by `field_names` through
+`ds.blocks(...)`, `ds.uniform_grid(...)`, `ds.uniform_full(...)`, and
+`ds.write_datfile(...)`.
+
+First-derivative stencil fields use the same materialization workflow but are
+registered declaratively with `ds.register_derivative(name, terms)`, where each
+term is `(field_name, axis, coefficient)`. These recipes require
+`ghost_width >= 2`, batch requested derivative outputs through the Cython
+central-difference backend, and expose only `ghost_width - 1` valid derived
+ghost layers; the outermost derived-output ghost layer remains zero.
+
+Ghost-dependent derived recipes currently require dependencies to be original
+loaded fields. Materialized derived fields may be selected by name for interior
+block, uniform-grid, and write workflows, but they are not exchanged as full
+mesh ghost fields.
+
+Keep the selector meanings distinct when changing this surface:
+
+- `field_indices` refer only to original AMRVAC `.dat` header indices.
+- `field_names` refer to currently loaded field columns, including
+  materialized derived fields.
+- Methods that accept both selector forms should reject calls where both are
+  supplied.
 
 Physical boundary modes for ghost-cell fills are normalized in
 `src/simesh/amrvac/boundary.py` before being passed to the Cython mesh. The
@@ -89,9 +119,10 @@ standard runtime environment variables such as `OMP_NUM_THREADS`.
 
 ### Dataset
 
-The canonical dataset object is defined in:
+The canonical dataset object and derived-field mixin are defined in:
 
 - `src/simesh/amrvac/amrvac_dataset.py`
+- `src/simesh/amrvac/derived_fields.py`
 
 ### Compiled AMR structures
 

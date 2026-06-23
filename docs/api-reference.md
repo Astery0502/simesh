@@ -41,6 +41,36 @@ ds.exchange_ghost_cells()
 ds.write_datfile("updated.dat", overwrite=True)
 ```
 
+Dataset objects also support explicit derived fields. Derived names are
+in-memory loaded field names, not original `.dat` field indices:
+
+```python
+ds.load_data(field_indices=[0, 2])
+ds.register_derived(
+    "p",
+    lambda ctx: ctx.field("e") - 0.5 * ctx.field("rho"),
+    dependencies=["rho", "e"],
+)
+ds.materialize_fields(["p"])
+blocks = ds.blocks(field_names=["p"])
+```
+
+First-derivative stencil fields use declarative terms and materialize through
+the same method:
+
+```python
+ds = open_dataset("snapshot.dat", ghost_width=2)
+ds.load_data(field_indices=[0, 1, 2])
+ds.register_derivative("j1", [("b3", "y", +1.0), ("b2", "z", -1.0)])
+ds.materialize_fields(["j1"])
+```
+
+Derivative fields require `ghost_width >= 2`. Their materialized padded output
+has valid interior values and `ghost_width - 1` valid ghost layers; the
+outermost derived-output ghost layer remains zero. Ghost-dependent derived
+recipes currently require dependencies to be original loaded fields because
+materialized derived fields do not have a full ghost-cell exchange contract.
+
 ### `read_blocks(path, *, field_indices=None, ghost_width=0, include_ghosts=False, boundary_conditions=None)`
 
 Read native AMR block data in SFC/Morton order.
@@ -51,8 +81,8 @@ Default return shape:
 (nleafs, nw, bx, by, bz)
 ```
 
-With `include_ghosts=True` and `ghost_width > 0`, the block dimensions include
-ghost padding.
+With `include_ghosts=True` and `ghost_width >= 2`, the block dimensions include
+ghost padding. `ghost_width=1` is rejected.
 
 `field_indices` are zero-based indices into the original file field list.
 
@@ -92,9 +122,9 @@ Interpolation choices:
 | `"zero"` | Piecewise-constant sampling; default low-memory path |
 | `"linear"` | Linear sampling through ghost-cell-padded mesh storage |
 
-`interpolation="linear"` requires `ghost_width > 0`. Refined datasets with
-coarse/fine interfaces require `ghost_width >= 2` because limited prolongation
-uses neighboring coarse cells.
+`interpolation="linear"` requires ghost-cell storage. Enabled ghost-cell
+storage uses `ghost_width >= 2`; `ghost_width=1` is rejected during dataset
+construction.
 
 `field_indices` are zero-based indices into the original file field list. The
 returned field axis follows the requested order.
@@ -118,7 +148,7 @@ write_datfile(
 ## Boundary conditions for ghost cells
 
 The `boundary_conditions` argument controls physical boundary fills when
-`ghost_width > 0`. It is accepted by `open_dataset()`, `read_blocks()`,
+`ghost_width >= 2`. It is accepted by `open_dataset()`, `read_blocks()`,
 `read_uniform()`, and `write_datfile()`.
 
 Supported modes:
@@ -249,15 +279,25 @@ These methods are available on the object returned by `open_dataset()` or
 | Method or attribute | Purpose |
 | --- | --- |
 | `ds.load_data(field_indices=None, boundary_conditions=None)` | Load selected block fields |
-| `ds.blocks(include_ghosts=False)` | Return loaded block data |
+| `ds.register_derived(name, func, dependencies, requires_ghosts=False)` | Register a derived-field recipe without computing it |
+| `ds.register_derivative(name, terms)` | Register one scalar first-derivative stencil field |
+| `ds.materialize_fields(names)` | Compute registered derived fields into the loaded field axis |
+| `ds.drop_derived_fields(names)` | Remove materialized derived fields from loaded data |
+| `ds.blocks(include_ghosts=False, field_indices=None, field_names=None)` | Return loaded block data |
 | `ds.exchange_ghost_cells()` | Refresh ghost cells after mutation |
-| `ds.uniform_grid(...)` | Sample loaded data into compute layout |
-| `ds.uniform_full(field_indices=None)` | Exact level-1 full-domain placement |
-| `ds.write_datfile(path, overwrite=False)` | Write loaded data to `.dat` |
+| `ds.uniform_grid(..., field_indices=None, field_names=None)` | Sample loaded data into compute layout |
+| `ds.uniform_full(field_indices=None, field_names=None)` | Exact level-1 full-domain placement |
+| `ds.write_datfile(path, overwrite=False, field_names=None)` | Write loaded data to `.dat` |
 | `ds.wnames` | Field names |
+| `ds.loaded_field_names` | Names matching the loaded columns in `ds.data` |
+| `ds.derived_field_names` | Materialized derived field names |
 | `ds.domain_nx` | Domain cell counts |
 | `ds.block_nx` | Block cell counts |
 | `ds.physical_domain` | Domain bounds |
+
+`field_indices` select original `.dat` header fields. `field_names` select
+loaded field columns by name, including materialized derived fields. Supplying
+both selector types to one method raises `ValueError`.
 
 ## Layout names
 

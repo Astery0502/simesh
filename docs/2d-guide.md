@@ -55,8 +55,8 @@ smooth_grid = read_uniform(
 )
 ```
 
-Use `ghost_width=2` for refined 2D datasets with coarse/fine interfaces.
-Level-1 or same-level-only 2D datasets can still use `ghost_width=1`.
+Use `ghost_width=2` or larger when enabling ghost-cell storage. `ghost_width=1`
+is rejected during dataset construction.
 
 ## Read 2D block data
 
