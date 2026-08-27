@@ -26,7 +26,7 @@ a capability becomes active.
 | HAL-001 | Non-periodic physical-boundary halo provision | GEO-001, STO-001 | complete |
 | HAL-002 | Same-level sibling halo provision | TOP-001, HAL-001 | complete |
 | SAM-001 | Exact level-1 block placement | GEO-001, STO-001 | complete |
-| SAM-002 | Zero-order uniform sampling | GEO-001, STO-001 | proposed |
+| SAM-002 | Zero-order uniform sampling | GEO-001, STO-001 | complete |
 | SAM-003 | Trilinear uniform sampling | HAL-002, GEO-001 | proposed |
 | OPR-001 | Pointwise operator contract and implementation | FND-002, STO-001 | proposed |
 | OPR-002 | Local stencil operator contract and implementation | FND-002, HAL-002 | proposed |

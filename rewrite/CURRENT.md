@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: SAM-001.
-- Current capability: SAM-002, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos, and exact native-grid placement plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`.
+- Last completed capability: SAM-002.
+- Current capability: SAM-003, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos, native placement, and deterministic zero-order sampling plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -58,21 +58,25 @@
 - Mixed sibling/physical transforms retain HAL-001's deterministic x/y/z order; this intentionally differs from the current pass-ordered kernel only where no-inflow and antisymmetry do not commute.
 - SAM-001 places a selected valid block region by exact integer cell boxes into field-first native uniform output; no floating geometry comparison is used.
 - Reordered and repeated placement is deterministic in slot order, while bounded STO-002 primary traversal gives exactly-once disjoint native-grid coverage.
+- SAM-002 defines output centers with separate binary64 operations and assigns exact face ties to the highest canonical native cell, giving one deterministic block owner.
+- Sample bounds must lie inside the domain; outer-center-collapsed grids are rejected, while GEO-valid coincident internal faces use the explicit highest-face rule.
+- SAM-001 native dispatch requires a separately amortized exact owner proof and is not repeated inside bounded SAM-002 chunk calls.
 
 ## Next Work
 
-Specify and implement SAM-002 zero-order Cartesian sampling for arbitrary
-uniform output bounds and resolution. Define exact cell-center ownership at
-block faces, preserve selected-field order, compare with the current sampler
-and an independent coordinate oracle, and integrate a bounded block traversal.
+Specify and implement SAM-003 trilinear Cartesian sampling over completed
+HAL-002 primary workspaces. Define center-relative indices and weights, prove
+the required halo reach, preserve deterministic arithmetic order, compare with
+the current sampler and affine/convergence references, and integrate bounded
+full-halo chunks.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sam_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sam_002.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/sam_001.py --repeats 15
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/sam_002.py --repeats 21
 ```
 
-SAM-001 evidence is recorded in `evidence/SAM-001.md`.
+SAM-002 evidence is recorded in `evidence/SAM-002.md`.
