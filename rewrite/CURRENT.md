@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: SAM-002.
-- Current capability: SAM-003, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos, native placement, and deterministic zero-order sampling plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`.
+- Last completed capability: SAM-003.
+- Current capability: OPR-001, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos, and native/zero-order/trilinear level-1 sampling plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -61,22 +61,25 @@
 - SAM-002 defines output centers with separate binary64 operations and assigns exact face ties to the highest canonical native cell, giving one deterministic block owner.
 - Sample bounds must lie inside the domain; outer-center-collapsed grids are rejected, while GEO-valid coincident internal faces use the explicit highest-face rule.
 - SAM-001 native dispatch requires a separately amortized exact owner proof and is not repeated inside bounded SAM-002 chunk calls.
+- SAM-003 reuses canonical ownership, uses current-style block-local center coordinates, and fixes a separately rounded z/y/x eight-corner blend tree.
+- Trilinear input reach is exactly one valid lower and upper layer on every axis; all eight corners are read even when a weight is zero.
+- Bounded trilinear execution samples only HAL-002-completed primaries after full-halo planning and gather/physical/sibling composition.
 
 ## Next Work
 
-Specify and implement SAM-003 trilinear Cartesian sampling over completed
-HAL-002 primary workspaces. Define center-relative indices and weights, prove
-the required halo reach, preserve deterministic arithmetic order, compare with
-the current sampler and affine/convergence references, and integrate bounded
-full-halo chunks.
+Specify and implement OPR-001 as the minimal pointwise operator contract and one
+representative compiled field transform. Use FND-002 zero reach, explicit input/
+output field positions and regions, caller-owned output, bounded STO gather and
+scatter composition, exact/operation-specific numerical evidence, and measured
+fusion trade-offs.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sam_002.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sam_003.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/sam_002.py --repeats 21
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/sam_003.py --repeats 15
 ```
 
-SAM-002 evidence is recorded in `evidence/SAM-002.md`.
+SAM-003 evidence is recorded in `evidence/SAM-003.md`.

@@ -7,7 +7,9 @@ import numpy as np
 from ._sampling import (
     place_level1_blocks_unchecked,
     sample_level1_zero_order_unchecked,
+    sample_level1_trilinear_unchecked,
     validate_selected_level1_placement_unchecked,
+    validate_trilinear_stencils_unchecked,
 )
 from ._geometry import validate_selected_geometry_unchecked
 from .foundation import (
@@ -356,6 +358,193 @@ def sample_level1_zero_order(
     sample_level1_zero_order_unchecked(
         payload,
         payload_valid_lower,
+        block_ids,
+        domain_lower,
+        domain_upper,
+        domain_cell_counts,
+        block_cell_counts,
+        rank_to_coord,
+        native_spacing,
+        sample_lower,
+        output_spacing,
+        uniform_grid,
+    )
+
+
+def sample_level1_trilinear(
+    payload: np.ndarray,
+    payload_valid_lower: np.ndarray,
+    payload_valid_upper: np.ndarray,
+    interior_lower: np.ndarray,
+    interior_upper: np.ndarray,
+    block_ids: np.ndarray,
+    domain_lower: np.ndarray,
+    domain_upper: np.ndarray,
+    domain_cell_counts: np.ndarray,
+    block_cell_counts: np.ndarray,
+    coord_to_rank: np.ndarray,
+    rank_to_coord: np.ndarray,
+    sample_lower: np.ndarray,
+    sample_upper: np.ndarray,
+    uniform_grid: np.ndarray,
+) -> None:
+    """Trilinearly sample completed level-1 primary workspaces."""
+    payload = _require_payload("payload", payload, writable=False)
+    payload_valid_lower = _require_index_triplet(
+        "payload_valid_lower", payload_valid_lower
+    )
+    payload_valid_upper = _require_index_triplet(
+        "payload_valid_upper", payload_valid_upper
+    )
+    interior_lower = _require_index_triplet("interior_lower", interior_lower)
+    interior_upper = _require_index_triplet("interior_upper", interior_upper)
+    block_ids = _require_index_vector("block_ids", block_ids)
+    domain_lower = _require_float_triplet("domain_lower", domain_lower)
+    domain_upper = _require_float_triplet("domain_upper", domain_upper)
+    domain_cell_counts = _require_index_triplet(
+        "domain_cell_counts", domain_cell_counts
+    )
+    block_cell_counts = _require_index_triplet(
+        "block_cell_counts", block_cell_counts
+    )
+    sample_lower = _require_float_triplet("sample_lower", sample_lower)
+    sample_upper = _require_float_triplet("sample_upper", sample_upper)
+    uniform_grid = _require_uniform_grid(uniform_grid)
+
+    if payload.shape[0] != block_ids.shape[0]:
+        raise ValueError("payload slot axis must match block_ids")
+    if payload.shape[1] != uniform_grid.shape[0]:
+        raise ValueError("payload and uniform_grid field counts must match")
+    if not np.all(np.isfinite(domain_lower)) or not np.all(
+        np.isfinite(domain_upper)
+    ):
+        raise ValueError("domain bounds must be finite")
+    if np.any(domain_upper <= domain_lower):
+        raise ValueError("domain_upper must be greater than domain_lower")
+    if not np.all(np.isfinite(sample_lower)) or not np.all(
+        np.isfinite(sample_upper)
+    ):
+        raise ValueError("sample bounds must be finite")
+    if np.any(sample_upper <= sample_lower):
+        raise ValueError("sample_upper must be greater than sample_lower")
+    if np.any(sample_lower < domain_lower) or np.any(sample_upper > domain_upper):
+        raise ValueError("sample bounds must be contained in the domain")
+    if np.any(domain_cell_counts <= 0) or np.any(block_cell_counts <= 0):
+        raise ValueError("cell counts must be positive")
+    if np.any(domain_cell_counts % block_cell_counts != 0):
+        raise ValueError("domain_cell_counts must be divisible by block_cell_counts")
+
+    root_shape = np.ascontiguousarray(
+        domain_cell_counts // block_cell_counts,
+        dtype=np.int64,
+    )
+    volume = _root_volume(root_shape)
+    coord_to_rank = _require_mapping(
+        "coord_to_rank",
+        coord_to_rank,
+        tuple(int(value) for value in root_shape),
+    )
+    rank_to_coord = _require_mapping(
+        "rank_to_coord",
+        rank_to_coord,
+        (volume, 3),
+    )
+
+    spatial_shape = np.asarray(payload.shape[2:], dtype=np.int64)
+    if np.any(payload_valid_lower < 0) or np.any(
+        payload_valid_lower >= payload_valid_upper
+    ):
+        raise ValueError("payload valid region must be nonempty and nonnegative")
+    if np.any(payload_valid_upper > spatial_shape):
+        raise ValueError("payload valid region exceeds payload spatial shape")
+    if np.any(interior_lower < 0) or np.any(interior_lower >= interior_upper):
+        raise ValueError("interior must be nonempty and nonnegative")
+    if np.any(interior_upper > spatial_shape):
+        raise ValueError("interior exceeds payload spatial shape")
+    if not np.array_equal(interior_upper - interior_lower, block_cell_counts):
+        raise ValueError("interior extent must equal block_cell_counts")
+    if np.any(interior_lower < 1) or np.any(interior_upper >= spatial_shape):
+        raise ValueError("trilinear sampling requires one allocated halo layer")
+    if np.any(payload_valid_lower > interior_lower - 1) or np.any(
+        payload_valid_upper < interior_upper + 1
+    ):
+        raise ValueError("trilinear sampling requires one valid halo layer")
+
+    output_counts = np.ascontiguousarray(
+        uniform_grid.shape[1:],
+        dtype=np.int64,
+    )
+    if np.any(output_counts <= 0):
+        raise ValueError("uniform_grid spatial counts must be positive")
+    _root_volume(output_counts)
+    native_spacing = _validated_spacing(
+        "native",
+        domain_lower,
+        domain_upper,
+        domain_cell_counts,
+    )
+    output_spacing = _validated_spacing(
+        "output",
+        sample_lower,
+        sample_upper,
+        output_counts,
+    )
+
+    readonly_inputs = (
+        payload,
+        payload_valid_lower,
+        payload_valid_upper,
+        interior_lower,
+        interior_upper,
+        block_ids,
+        domain_lower,
+        domain_upper,
+        domain_cell_counts,
+        block_cell_counts,
+        coord_to_rank,
+        rank_to_coord,
+        sample_lower,
+        sample_upper,
+    )
+    if any(np.shares_memory(uniform_grid, value) for value in readonly_inputs):
+        raise ValueError("uniform_grid must not overlap sampling inputs")
+
+    invalid_slot = int(
+        validate_selected_geometry_unchecked(
+            domain_lower,
+            domain_upper,
+            domain_cell_counts,
+            block_cell_counts,
+            coord_to_rank,
+            rank_to_coord,
+            block_ids,
+            native_spacing,
+        )
+    )
+    if invalid_slot >= 0:
+        raise ValueError(f"invalid selected sampling geometry at slot {invalid_slot}")
+    invalid_stencil = int(
+        validate_trilinear_stencils_unchecked(
+            block_ids,
+            domain_lower,
+            domain_upper,
+            domain_cell_counts,
+            block_cell_counts,
+            rank_to_coord,
+            native_spacing,
+            sample_lower,
+            output_spacing,
+            uniform_grid,
+        )
+    )
+    if invalid_stencil >= 0:
+        raise ValueError(f"invalid trilinear stencil at slot {invalid_stencil}")
+    if payload.shape[0] == 0 or payload.shape[1] == 0:
+        return
+
+    sample_level1_trilinear_unchecked(
+        payload,
+        interior_lower,
         block_ids,
         domain_lower,
         domain_upper,

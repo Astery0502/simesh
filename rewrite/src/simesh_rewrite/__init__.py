@@ -38,7 +38,11 @@ from .halos import (
     fill_physical_halos,
     fill_same_level_halos,
 )
-from .sampling import place_level1_blocks, sample_level1_zero_order
+from .sampling import (
+    place_level1_blocks,
+    sample_level1_trilinear,
+    sample_level1_zero_order,
+)
 
 __all__ = [
     "AccessPattern",
@@ -67,6 +71,7 @@ __all__ = [
     "ravel_cell",
     "required_input_region",
     "sample_level1_zero_order",
+    "sample_level1_trilinear",
     "scatter_blocks_from",
     "supports_output_region",
     "unravel_cell",
