@@ -28,7 +28,7 @@ a capability becomes active.
 | SAM-001 | Exact level-1 block placement | GEO-001, STO-001 | complete |
 | SAM-002 | Zero-order uniform sampling | GEO-001, STO-001 | complete |
 | SAM-003 | Trilinear uniform sampling | HAL-002, GEO-001 | complete |
-| OPR-001 | Pointwise operator contract and implementation | FND-002, STO-001 | proposed |
+| OPR-001 | Pointwise operator contract and implementation | FND-002, STO-001 | complete |
 | OPR-002 | Local stencil operator contract and implementation | FND-002, HAL-002 | proposed |
 | RED-001 | Streaming associative reduction | FND-002, STO-002 | proposed |
 | INT-001 | M0 end-to-end numerical and bounded-memory path | SAM-003, OPR-001, OPR-002, RED-001 | proposed |

@@ -43,6 +43,7 @@ from .sampling import (
     sample_level1_trilinear,
     sample_level1_zero_order,
 )
+from .operators import scaled_difference_into
 
 __all__ = [
     "AccessPattern",
@@ -72,6 +73,7 @@ __all__ = [
     "required_input_region",
     "sample_level1_zero_order",
     "sample_level1_trilinear",
+    "scaled_difference_into",
     "scatter_blocks_from",
     "supports_output_region",
     "unravel_cell",
