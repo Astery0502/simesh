@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: MOR-001.
-- Current capability: TOP-001, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with Cython foundation, access-region, and dense level-1 Morton primitives plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`.
+- Last completed capability: TOP-001.
+- Current capability: GEO-001, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with Cython foundation, access-region, dense Morton, and validated six-face level-1 topology primitives plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -35,20 +35,23 @@
 - Level-1 Morton rank is standard x/y/z bit-interleaved order filtered to the positive rectangular root grid and compacted to dense zero-based ranks.
 - M0 uses Morton rank as the global level-1 block ID; arbitrary chunk slots remain distinct.
 - Morton maps are caller-owned C-contiguous `int64` outputs with no raw-code width limit or heap scratch.
+- M0 topology stores only `(xlo,xhi,ylo,yhi,zlo,zhi)` face IDs in zero-based `int64`; exact sentinel `-1` denotes a physical face.
+- Face topology structurally validates the supplied MOR maps before output mutation.
+- Edge/corner relations are derived through commuting face steps instead of a 4.5x larger 27-direction table.
 
 ## Next Work
 
-Specify and implement TOP-001 as validated non-periodic level-1 topology over
-the MOR-001 maps. Establish exact face-neighbor IDs and physical-boundary
-classification without adding refined, periodic, geometry, or halo behavior.
+Specify and implement GEO-001 Cartesian 3D level-1 block bounds, cell spacing,
+and cell-center coordinates from domain bounds, domain cell counts, block cell
+counts, and TOP-001 block IDs. Do not add sampling or payload storage.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_mor_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_top_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/mor_001.py --repeats 15 --reference-limit 50000 --current-shapes 32x32x32,31x29x27,33x33x33,64x64x64 --current-repeats 3
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/top_001.py --repeats 15 --reference-limit 50000
 ```
 
-MOR-001 evidence is recorded in `evidence/MOR-001.md`.
+TOP-001 evidence is recorded in `evidence/TOP-001.md`.
