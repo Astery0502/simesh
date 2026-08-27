@@ -16,7 +16,7 @@ a capability becomes active.
 
 | ID | Capability | Depends on | Status |
 | --- | --- | --- | --- |
-| FND-001 | Layout, index, ownership, and valid-region conventions | -- | proposed |
+| FND-001 | Layout, index, ownership, and valid-region conventions | -- | complete |
 | FND-002 | Operator access-pattern and halo-requirement vocabulary | FND-001 | proposed |
 | MOR-001 | Cartesian 3D level-1 Morton mapping | FND-001 | proposed |
 | TOP-001 | Validated level-1 topology | MOR-001 | proposed |
