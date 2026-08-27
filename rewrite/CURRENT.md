@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: OPR-001.
-- Current capability: OPR-002, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos/sampling, and one explicit zero-reach pointwise operator plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`.
+- Last completed capability: OPR-002.
+- Current capability: RED-001, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos/sampling, and concrete pointwise/axis-stencil operators plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -67,22 +67,25 @@
 - OPR-001 is a concrete `left - scale*right` transform with explicit source/output fields and translated regions; scale accepts only exact binary64 scalar types.
 - The pointwise access contract has exact zero reach, separate multiply/subtract rounding, no input/output overlap, and caller-owned output.
 - Bounded no-closure gather/compute/scatter approaches whole-array NumPy throughput without its full product temporary, so no fused storage operator is retained.
+- OPR-002 computes one axis-centered first derivative with exact reach one only on that axis and zero transverse reach.
+- The stencil fixes inverse-spacing, neighbor subtraction, and multiplication order; current batching signed-zero behavior is deliberately outside the direct stencil.
+- Bounded stencil execution uses full-halo primary chunks and separate output scatter; one valid halo layer is sufficient even though current dataset policy requests two.
 
 ## Next Work
 
-Specify and implement OPR-002 as one representative local stencil over completed
-HAL-002 workspaces. Use explicit axis/field/output positions, the tight FND-002
-one-cell reach, fixed central-difference arithmetic and geometry, primary-only
-output validity, bounded full-halo gather/compute/scatter composition, current
-comparison, convergence evidence, and measured fusion trade-offs.
+Specify and implement RED-001 as one associative streaming reduction over
+exactly-once no-closure primary chunks. Define accumulator/merge/finalize order,
+empty and nonfinite behavior, selected field/region semantics, bounded memory,
+current/NumPy comparison, chunk-size sensitivity, and deterministic serial
+evidence without pretending floating addition is mathematically associative.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_opr_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_opr_002.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/opr_001.py --repeats 15
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/opr_002.py --repeats 11
 ```
 
-OPR-001 evidence is recorded in `evidence/OPR-001.md`.
+OPR-002 evidence is recorded in `evidence/OPR-002.md`.

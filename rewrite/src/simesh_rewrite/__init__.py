@@ -43,7 +43,7 @@ from .sampling import (
     sample_level1_trilinear,
     sample_level1_zero_order,
 )
-from .operators import scaled_difference_into
+from .operators import central_difference_into, scaled_difference_into
 
 __all__ = [
     "AccessPattern",
@@ -54,6 +54,7 @@ __all__ = [
     "PHYSICAL_BOUNDARY_ID",
     "copy_region_into",
     "common_physical_valid_region",
+    "central_difference_into",
     "fill_level1_face_neighbors",
     "fill_level1_block_geometry",
     "fill_level1_morton",
