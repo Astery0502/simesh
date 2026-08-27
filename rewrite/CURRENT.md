@@ -2,11 +2,11 @@
 
 ## State
 
-- Active milestone: Foundation leading to M0.
-- Last completed capability: RED-001.
-- Current capability: INT-001, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos/sampling, concrete pointwise/axis-stencil operators, and fixed-order streaming reduction plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`.
+- Active milestone: M0 complete.
+- Last completed capability: INT-001.
+- Current capability: none; no M0 work remains.
+- Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -73,22 +73,23 @@
 - RED-001 uses one caller-owned binary64 state and fixed slot/x/y/z additions; persistent ascending no-closure chunks are bit-identical across capacities.
 - Partial merge trees are explicitly strategy-dependent because binary64 addition is not associative; NumPy and `math.fsum` are descriptive/accuracy references, not alternate contract results.
 - Empty updates perform no state write, while signed zero, NaN, infinity, and overflow follow the complete sequential IEEE stream without skipping or early exit.
+- INT-001 uses separate no-closure and full-halo passes with one padded payload, one ID vector, one reused output workspace, and one persistent reduction scalar.
+- Managed raw bytes are exactly `8*S*(F*Pvol+Bvol+1)+8`; source mapping/page cache, fixed controls, topology, and five final outputs are outside that budget and reported separately.
+- Full semantic topology and actual-ID dry-plan validation complete before any result mutation; successful execution fully overwrites every sink/grid.
 
 ## Next Work
 
-Specify and implement INT-001 as the M0 end-to-end bounded execution path over a
-read-only source. Compose topology, full-halo chunking, gather, physical/sibling
-halos, pointwise and stencil outputs with scatter, zero/trilinear sampling, and
-persistent reduction. Compare all final artifacts with full-resident references,
-enforce the managed budget, and measure composed runtime/peak memory/scaling.
+M0 is complete. The next roadmap work is M1 refined topology, coarse/fine
+connectivity, restriction/prolongation, refined halos, and refined sampling; it
+is outside this completed goal.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_red_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_int_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/red_001.py --repeats 11 --blocks 4096
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/int_001.py --repeats 7
 ```
 
-RED-001 evidence is recorded in `evidence/RED-001.md`.
+INT-001 and M0 completion evidence is recorded in `evidence/INT-001.md`.

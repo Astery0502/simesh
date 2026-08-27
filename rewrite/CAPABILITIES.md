@@ -31,7 +31,9 @@ a capability becomes active.
 | OPR-001 | Pointwise operator contract and implementation | FND-002, STO-001 | complete |
 | OPR-002 | Local stencil operator contract and implementation | FND-002, HAL-002 | complete |
 | RED-001 | Streaming associative reduction | FND-002, STO-002 | complete |
-| INT-001 | M0 end-to-end numerical and bounded-memory path | SAM-003, OPR-001, OPR-002, RED-001 | proposed |
+| INT-001 | M0 end-to-end numerical and bounded-memory path | SAM-003, OPR-001, OPR-002, RED-001 | complete |
+
+All Foundation and M0 capabilities are complete.
 
 ## Later Milestones
 

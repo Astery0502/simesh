@@ -16,6 +16,8 @@ Establish the common vocabulary and the smallest executable contracts:
 
 ## M0: Cartesian 3D Level-1
 
+Status: complete.
+
 Target: a complete non-periodic, non-staggered 3D path without refinement.
 
 Required capabilities:

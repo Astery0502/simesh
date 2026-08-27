@@ -49,6 +49,7 @@ from .reductions import (
     finalize_field_sum,
     merge_field_sums,
 )
+from .pipeline import execute_level1_m0
 
 __all__ = [
     "AccessPattern",
@@ -59,6 +60,7 @@ __all__ = [
     "PAYLOAD_DTYPE",
     "PHYSICAL_BOUNDARY_ID",
     "copy_region_into",
+    "execute_level1_m0",
     "common_physical_valid_region",
     "central_difference_into",
     "fill_level1_face_neighbors",

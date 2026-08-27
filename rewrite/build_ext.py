@@ -71,6 +71,11 @@ def main() -> None:
             [str(ROOT / "src/simesh_rewrite/_reductions.pyx")],
             include_dirs=[np.get_include()],
         ),
+        Extension(
+            "simesh_rewrite._pipeline",
+            [str(ROOT / "src/simesh_rewrite/_pipeline.pyx")],
+            include_dirs=[np.get_include()],
+        ),
     ]
     setup(
         name="simesh-rewrite-core",
