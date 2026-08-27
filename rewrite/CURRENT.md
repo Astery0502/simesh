@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: OPR-002.
-- Current capability: RED-001, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos/sampling, and concrete pointwise/axis-stencil operators plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`.
+- Last completed capability: RED-001.
+- Current capability: INT-001, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos/sampling, concrete pointwise/axis-stencil operators, and fixed-order streaming reduction plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -70,22 +70,25 @@
 - OPR-002 computes one axis-centered first derivative with exact reach one only on that axis and zero transverse reach.
 - The stencil fixes inverse-spacing, neighbor subtraction, and multiplication order; current batching signed-zero behavior is deliberately outside the direct stencil.
 - Bounded stencil execution uses full-halo primary chunks and separate output scatter; one valid halo layer is sufficient even though current dataset policy requests two.
+- RED-001 uses one caller-owned binary64 state and fixed slot/x/y/z additions; persistent ascending no-closure chunks are bit-identical across capacities.
+- Partial merge trees are explicitly strategy-dependent because binary64 addition is not associative; NumPy and `math.fsum` are descriptive/accuracy references, not alternate contract results.
+- Empty updates perform no state write, while signed zero, NaN, infinity, and overflow follow the complete sequential IEEE stream without skipping or early exit.
 
 ## Next Work
 
-Specify and implement RED-001 as one associative streaming reduction over
-exactly-once no-closure primary chunks. Define accumulator/merge/finalize order,
-empty and nonfinite behavior, selected field/region semantics, bounded memory,
-current/NumPy comparison, chunk-size sensitivity, and deterministic serial
-evidence without pretending floating addition is mathematically associative.
+Specify and implement INT-001 as the M0 end-to-end bounded execution path over a
+read-only source. Compose topology, full-halo chunking, gather, physical/sibling
+halos, pointwise and stencil outputs with scatter, zero/trilinear sampling, and
+persistent reduction. Compare all final artifacts with full-resident references,
+enforce the managed budget, and measure composed runtime/peak memory/scaling.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_opr_002.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_red_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/opr_002.py --repeats 11
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/red_001.py --repeats 11 --blocks 4096
 ```
 
-OPR-002 evidence is recorded in `evidence/OPR-002.md`.
+RED-001 evidence is recorded in `evidence/RED-001.md`.

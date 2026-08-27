@@ -44,9 +44,15 @@ from .sampling import (
     sample_level1_zero_order,
 )
 from .operators import central_difference_into, scaled_difference_into
+from .reductions import (
+    accumulate_field_sum,
+    finalize_field_sum,
+    merge_field_sums,
+)
 
 __all__ = [
     "AccessPattern",
+    "accumulate_field_sum",
     "AXIS_NAMES",
     "BoundaryMode",
     "INDEX_DTYPE",
@@ -60,6 +66,7 @@ __all__ = [
     "fill_level1_morton",
     "fill_physical_halos",
     "fill_same_level_halos",
+    "finalize_field_sum",
     "gather_blocks_into",
     "interior_region",
     "level1_morton",
@@ -67,6 +74,7 @@ __all__ = [
     "level1_block_geometry",
     "minimum_face_closed_slots",
     "minimum_halo_closed_slots",
+    "merge_field_sums",
     "plan_level1_chunk",
     "plan_level1_halo_chunk",
     "place_level1_blocks",
