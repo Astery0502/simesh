@@ -26,7 +26,9 @@ from .topology import (
 from .storage import gather_blocks_into, scatter_blocks_from
 from .chunking import (
     minimum_face_closed_slots,
+    minimum_halo_closed_slots,
     plan_level1_chunk,
+    plan_level1_halo_chunk,
     workspace_nbytes,
     workspace_slot_capacity,
 )
@@ -55,7 +57,9 @@ __all__ = [
     "level1_face_neighbors",
     "level1_block_geometry",
     "minimum_face_closed_slots",
+    "minimum_halo_closed_slots",
     "plan_level1_chunk",
+    "plan_level1_halo_chunk",
     "ravel_cell",
     "required_input_region",
     "scatter_blocks_from",

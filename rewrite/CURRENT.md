@@ -4,7 +4,7 @@
 
 - Active milestone: Foundation leading to M0.
 - Last completed capability: HAL-001.
-- Current capability: HAL-002, not started and ready.
+- Current capability: HAL-002, contract work ready after its STO-002 integration prerequisite.
 - Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, and bit-exact physical-envelope halo provision plus independent references.
 - Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`.
 - Unresolved differences: none.
@@ -47,6 +47,7 @@
 - STO-001 uses slab, plane, or row copies without selector sorting, hidden allocation, or source/sink classes.
 - Managed workspace bytes are exactly `8*S*(F*V+1)` for payload plus block IDs; capacity counts the full allocation, including unused final slots.
 - Chunk primaries are maximal ascending contiguous ID prefixes; optional unique direct-face support follows in first-discovery order.
+- Full-halo chunks preserve the same primary-prefix contract and add the clipped one-block `3x3x3` support closure in canonical x-fast direction order; capacity 27 guarantees progress.
 - Primary coverage is exactly once, while support may recur; no hash, bitmap, or primary-slot map is used.
 - Read-only C-order `numpy.memmap` backing demonstrates that full payload need not be eagerly resident, while OS page cache remains outside the managed budget.
 - Physical halo modes are explicit per local field and face: continuous, symmetric, antisymmetric, and no-inflow with explicit normal-field slots.
@@ -56,17 +57,18 @@
 ## Next Work
 
 Specify and implement HAL-002 same-level sibling halo provision over TOP-001
-faces and STO-002 face-closed workspaces. Complete remaining halo cells without
-changing interiors, preserve HAL-001 physical composition at mixed edges, and
-declare a full padded valid region for processed primary slots.
+faces and STO-002 full-halo-closed workspaces. Complete remaining halo cells
+without changing interiors, preserve HAL-001 physical composition at mixed
+edges, and declare a full padded valid region for processed primary slots.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hal_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_002.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/hal_001.py --repeats 9 --metadata-slots 1000000
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_002.py --capacities 64,256,1024 --memmap-blocks 2048 --budget-mib 2
 ```
 
-HAL-001 evidence is recorded in `evidence/HAL-001.md`.
+The independently reviewed STO-002 halo-closure extension is recorded in
+`evidence/STO-002.md`.

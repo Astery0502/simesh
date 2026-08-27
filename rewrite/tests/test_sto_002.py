@@ -6,11 +6,16 @@ import pytest
 
 from simesh_rewrite.chunking import (
     minimum_face_closed_slots,
+    minimum_halo_closed_slots,
     plan_level1_chunk,
+    plan_level1_halo_chunk,
     workspace_nbytes,
     workspace_slot_capacity,
 )
-from simesh_rewrite.chunking_reference import plan_level1_chunk_reference
+from simesh_rewrite.chunking_reference import (
+    plan_level1_chunk_reference,
+    plan_level1_halo_chunk_reference,
+)
 from simesh_rewrite.morton import level1_morton
 from simesh_rewrite.storage import gather_blocks_into
 from simesh_rewrite.topology import level1_face_neighbors
@@ -144,6 +149,130 @@ def test_minimum_closed_capacity_and_invalid_requests_are_atomic() -> None:
         plan_level1_chunk(0, neighbors, True, readonly)
     with pytest.raises(ValueError, match="exceeds"):
         plan_level1_chunk(neighbors.shape[0] + 1, neighbors, False, np.empty(7, dtype=np.int64))
+
+
+def test_halo_closed_plan_has_canonical_complete_neighborhood() -> None:
+    root_shape = i3(5, 5, 5)
+    coord_to_rank, rank_to_coord = level1_morton(root_shape)
+    neighbors = level1_face_neighbors(root_shape, coord_to_rank, rank_to_coord)
+    center = int(coord_to_rank[2, 2, 2])
+    ids = np.full(27, -77, dtype=np.int64)
+
+    primary_count, selected_count = plan_level1_halo_chunk(
+        center,
+        neighbors,
+        ids,
+    )
+
+    expected = [center]
+    expected.extend(
+        int(coord_to_rank[2 + dx, 2 + dy, 2 + dz])
+        for dz in range(-1, 2)
+        for dy in range(-1, 2)
+        for dx in range(-1, 2)
+        if (dx, dy, dz) != (0, 0, 0)
+    )
+    assert (primary_count, selected_count) == (1, 27)
+    assert ids.tolist() == expected
+    assert len(np.unique(ids)) == 27
+
+
+def test_halo_closed_chunks_match_reference_and_cover_all_primaries() -> None:
+    neighbors = topology((6, 4, 3))
+    for capacity in (27, 40, 64):
+        ids = np.full(capacity, -91, dtype=np.int64)
+        first = 0
+        covered = []
+        while first < neighbors.shape[0]:
+            before = ids.copy()
+            expected, expected_primary, expected_selected = (
+                plan_level1_halo_chunk_reference(first, neighbors, capacity)
+            )
+            primary_count, selected_count = plan_level1_halo_chunk(
+                first,
+                neighbors,
+                ids,
+            )
+            assert (primary_count, selected_count) == (
+                expected_primary,
+                expected_selected,
+            )
+            assert ids[:selected_count].tolist() == expected
+            assert np.array_equal(ids[selected_count:], before[selected_count:])
+            assert len(np.unique(ids[:selected_count])) == selected_count
+            covered.extend(ids[:primary_count].tolist())
+            first += primary_count
+        assert covered == list(range(neighbors.shape[0]))
+
+
+def test_minimum_halo_capacity_guarantees_progress_and_failure_is_atomic() -> None:
+    root_shape = i3(5, 5, 5)
+    coord_to_rank, rank_to_coord = level1_morton(root_shape)
+    neighbors = level1_face_neighbors(root_shape, coord_to_rank, rank_to_coord)
+    center = int(coord_to_rank[2, 2, 2])
+    assert minimum_halo_closed_slots(neighbors) == 27
+
+    too_small = np.full(26, -8, dtype=np.int64)
+    before = too_small.copy()
+    with pytest.raises(ValueError, match="first halo closure"):
+        plan_level1_halo_chunk(center, neighbors, too_small)
+    assert np.array_equal(too_small, before)
+
+    exact = np.empty(27, dtype=np.int64)
+    first = 0
+    while first < neighbors.shape[0]:
+        primary_count, selected_count = plan_level1_halo_chunk(
+            first,
+            neighbors,
+            exact,
+        )
+        assert primary_count > 0
+        assert primary_count <= selected_count <= 27
+        first += primary_count
+
+
+def test_halo_closure_is_clipped_and_promotes_support() -> None:
+    corner_shape = i3(5, 5, 5)
+    coord_to_rank, rank_to_coord = level1_morton(corner_shape)
+    neighbors = level1_face_neighbors(corner_shape, coord_to_rank, rank_to_coord)
+    ids = np.full(8, -3, dtype=np.int64)
+    primary_count, selected_count = plan_level1_halo_chunk(0, neighbors, ids)
+    expected = [0]
+    expected.extend(
+        int(coord_to_rank[dx, dy, dz])
+        for dz in range(2)
+        for dy in range(2)
+        for dx in range(2)
+        if (dx, dy, dz) != (0, 0, 0)
+    )
+    assert (primary_count, selected_count) == (1, 8)
+    assert ids.tolist() == expected
+
+    singleton_neighbors = topology((4, 1, 1))
+    assert minimum_halo_closed_slots(singleton_neighbors) == 3
+    promoted = np.full(3, -1, dtype=np.int64)
+    assert plan_level1_halo_chunk(0, singleton_neighbors, promoted) == (2, 3)
+    assert promoted.tolist() == [0, 1, 2]
+
+
+def test_halo_planner_shared_validation_and_end_state() -> None:
+    neighbors = topology((3, 2, 2))
+    ids = np.full(27, -6, dtype=np.int64)
+    before = ids.copy()
+    assert plan_level1_halo_chunk(neighbors.shape[0], neighbors, ids) == (0, 0)
+    assert np.array_equal(ids, before)
+
+    readonly = ids.copy()
+    readonly.setflags(write=False)
+    with pytest.raises(ValueError, match="writable"):
+        plan_level1_halo_chunk(0, neighbors, readonly)
+    with pytest.raises(ValueError, match="exceeds"):
+        plan_level1_halo_chunk(neighbors.shape[0] + 1, neighbors, ids)
+
+    overlapping_faces = neighbors.copy()
+    overlapping_ids = overlapping_faces.reshape(-1)[:27]
+    with pytest.raises(ValueError, match="overlap"):
+        plan_level1_halo_chunk(0, overlapping_faces, overlapping_ids)
 
 
 def test_memmap_stream_reuses_budgeted_workspace_without_resident_full_copy(tmp_path) -> None:

@@ -47,6 +47,50 @@ cpdef int64_t minimum_face_closed_slots_unchecked(
     return maximum
 
 
+cdef inline int64_t _walk_direction(
+    int64_t block_id,
+    int dx,
+    int dy,
+    int dz,
+    const int64_t[:, ::1] face_neighbor_ids,
+):
+    if dx != 0:
+        block_id = face_neighbor_ids[block_id, 0 if dx < 0 else 1]
+        if block_id < 0:
+            return -1
+    if dy != 0:
+        block_id = face_neighbor_ids[block_id, 2 if dy < 0 else 3]
+        if block_id < 0:
+            return -1
+    if dz != 0:
+        block_id = face_neighbor_ids[block_id, 4 if dz < 0 else 5]
+    return block_id
+
+
+cpdef int64_t minimum_halo_closed_slots_unchecked(
+    const int64_t[:, ::1] face_neighbor_ids,
+):
+    cdef int64_t block_id, neighbor, count, maximum = 0
+    cdef int dx, dy, dz
+    for block_id in range(face_neighbor_ids.shape[0]):
+        count = 0
+        for dz in range(-1, 2):
+            for dy in range(-1, 2):
+                for dx in range(-1, 2):
+                    neighbor = _walk_direction(
+                        block_id,
+                        dx,
+                        dy,
+                        dz,
+                        face_neighbor_ids,
+                    )
+                    if neighbor >= 0:
+                        count += 1
+        if count > maximum:
+            maximum = count
+    return maximum
+
+
 cpdef tuple plan_level1_chunk_unchecked(
     int64_t first_primary_id,
     const int64_t[:, ::1] face_neighbor_ids,
@@ -115,5 +159,91 @@ cpdef tuple plan_level1_chunk_unchecked(
             ):
                 chunk_block_ids[selected_count] = neighbor
                 selected_count += 1
+
+    return primary_count, selected_count
+
+
+cpdef tuple plan_level1_halo_chunk_unchecked(
+    int64_t first_primary_id,
+    const int64_t[:, ::1] face_neighbor_ids,
+    int64_t[::1] chunk_block_ids,
+):
+    cdef int64_t block_count = face_neighbor_ids.shape[0]
+    cdef int64_t capacity = chunk_block_ids.shape[0]
+    cdef int64_t primary_count = 0
+    cdef int64_t selected_count = 0
+    cdef int64_t candidate, neighbor, missing, position, index
+    cdef int dx, dy, dz
+
+    if first_primary_id == block_count:
+        return 0, 0
+
+    while first_primary_id + primary_count < block_count:
+        candidate = first_primary_id + primary_count
+        position = _find_support_id(
+            chunk_block_ids,
+            primary_count,
+            selected_count,
+            candidate,
+        )
+        missing = 1 if position < 0 else 0
+        for dz in range(-1, 2):
+            for dy in range(-1, 2):
+                for dx in range(-1, 2):
+                    if dx == 0 and dy == 0 and dz == 0:
+                        continue
+                    neighbor = _walk_direction(
+                        candidate,
+                        dx,
+                        dy,
+                        dz,
+                        face_neighbor_ids,
+                    )
+                    if neighbor >= 0 and not _is_selected(
+                        first_primary_id,
+                        primary_count,
+                        chunk_block_ids,
+                        selected_count,
+                        neighbor,
+                    ):
+                        missing += 1
+
+        if selected_count + missing > capacity:
+            if primary_count == 0:
+                raise ValueError("chunk capacity cannot fit the first halo closure")
+            break
+
+        if position >= primary_count:
+            for index in range(position, selected_count - 1):
+                chunk_block_ids[index] = chunk_block_ids[index + 1]
+            selected_count -= 1
+
+        for index in range(selected_count, primary_count, -1):
+            chunk_block_ids[index] = chunk_block_ids[index - 1]
+        chunk_block_ids[primary_count] = candidate
+        primary_count += 1
+        selected_count += 1
+
+        for dz in range(-1, 2):
+            for dy in range(-1, 2):
+                for dx in range(-1, 2):
+                    if dx == 0 and dy == 0 and dz == 0:
+                        continue
+                    neighbor = _walk_direction(
+                        candidate,
+                        dx,
+                        dy,
+                        dz,
+                        face_neighbor_ids,
+                    )
+                    if neighbor >= 0 and not _is_selected(
+                        first_primary_id,
+                        primary_count,
+                        chunk_block_ids,
+                        selected_count,
+                        neighbor,
+                    ):
+                        chunk_block_ids[selected_count] = neighbor
+                        selected_count += 1
 
     return primary_count, selected_count

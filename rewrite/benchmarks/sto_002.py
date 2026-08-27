@@ -15,7 +15,11 @@ import tracemalloc
 from numpy.lib.format import open_memmap
 import numpy as np
 
-from simesh_rewrite.chunking import plan_level1_chunk, workspace_nbytes
+from simesh_rewrite.chunking import (
+    plan_level1_chunk,
+    plan_level1_halo_chunk,
+    workspace_nbytes,
+)
 from simesh_rewrite.morton import level1_morton
 from simesh_rewrite.storage import gather_blocks_into
 from simesh_rewrite.topology import level1_face_neighbors
@@ -25,19 +29,30 @@ def i3(*values: int) -> np.ndarray:
     return np.asarray(values, dtype=np.int64)
 
 
-def plan_full_traversal(neighbors: np.ndarray, capacity: int, closure: bool) -> dict:
+def plan_full_traversal(
+    neighbors: np.ndarray,
+    capacity: int,
+    closure: str,
+) -> dict:
     ids = np.empty(capacity, dtype=np.int64)
     first = 0
     chunks = 0
     selected_total = 0
     started = time.perf_counter()
     while first < neighbors.shape[0]:
-        primary_count, selected_count = plan_level1_chunk(
-            first,
-            neighbors,
-            closure,
-            ids,
-        )
+        if closure == "halo":
+            primary_count, selected_count = plan_level1_halo_chunk(
+                first,
+                neighbors,
+                ids,
+            )
+        else:
+            primary_count, selected_count = plan_level1_chunk(
+                first,
+                neighbors,
+                closure == "faces",
+                ids,
+            )
         first += primary_count
         selected_total += selected_count
         chunks += 1
@@ -144,7 +159,7 @@ def main() -> None:
     capacities = [int(value) for value in args.capacities.split(",")]
     planner_results = []
     for capacity in capacities:
-        for closure in (False, True):
+        for closure in ("none", "faces", "halo"):
             samples = [
                 plan_full_traversal(neighbors, capacity, closure)
                 for _ in range(5)
