@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: STO-001.
-- Current capability: STO-002, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with Cython foundation, access-region, dense Morton, validated topology/geometry, and exact in-memory selected block transfers plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`.
+- Last completed capability: STO-002.
+- Current capability: HAL-001, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with Cython foundation, topology/geometry, exact selected transfers, deterministic bounded chunks, and a reusable memmap-backed workspace path plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -45,21 +45,25 @@
 - In-memory backing is canonical `(global_block,field,x,y,z)` C-contiguous `float64`; gathers/scatters use explicit block/field selectors and translated valid boxes.
 - Storage transfers are caller-buffered and bit-exact; duplicate scatter targets use deterministic slot-major/field-slot last-write semantics.
 - STO-001 uses slab, plane, or row copies without selector sorting, hidden allocation, or source/sink classes.
+- Managed workspace bytes are exactly `8*S*(F*V+1)` for payload plus block IDs; capacity counts the full allocation, including unused final slots.
+- Chunk primaries are maximal ascending contiguous ID prefixes; optional unique direct-face support follows in first-discovery order.
+- Primary coverage is exactly once, while support may recur; no hash, bitmap, or primary-slot map is used.
+- Read-only C-order `numpy.memmap` backing demonstrates that full payload need not be eagerly resident, while OS page cache remains outside the managed budget.
 
 ## Next Work
 
-Specify and implement STO-002 as bounded-memory block selection and reusable
-workspace policy over STO-001 and TOP-001. Establish exact budget accounting,
-deterministic chunk coverage, face-neighbor closure where required, and a path
-whose full field payload need not reside in memory.
+Specify and implement HAL-001 non-periodic physical-boundary halo provision for
+canonical padded payloads. Separate per-face boundary modes from topology,
+preserve interiors exactly, declare the produced valid region, and compare the
+continuous/symmetric/antisymmetric/no-inflow rules with current behavior.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_002.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_001.py --repeats 15
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_002.py --capacities 64,256,1024 --memmap-blocks 2048 --budget-mib 2
 ```
 
-STO-001 evidence is recorded in `evidence/STO-001.md`.
+STO-002 evidence is recorded in `evidence/STO-002.md`.

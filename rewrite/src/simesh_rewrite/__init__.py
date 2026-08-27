@@ -24,6 +24,12 @@ from .topology import (
     level1_face_neighbors,
 )
 from .storage import gather_blocks_into, scatter_blocks_from
+from .chunking import (
+    minimum_face_closed_slots,
+    plan_level1_chunk,
+    workspace_nbytes,
+    workspace_slot_capacity,
+)
 
 __all__ = [
     "AccessPattern",
@@ -40,6 +46,8 @@ __all__ = [
     "level1_morton",
     "level1_face_neighbors",
     "level1_block_geometry",
+    "minimum_face_closed_slots",
+    "plan_level1_chunk",
     "ravel_cell",
     "required_input_region",
     "scatter_blocks_from",
@@ -47,4 +55,6 @@ __all__ = [
     "unravel_cell",
     "valid_output_region",
     "validate_access_requirement",
+    "workspace_nbytes",
+    "workspace_slot_capacity",
 ]
