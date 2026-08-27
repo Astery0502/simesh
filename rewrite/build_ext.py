@@ -21,6 +21,11 @@ def main() -> None:
             [str(ROOT / "src/simesh_rewrite/_foundation.pyx")],
             include_dirs=[np.get_include()],
         ),
+        Extension(
+            "simesh_rewrite._access",
+            [str(ROOT / "src/simesh_rewrite/_access.pyx")],
+            include_dirs=[np.get_include()],
+        ),
     ]
     setup(
         name="simesh-rewrite-core",

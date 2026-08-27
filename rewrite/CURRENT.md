@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: FND-001.
-- Current capability: FND-002, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with a local Cython build path, NumPy reference, and FND-001 primitives.
-- Stable contracts: `contracts/FND-001.md`.
+- Last completed capability: FND-002.
+- Current capability: MOR-001, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with local Cython foundation and access-region primitives plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -29,21 +29,23 @@
 - Spatial regions are half-open boxes in storage coordinates and may express asymmetric halo storage.
 - Inputs are borrowed read-only and callers own explicit output/workspace buffers; compiled boundaries do not repair layouts or allocate payload scratch.
 - Rewrite extensions build only through `rewrite/build_ext.py`; root build and clean paths are not used for rewrite work.
+- M0 access patterns are pointwise, fixed local stencil, and streaming reduction.
+- Per-input halo requirements use tight asymmetric lower/upper `int64[3]` reach; a boolean `requires_ghosts` is not sufficient.
+- Required-input expansion and valid-output contraction use exact half-open region algebra with explicit canonical empty boxes.
 
 ## Next Work
 
-Specify FND-002 without implementing an executor or operator family. Establish
-the smallest access-pattern and halo-requirement vocabulary needed by pointwise,
-local-stencil, and streaming-reduction consumers, using the FND-001 half-open
-region convention.
+Specify and implement MOR-001 for Cartesian 3D level-1 blocks. Recover the
+current dense Morton ranking for both power-of-two and clipped rectangular
+root grids, but do not introduce topology or forest state.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_fnd_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_fnd_002.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/fnd_001.py --repeats 31 --warmups 5
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/fnd_002.py --iterations 100000 --repeats 9
 ```
 
-FND-001 evidence is recorded in `evidence/FND-001.md`.
+FND-002 evidence is recorded in `evidence/FND-002.md`.
