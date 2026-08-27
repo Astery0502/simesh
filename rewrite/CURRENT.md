@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: HAL-001.
-- Current capability: HAL-002, contract work ready after its STO-002 integration prerequisite.
-- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, and bit-exact physical-envelope halo provision plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`.
+- Last completed capability: HAL-002.
+- Current capability: SAM-001, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, and completed bit-exact level-1 padded primary workspaces plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -53,22 +53,25 @@
 - Physical halo modes are explicit per local field and face: continuous, symmetric, antisymmetric, and no-inflow with explicit normal-field slots.
 - HAL-001 maps only from valid interior cells, composes incident rules x then y then z, and fills each slot's exact physical envelope in place.
 - The common FND valid box is the intersection of slot envelopes; reflected depth beyond the interior and missing no-inflow metadata are rejected.
+- HAL-002 maps each sibling-dependent primary halo cell directly from one selected interior, uses fixed 27-slot stack lookup, and never reads or mutates support halos.
+- HAL-002 requires complete STO-002 one-block closure and halo widths no larger than the interior extent, then establishes the full padded valid box for the primary prefix.
+- Mixed sibling/physical transforms retain HAL-001's deterministic x/y/z order; this intentionally differs from the current pass-ordered kernel only where no-inflow and antisymmetry do not commute.
 
 ## Next Work
 
-Specify and implement HAL-002 same-level sibling halo provision over TOP-001
-faces and STO-002 full-halo-closed workspaces. Complete remaining halo cells
-without changing interiors, preserve HAL-001 physical composition at mixed
-edges, and declare a full padded valid region for processed primary slots.
+Specify and implement SAM-001 exact level-1 block placement over GEO-001 bounds
+and STO-001 payloads. Establish exact uniform-grid ownership at block faces,
+validate direct placement against the current implementation and independent
+indexing, then measure the composed bounded path.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_002.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hal_002.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_002.py --capacities 64,256,1024 --memmap-blocks 2048 --budget-mib 2
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/hal_002.py --repeats 21
 ```
 
-The independently reviewed STO-002 halo-closure extension is recorded in
-`evidence/STO-002.md`.
+HAL-002 evidence, including the bounded current-order divergence, is recorded in
+`evidence/HAL-002.md`.

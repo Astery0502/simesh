@@ -36,6 +36,7 @@ from .halos import (
     BoundaryMode,
     common_physical_valid_region,
     fill_physical_halos,
+    fill_same_level_halos,
 )
 
 __all__ = [
@@ -51,6 +52,7 @@ __all__ = [
     "fill_level1_block_geometry",
     "fill_level1_morton",
     "fill_physical_halos",
+    "fill_same_level_halos",
     "gather_blocks_into",
     "interior_region",
     "level1_morton",

@@ -1,4 +1,4 @@
-"""Validated HAL-001 non-periodic physical halo provision."""
+"""Validated non-periodic level-1 halo provision."""
 
 from __future__ import annotations
 
@@ -8,7 +8,10 @@ import numpy as np
 
 from ._halos import (
     common_physical_valid_region_unchecked,
+    duplicate_block_id_index_unchecked,
     fill_physical_halos_unchecked,
+    fill_same_level_halos_unchecked,
+    missing_halo_closure_primary_unchecked,
 )
 from ._storage import validate_indices_unchecked
 from .foundation import INDEX_DTYPE, _require_index_triplet, _require_payload
@@ -19,6 +22,9 @@ class BoundaryMode(IntEnum):
     SYMMETRIC = 1
     ANTISYMMETRIC = 2
     NO_INFLOW = 3
+
+
+_INDEX_MAX = int(np.iinfo(np.int64).max)
 
 
 def _require_index_vector(name: str, value: np.ndarray) -> np.ndarray:
@@ -160,6 +166,97 @@ def fill_physical_halos(
         interior_lower,
         interior_upper,
         block_ids,
+        face_neighbor_ids,
+        boundary_modes,
+        normal_field_slots,
+    )
+
+
+def _require_primary_count(primary_count) -> int:
+    if isinstance(primary_count, bool) or not isinstance(
+        primary_count, (int, np.integer)
+    ):
+        raise TypeError("primary_count must be an integer")
+    primary_count = int(primary_count)
+    if primary_count < 0:
+        raise ValueError("primary_count must be non-negative")
+    if primary_count > _INDEX_MAX:
+        raise OverflowError("primary_count does not fit in int64")
+    return primary_count
+
+
+def fill_same_level_halos(
+    payload: np.ndarray,
+    interior_lower: np.ndarray,
+    interior_upper: np.ndarray,
+    block_ids: np.ndarray,
+    primary_count: int,
+    face_neighbor_ids: np.ndarray,
+    boundary_modes: np.ndarray,
+    normal_field_slots: np.ndarray,
+) -> None:
+    """Fill same-level-dependent halo cells of the primary slot prefix."""
+    payload = _require_payload("payload", payload, writable=True)
+    interior_lower = _require_index_triplet("interior_lower", interior_lower)
+    interior_upper = _require_index_triplet("interior_upper", interior_upper)
+    block_ids = _require_index_vector("block_ids", block_ids)
+    primary_count = _require_primary_count(primary_count)
+    face_neighbor_ids = _require_face_table(face_neighbor_ids)
+    boundary_modes = _require_modes(boundary_modes, payload.shape[1])
+    normal_field_slots = _require_index_triplet(
+        "normal_field_slots", normal_field_slots
+    )
+    if payload.shape[0] != block_ids.shape[0]:
+        raise ValueError("payload slot axis must match block_ids")
+    if primary_count > payload.shape[0]:
+        raise ValueError("primary_count exceeds selected slot count")
+
+    metadata = (
+        interior_lower,
+        interior_upper,
+        block_ids,
+        face_neighbor_ids,
+        boundary_modes,
+        normal_field_slots,
+    )
+    if any(np.shares_memory(payload, value) for value in metadata):
+        raise ValueError("payload must not overlap halo metadata")
+    _validate_configuration(
+        payload,
+        interior_lower,
+        interior_upper,
+        block_ids,
+        face_neighbor_ids,
+        boundary_modes,
+        normal_field_slots,
+    )
+    spatial_shape = np.asarray(payload.shape[2:], dtype=np.int64)
+    interior_extent = interior_upper - interior_lower
+    if np.any(interior_lower > interior_extent) or np.any(
+        spatial_shape - interior_upper > interior_extent
+    ):
+        raise ValueError("allocated halo width exceeds interior extent")
+    duplicate = int(duplicate_block_id_index_unchecked(block_ids))
+    if duplicate >= 0:
+        raise ValueError(f"block_ids entry {duplicate} duplicates an earlier ID")
+    missing_primary = int(
+        missing_halo_closure_primary_unchecked(
+            primary_count,
+            block_ids,
+            face_neighbor_ids,
+        )
+    )
+    if missing_primary >= 0:
+        raise ValueError(
+            f"primary slot {missing_primary} lacks complete one-block halo closure"
+        )
+
+    fill_same_level_halos_unchecked(
+        payload,
+        interior_lower,
+        interior_upper,
+        block_ids,
+        primary_count,
         face_neighbor_ids,
         boundary_modes,
         normal_field_slots,
