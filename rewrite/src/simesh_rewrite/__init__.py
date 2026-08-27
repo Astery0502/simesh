@@ -38,6 +38,7 @@ from .halos import (
     fill_physical_halos,
     fill_same_level_halos,
 )
+from .sampling import place_level1_blocks
 
 __all__ = [
     "AccessPattern",
@@ -62,6 +63,7 @@ __all__ = [
     "minimum_halo_closed_slots",
     "plan_level1_chunk",
     "plan_level1_halo_chunk",
+    "place_level1_blocks",
     "ravel_cell",
     "required_input_region",
     "scatter_blocks_from",

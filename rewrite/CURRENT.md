@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: HAL-002.
-- Current capability: SAM-001, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, and completed bit-exact level-1 padded primary workspaces plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`.
+- Last completed capability: SAM-001.
+- Current capability: SAM-002, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, complete level-1 halos, and exact native-grid placement plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -56,22 +56,23 @@
 - HAL-002 maps each sibling-dependent primary halo cell directly from one selected interior, uses fixed 27-slot stack lookup, and never reads or mutates support halos.
 - HAL-002 requires complete STO-002 one-block closure and halo widths no larger than the interior extent, then establishes the full padded valid box for the primary prefix.
 - Mixed sibling/physical transforms retain HAL-001's deterministic x/y/z order; this intentionally differs from the current pass-ordered kernel only where no-inflow and antisymmetry do not commute.
+- SAM-001 places a selected valid block region by exact integer cell boxes into field-first native uniform output; no floating geometry comparison is used.
+- Reordered and repeated placement is deterministic in slot order, while bounded STO-002 primary traversal gives exactly-once disjoint native-grid coverage.
 
 ## Next Work
 
-Specify and implement SAM-001 exact level-1 block placement over GEO-001 bounds
-and STO-001 payloads. Establish exact uniform-grid ownership at block faces,
-validate direct placement against the current implementation and independent
-indexing, then measure the composed bounded path.
+Specify and implement SAM-002 zero-order Cartesian sampling for arbitrary
+uniform output bounds and resolution. Define exact cell-center ownership at
+block faces, preserve selected-field order, compare with the current sampler
+and an independent coordinate oracle, and integrate a bounded block traversal.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hal_002.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sam_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/hal_002.py --repeats 21
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/sam_001.py --repeats 15
 ```
 
-HAL-002 evidence, including the bounded current-order divergence, is recorded in
-`evidence/HAL-002.md`.
+SAM-001 evidence is recorded in `evidence/SAM-001.md`.
