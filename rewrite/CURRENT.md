@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: GEO-001.
-- Current capability: STO-001, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with Cython foundation, access-region, dense Morton, validated topology, and selected level-1 geometry primitives plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`.
+- Last completed capability: STO-001.
+- Current capability: STO-002, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with Cython foundation, access-region, dense Morton, validated topology/geometry, and exact in-memory selected block transfers plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -42,21 +42,24 @@
 - Physical faces come from global integer cell-face indices, giving bit-identical sibling faces and exact supplied endpoints.
 - Cell centers use global integer cell indices; center arrays and per-block spacing are not materialized.
 - GEO rejects subnormal spacing and numeric domains whose outer canonical centers collapse onto domain faces.
+- In-memory backing is canonical `(global_block,field,x,y,z)` C-contiguous `float64`; gathers/scatters use explicit block/field selectors and translated valid boxes.
+- Storage transfers are caller-buffered and bit-exact; duplicate scatter targets use deterministic slot-major/field-slot last-write semantics.
+- STO-001 uses slab, plane, or row copies without selector sorting, hidden allocation, or source/sink classes.
 
 ## Next Work
 
-Specify and implement STO-001 as the minimal in-memory block source and sink for
-canonical FND-001 payloads. Preserve explicit block-ID selection, valid regions,
-ownership, and caller-provided buffers without introducing chunk budgets or
-file-backed storage yet.
+Specify and implement STO-002 as bounded-memory block selection and reusable
+workspace policy over STO-001 and TOP-001. Establish exact budget accounting,
+deterministic chunk coverage, face-neighbor closure where required, and a path
+whose full field payload need not reside in memory.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_geo_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/geo_001.py --repeats 15
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_001.py --repeats 15
 ```
 
-GEO-001 evidence is recorded in `evidence/GEO-001.md`.
+STO-001 evidence is recorded in `evidence/STO-001.md`.

@@ -23,6 +23,7 @@ from .topology import (
     fill_level1_face_neighbors,
     level1_face_neighbors,
 )
+from .storage import gather_blocks_into, scatter_blocks_from
 
 __all__ = [
     "AccessPattern",
@@ -34,12 +35,14 @@ __all__ = [
     "fill_level1_face_neighbors",
     "fill_level1_block_geometry",
     "fill_level1_morton",
+    "gather_blocks_into",
     "interior_region",
     "level1_morton",
     "level1_face_neighbors",
     "level1_block_geometry",
     "ravel_cell",
     "required_input_region",
+    "scatter_blocks_from",
     "supports_output_region",
     "unravel_cell",
     "valid_output_region",
