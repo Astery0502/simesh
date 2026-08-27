@@ -30,17 +30,25 @@ from .chunking import (
     workspace_nbytes,
     workspace_slot_capacity,
 )
+from .halos import (
+    BoundaryMode,
+    common_physical_valid_region,
+    fill_physical_halos,
+)
 
 __all__ = [
     "AccessPattern",
     "AXIS_NAMES",
+    "BoundaryMode",
     "INDEX_DTYPE",
     "PAYLOAD_DTYPE",
     "PHYSICAL_BOUNDARY_ID",
     "copy_region_into",
+    "common_physical_valid_region",
     "fill_level1_face_neighbors",
     "fill_level1_block_geometry",
     "fill_level1_morton",
+    "fill_physical_halos",
     "gather_blocks_into",
     "interior_region",
     "level1_morton",

@@ -1,0 +1,55 @@
+"""Independent direct-cell reference for HAL-001."""
+
+from __future__ import annotations
+
+import numpy as np
+
+
+def fill_physical_halos_reference(
+    payload: np.ndarray,
+    interior_lower: np.ndarray,
+    interior_upper: np.ndarray,
+    block_ids: np.ndarray,
+    face_neighbor_ids: np.ndarray,
+    boundary_modes: np.ndarray,
+    normal_field_slots: np.ndarray,
+) -> None:
+    for slot, block_id in enumerate(block_ids):
+        for field in range(payload.shape[1]):
+            for target in np.ndindex(payload.shape[2:]):
+                source = list(target)
+                operations = []
+                valid = True
+                for axis in range(3):
+                    if target[axis] < interior_lower[axis]:
+                        face = 2 * axis
+                    elif target[axis] >= interior_upper[axis]:
+                        face = 2 * axis + 1
+                    else:
+                        continue
+                    if face_neighbor_ids[int(block_id), face] != -1:
+                        valid = False
+                        break
+                    mode = int(boundary_modes[field, face])
+                    if mode in (1, 2):
+                        if face % 2 == 0:
+                            source[axis] = 2 * int(interior_lower[axis]) - target[axis] - 1
+                        else:
+                            source[axis] = 2 * int(interior_upper[axis]) - target[axis] - 1
+                    elif face % 2 == 0:
+                        source[axis] = int(interior_lower[axis])
+                    else:
+                        source[axis] = int(interior_upper[axis]) - 1
+                    operations.append((axis, face, mode))
+                if not operations or not valid:
+                    continue
+                value = payload[(slot, field, *source)]
+                for axis, face, mode in operations:
+                    if mode == 2:
+                        value = -value
+                    elif mode == 3 and field == normal_field_slots[axis]:
+                        if face % 2 == 0 and value > 0.0:
+                            value = np.float64(0.0)
+                        elif face % 2 == 1 and value < 0.0:
+                            value = np.float64(0.0)
+                payload[(slot, field, *target)] = value

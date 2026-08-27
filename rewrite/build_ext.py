@@ -51,6 +51,11 @@ def main() -> None:
             [str(ROOT / "src/simesh_rewrite/_chunking.pyx")],
             include_dirs=[np.get_include()],
         ),
+        Extension(
+            "simesh_rewrite._halos",
+            [str(ROOT / "src/simesh_rewrite/_halos.pyx")],
+            include_dirs=[np.get_include()],
+        ),
     ]
     setup(
         name="simesh-rewrite-core",

@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: STO-002.
-- Current capability: HAL-001, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with Cython foundation, topology/geometry, exact selected transfers, deterministic bounded chunks, and a reusable memmap-backed workspace path plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`.
+- Last completed capability: HAL-001.
+- Current capability: HAL-002, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with topology/geometry, exact bounded storage, and bit-exact physical-envelope halo provision plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -49,21 +49,24 @@
 - Chunk primaries are maximal ascending contiguous ID prefixes; optional unique direct-face support follows in first-discovery order.
 - Primary coverage is exactly once, while support may recur; no hash, bitmap, or primary-slot map is used.
 - Read-only C-order `numpy.memmap` backing demonstrates that full payload need not be eagerly resident, while OS page cache remains outside the managed budget.
+- Physical halo modes are explicit per local field and face: continuous, symmetric, antisymmetric, and no-inflow with explicit normal-field slots.
+- HAL-001 maps only from valid interior cells, composes incident rules x then y then z, and fills each slot's exact physical envelope in place.
+- The common FND valid box is the intersection of slot envelopes; reflected depth beyond the interior and missing no-inflow metadata are rejected.
 
 ## Next Work
 
-Specify and implement HAL-001 non-periodic physical-boundary halo provision for
-canonical padded payloads. Separate per-face boundary modes from topology,
-preserve interiors exactly, declare the produced valid region, and compare the
-continuous/symmetric/antisymmetric/no-inflow rules with current behavior.
+Specify and implement HAL-002 same-level sibling halo provision over TOP-001
+faces and STO-002 face-closed workspaces. Complete remaining halo cells without
+changing interiors, preserve HAL-001 physical composition at mixed edges, and
+declare a full padded valid region for processed primary slots.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_002.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hal_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_002.py --capacities 64,256,1024 --memmap-blocks 2048 --budget-mib 2
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/hal_001.py --repeats 9 --metadata-slots 1000000
 ```
 
-STO-002 evidence is recorded in `evidence/STO-002.md`.
+HAL-001 evidence is recorded in `evidence/HAL-001.md`.
