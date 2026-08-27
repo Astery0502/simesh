@@ -16,6 +16,7 @@ from .foundation import (
     ravel_cell,
     unravel_cell,
 )
+from .morton import fill_level1_morton, level1_morton
 
 __all__ = [
     "AccessPattern",
@@ -23,7 +24,9 @@ __all__ = [
     "INDEX_DTYPE",
     "PAYLOAD_DTYPE",
     "copy_region_into",
+    "fill_level1_morton",
     "interior_region",
+    "level1_morton",
     "ravel_cell",
     "required_input_region",
     "supports_output_region",

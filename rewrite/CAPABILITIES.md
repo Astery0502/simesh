@@ -18,7 +18,7 @@ a capability becomes active.
 | --- | --- | --- | --- |
 | FND-001 | Layout, index, ownership, and valid-region conventions | -- | complete |
 | FND-002 | Operator access-pattern and halo-requirement vocabulary | FND-001 | complete |
-| MOR-001 | Cartesian 3D level-1 Morton mapping | FND-001 | proposed |
+| MOR-001 | Cartesian 3D level-1 Morton mapping | FND-001 | complete |
 | TOP-001 | Validated level-1 topology | MOR-001 | proposed |
 | GEO-001 | Cartesian 3D block bounds and spacing | TOP-001 | proposed |
 | STO-001 | In-memory block source and sink | FND-001 | proposed |
