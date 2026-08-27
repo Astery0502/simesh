@@ -17,6 +17,7 @@ from .foundation import (
     unravel_cell,
 )
 from .morton import fill_level1_morton, level1_morton
+from .geometry import fill_level1_block_geometry, level1_block_geometry
 from .topology import (
     PHYSICAL_BOUNDARY_ID,
     fill_level1_face_neighbors,
@@ -31,10 +32,12 @@ __all__ = [
     "PHYSICAL_BOUNDARY_ID",
     "copy_region_into",
     "fill_level1_face_neighbors",
+    "fill_level1_block_geometry",
     "fill_level1_morton",
     "interior_region",
     "level1_morton",
     "level1_face_neighbors",
+    "level1_block_geometry",
     "ravel_cell",
     "required_input_region",
     "supports_output_region",

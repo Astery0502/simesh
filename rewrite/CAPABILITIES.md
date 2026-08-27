@@ -20,7 +20,7 @@ a capability becomes active.
 | FND-002 | Operator access-pattern and halo-requirement vocabulary | FND-001 | complete |
 | MOR-001 | Cartesian 3D level-1 Morton mapping | FND-001 | complete |
 | TOP-001 | Validated level-1 topology | MOR-001 | complete |
-| GEO-001 | Cartesian 3D block bounds and spacing | TOP-001 | proposed |
+| GEO-001 | Cartesian 3D block bounds and spacing | TOP-001 | complete |
 | STO-001 | In-memory block source and sink | FND-001 | proposed |
 | STO-002 | Bounded-memory block/chunk source and workspace | STO-001, TOP-001 | proposed |
 | HAL-001 | Non-periodic physical-boundary halo provision | GEO-001, STO-001 | proposed |

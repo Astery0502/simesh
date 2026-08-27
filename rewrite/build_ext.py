@@ -36,6 +36,11 @@ def main() -> None:
             [str(ROOT / "src/simesh_rewrite/_topology.pyx")],
             include_dirs=[np.get_include()],
         ),
+        Extension(
+            "simesh_rewrite._geometry",
+            [str(ROOT / "src/simesh_rewrite/_geometry.pyx")],
+            include_dirs=[np.get_include()],
+        ),
     ]
     setup(
         name="simesh-rewrite-core",

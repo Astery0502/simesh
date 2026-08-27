@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: Foundation leading to M0.
-- Last completed capability: TOP-001.
-- Current capability: GEO-001, not started and ready.
-- Rewrite implementation: isolated `simesh_rewrite` package with Cython foundation, access-region, dense Morton, and validated six-face level-1 topology primitives plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`.
+- Last completed capability: GEO-001.
+- Current capability: STO-001, not started and ready.
+- Rewrite implementation: isolated `simesh_rewrite` package with Cython foundation, access-region, dense Morton, validated topology, and selected level-1 geometry primitives plus independent references.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -38,20 +38,25 @@
 - M0 topology stores only `(xlo,xhi,ylo,yhi,zlo,zhi)` face IDs in zero-based `int64`; exact sentinel `-1` denotes a physical face.
 - Face topology structurally validates the supplied MOR maps before output mutation.
 - Edge/corner relations are derived through commuting face steps instead of a 4.5x larger 27-direction table.
+- Level-1 geometry is slot-aligned to explicit block IDs and emits selected `(slot,lower/upper,x/y/z)` bounds plus one global spacing triplet.
+- Physical faces come from global integer cell-face indices, giving bit-identical sibling faces and exact supplied endpoints.
+- Cell centers use global integer cell indices; center arrays and per-block spacing are not materialized.
+- GEO rejects subnormal spacing and numeric domains whose outer canonical centers collapse onto domain faces.
 
 ## Next Work
 
-Specify and implement GEO-001 Cartesian 3D level-1 block bounds, cell spacing,
-and cell-center coordinates from domain bounds, domain cell counts, block cell
-counts, and TOP-001 block IDs. Do not add sampling or payload storage.
+Specify and implement STO-001 as the minimal in-memory block source and sink for
+canonical FND-001 payloads. Preserve explicit block-ID selection, valid regions,
+ownership, and caller-provided buffers without introducing chunk budgets or
+file-backed storage yet.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_top_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_geo_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/top_001.py --repeats 15 --reference-limit 50000
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/geo_001.py --repeats 15
 ```
 
-TOP-001 evidence is recorded in `evidence/TOP-001.md`.
+GEO-001 evidence is recorded in `evidence/GEO-001.md`.
