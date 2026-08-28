@@ -20,6 +20,10 @@ Read, in order:
 
 Read `FUNCTIONAL_COMPOSITION.md` before adding a storage backend, execution
 strategy, framework adapter, halo family, or cross-capability executor.
+Read `SOURCE_MIGRATION.md` when selecting a milestone, adding/removing public
+behavior, or preparing production integration. Read `PERFORMANCE.md` before
+implementing or declaring completion of a hot path, benchmark, parallel path,
+or milestone workflow.
 
 Resume from `CURRENT.md`; do not reconstruct or redesign the whole project on
 every turn. Read `ROADMAP.md` when choosing or revising a milestone. Read
@@ -45,6 +49,15 @@ checkpoint. Do not reread every process document on every work cycle.
 - Decompose halos into access requirements, support planning, topology
   relations, value-transfer rules, and workspace mutation. Do not grow the
   level-1 same-level kernel into a refined/periodic dispatcher.
+- Close migration by feature disposition and public-workflow evidence. Do not
+  mechanically port legacy files or claim completion from source/line counts.
+- For a hot path, declare the benchmark workload, current/reference
+  comparator, performance hypothesis, metrics, and material-regression rule
+  before final optimization. Record both the kernel and its immediate composed
+  consumer.
+- Store raw benchmark runs outside Git under the ignored benchmark-results
+  tree; commit concise environment, command, raw-summary, comparison, and
+  trade-off evidence under `evidence/`.
 - Use Cython typed memoryviews, C structs, pointers, or contiguous arrays where appropriate.
 - Do not use Python callbacks in hot loops.
 - Do not allocate inside cell, stencil, or block hot loops unless measurement justifies it.

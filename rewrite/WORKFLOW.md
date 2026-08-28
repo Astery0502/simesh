@@ -62,11 +62,29 @@ the chosen comparison is sufficient.
 
 Do not use hashes for numerical comparison or artifact governance.
 
+## Source Migration Closure
+
+Before implementing a current-source behavior, identify its feature-family row
+in `SOURCE_MIGRATION.md`, current authority, user-observable contract, and
+intended disposition. Migrate semantics rather than classes or lines. When a
+feature is integrated, update its parity tests, benchmark/workflow evidence,
+and disposition together.
+
+Do not retire or bypass a canonical path merely because lower kernels exist.
+Replacement requires the corresponding real public workflow, format behavior,
+failure behavior, and fallback/rollback evidence. Legacy modules are evidence
+unless a supported behavior still uniquely depends on them.
+
 ## Optimization
 
 An optimization begins with a concrete hypothesis. Keep the simple validated
 implementation available while testing variants such as loop fusion, layout
 changes, workspace reuse, tiling, mapping, caching, streaming, or OpenMP.
+
+For a hot path, record the `PERFORMANCE.md` workload/profile, comparator,
+hypothesis, metrics, and material-regression rule before the final experiment.
+Completion includes the kernel and immediate composed benchmark. Milestones
+also require a real-data/public-workflow benchmark at the level reached so far.
 
 Choose among useful variants by the relevant combination of runtime,
 throughput, peak memory, allocation behavior, scaling, and conceptual cost.
@@ -140,6 +158,7 @@ After each completed capability or material decision, `CURRENT.md` should say:
 - important unresolved differences;
 - next ready capability;
 - exact commands needed to reproduce the latest checks.
+- source-migration rows and benchmark baselines changed by the checkpoint.
 
 The Git commit created after a completed capability is the durable recovery
 point. Keep commits cohesive and executable. Intermediate experiments do not

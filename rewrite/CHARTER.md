@@ -7,6 +7,14 @@ directory. The rewrite should make domain concepts explicit, keep individual
 responsibilities small, compose them efficiently, and remain understandable to
 agents working over a long period.
 
+The computational core is the first axis of a complete source migration. The
+long-term outcome is that every supported, user-observable capability currently
+owned under `src/simesh/` has an explicit disposition and the canonical public
+workflows run on the new functional implementation. The isolated `rewrite/`
+tree is a development and validation surface; final integration may place the
+validated modules behind the canonical `simesh` package rather than preserving
+this directory layout forever.
+
 The rewrite is also an investigation. Differences from the current
 implementation should be used to clarify the real semantics of the project,
 not merely copied or suppressed.
@@ -16,6 +24,14 @@ not merely copied or suppressed.
 The rewrite must preserve supported numerical behavior. It does not need to
 preserve the current classes, public API, internal algorithms, memory layout,
 or byte-for-byte file output.
+
+Migration is feature based, not a mechanical source translation. Each
+canonical behavior must be migrated, replaced by a contract-equivalent
+implementation, deliberately retained behind a functional boundary, or
+explicitly retired/rejected with evidence. Legacy/reference modules are inputs
+to behavior recovery, not automatic porting requirements. Completion requires
+public API, file I/O, dataset, scientific helper, build/runtime, and migration
+evidence in addition to the AMR numerical core.
 
 Discrete artifacts such as Morton mappings, topology, neighbor classes, field
 ordering, and exact block placement should agree exactly when their contracts
@@ -77,6 +93,23 @@ backend implements the same kernel contracts directly.
 11. Build from low-level semantic functions upward, then optimize both individual kernels and their composed execution paths.
 12. Make implementation substitution explicit at coarse orchestration boundaries, not through hidden dispatch inside numerical kernels.
 13. Keep resident, bounded, cached, and future framework-specific execution as strategies over shared contracts rather than separate scientific implementations.
+14. Track migration by supported feature and public workflow; do not use file counts or line-for-line translation as evidence of parity.
+15. Define high performance through reproducible kernel, composition, workflow, memory, I/O, and parallel measurements against explicit baselines.
+
+## Performance Outcome
+
+High performance means a useful Pareto result under correctness constraints,
+not one universal fastest number. Resident execution is compared with the best
+current canonical resident path. Bounded execution records the runtime cost of
+its memory reduction. Storage adapters separate I/O, caching, and transfer
+costs from compute. Parallel implementations record speedup and efficiency.
+
+Hot-path completion requires a declared workload, comparator, metrics, and
+material-regression threshold before the final optimization measurement.
+Absolute timings are evidence only on the recorded environment; portable gates
+use same-runner relative comparisons. A slower implementation may be retained
+when deterministic semantics or a measured memory/I/O improvement justifies
+the trade-off explicitly.
 
 ## Support Sequence
 

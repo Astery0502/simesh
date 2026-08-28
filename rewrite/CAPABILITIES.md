@@ -18,6 +18,8 @@ a capability becomes active.
 | --- | --- | --- | --- |
 | FND-001 | Layout, index, ownership, and valid-region conventions | -- | complete |
 | FND-002 | Operator access-pattern and halo-requirement vocabulary | FND-001 | complete |
+| MIG-001 | Supported-feature migration ledger and final cutover gate | FND-001 | complete |
+| PERF-001 | Benchmark levels, baseline, recording, and regression protocol | FND-001 | complete |
 | MOR-001 | Cartesian 3D level-1 Morton mapping | FND-001 | complete |
 | TOP-001 | Validated level-1 topology | MOR-001 | complete |
 | GEO-001 | Cartesian 3D block bounds and spacing | TOP-001 | complete |
@@ -39,9 +41,30 @@ complete.
 
 ## Later Milestones
 
-M1 adds refined topology, coarse/fine connectivity, restriction, prolongation,
-refined halos, and refined sampling. M2 generalizes the proven model to 2D. M3
-adds periodic topology and halo behavior.
+The planned dependency sequence is:
+
+1. M1: refined forest/topology -> refined geometry -> support/relation planning
+   -> restriction/prolongation -> refined halos -> refined sampling -> native
+   selective `.dat` adapter -> real-data bounded integration.
+2. M2: active-dimension conventions -> quadtree/Morton generalization -> 2D
+   topology/geometry -> refined halos -> bilinear sampling/operators -> real 2D
+   integration.
+3. M3: periodic topology -> periodic support/transfer -> refined periodic
+   sampling/operators -> periodic integration.
+4. M4: concrete scientific operators -> derived dependency/materialization
+   lifecycle -> diagnostics/traversal -> independent helper disposition.
+5. M5: complete AMRVAC parse/source -> writer/roundtrip -> uniform
+   construction/layout -> export -> format workflow integration.
+6. M6: boundary/name adapters -> dataset lifecycle -> canonical public API ->
+   compatibility and backend-selection integration.
+7. M7: package build -> parallel strategies -> supported-platform evidence ->
+   fallback/rollback -> canonical cutover and old-path retirement.
+
+Each arrow is a default semantic dependency, not permission to predeclare all
+detailed contracts. Add concrete IDs and exact dependencies when a family
+becomes active. Every milestone also closes the corresponding rows in
+`SOURCE_MIGRATION.md` and records the benchmark levels required by
+`PERFORMANCE.md`.
 
 When selecting work, choose a capability whose dependencies are sufficiently
 complete and whose result unlocks a real consumer. By default, every dependency

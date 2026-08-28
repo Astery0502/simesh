@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M0 complete.
-- Last completed capability: STO-003 functional composition checkpoint.
-- Current capability: none; no pre-M1 composition work remains.
+- Last completed capability: MIG-001/PERF-001 migration and performance protocol checkpoint.
+- Current capability: none; M1 may start from refined forest/topology semantics.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, independent references, and explicit functional block reader/writer substitution over resident, mapped, or future external state.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -91,12 +91,26 @@
 - HAL-001 and HAL-002 remain physical and level-1 same-level primitives; M1
   must separately compose access reach, support planning, relation
   classification, same-level copy, prolongation, and restriction.
+- M0--M3 are the numerical-core axis, not the complete source migration.
+  M4--M7 close scientific/derived behavior, I/O/export, dataset/public API,
+  packaging/parallelism, and production cutover.
+- Migration is tracked by supported feature disposition, parity tests, and
+  public workflow evidence; files, classes, and source lines are not migration
+  units.
+- Every canonical `src/simesh` feature must end as rewrite, adapter, retain,
+  replace, retire, or intentionally unsupported before cutover.
+- High performance is a correctness-constrained multi-objective result across
+  kernel, composition, real workflow, scaling, memory, and I/O measurements.
+- Hot paths declare comparator, workload, hypothesis, metrics, and material
+  regression before final optimization; raw runs stay ignored while compact
+  benchmark evidence is committed.
 
 ## Next Work
 
-M0 is complete. The next roadmap work is M1 refined topology, coarse/fine
-connectivity, restriction/prolongation, refined halos, and refined sampling; it
-is outside this completed goal.
+M0 and the pre-M1 functional/migration/performance protocols are complete. The
+next roadmap work is M1 refined forest reconstruction and topology, followed by
+geometry, support/relation planning, restriction/prolongation, refined halos,
+sampling, a native selective `.dat` adapter, and real-data bounded integration.
 
 ## Latest Reproduction Commands
 
@@ -108,5 +122,6 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_003.py --repeats 31
 ```
 
-STO-003 composition evidence is recorded in `evidence/STO-003.md`; INT-001 and
-M0 completion evidence remains in `evidence/INT-001.md`.
+Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
+`evidence/PERF-001.md`. STO-003 composition evidence remains in
+`evidence/STO-003.md`; INT-001 and M0 evidence remains in `evidence/INT-001.md`.
