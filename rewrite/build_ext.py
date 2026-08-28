@@ -62,6 +62,11 @@ def main() -> None:
             include_dirs=[np.get_include()],
         ),
         Extension(
+            "simesh_rewrite._boundary_rules",
+            [str(ROOT / "src/simesh_rewrite/_boundary_rules.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
             "simesh_rewrite._sampling",
             [str(ROOT / "src/simesh_rewrite/_sampling.pyx")],
             include_dirs=[np.get_include()],

@@ -4,6 +4,11 @@ import cython
 
 from libc.stdint cimport int64_t, uint8_t
 
+from ._boundary_rules cimport (
+    physical_halo_source_index_c,
+    transform_physical_halo_value_c,
+)
+
 
 cdef inline int64_t _walk_direction(
     int64_t block_id,
@@ -256,23 +261,13 @@ cpdef void fill_physical_halos_unchecked(
                                 physical = False
                                 break
                             mode[axis] = boundary_modes[field, face[axis]]
-                            if mode[axis] == 1 or mode[axis] == 2:
-                                if face[axis] % 2 == 0:
-                                    source[axis] = (
-                                        2 * interior_lower[axis]
-                                        - target[axis]
-                                        - 1
-                                    )
-                                else:
-                                    source[axis] = (
-                                        2 * interior_upper[axis]
-                                        - target[axis]
-                                        - 1
-                                    )
-                            elif face[axis] % 2 == 0:
-                                source[axis] = interior_lower[axis]
-                            else:
-                                source[axis] = interior_upper[axis] - 1
+                            source[axis] = physical_halo_source_index_c(
+                                target[axis],
+                                interior_lower[axis],
+                                interior_upper[axis],
+                                face[axis],
+                                mode[axis],
+                            )
 
                         if not physical or not (outside[0] or outside[1] or outside[2]):
                             continue
@@ -287,16 +282,13 @@ cpdef void fill_physical_halos_unchecked(
                         for axis in range(3):
                             if not outside[axis]:
                                 continue
-                            if mode[axis] == 2:
-                                value = -value
-                            elif (
-                                mode[axis] == 3
-                                and field == normal_field_slots[axis]
-                            ):
-                                if face[axis] % 2 == 0 and value > 0.0:
-                                    value = 0.0
-                                elif face[axis] % 2 == 1 and value < 0.0:
-                                    value = 0.0
+                            value = transform_physical_halo_value_c(
+                                value,
+                                field,
+                                normal_field_slots[axis],
+                                face[axis],
+                                mode[axis],
+                            )
                         payload[slot, field, i, j, k] = value
 
 
@@ -386,23 +378,13 @@ cpdef void fill_same_level_halos_unchecked(
                             if not physical[axis]:
                                 continue
                             mode[axis] = boundary_modes[field, face[axis]]
-                            if mode[axis] == 1 or mode[axis] == 2:
-                                if face[axis] % 2 == 0:
-                                    source[axis] = (
-                                        2 * interior_lower[axis]
-                                        - target[axis]
-                                        - 1
-                                    )
-                                else:
-                                    source[axis] = (
-                                        2 * interior_upper[axis]
-                                        - target[axis]
-                                        - 1
-                                    )
-                            elif face[axis] % 2 == 0:
-                                source[axis] = interior_lower[axis]
-                            else:
-                                source[axis] = interior_upper[axis] - 1
+                            source[axis] = physical_halo_source_index_c(
+                                target[axis],
+                                interior_lower[axis],
+                                interior_upper[axis],
+                                face[axis],
+                                mode[axis],
+                            )
 
                         if not has_sibling:
                             continue
@@ -424,14 +406,11 @@ cpdef void fill_same_level_halos_unchecked(
                         for axis in range(3):
                             if not physical[axis]:
                                 continue
-                            if mode[axis] == 2:
-                                value = -value
-                            elif (
-                                mode[axis] == 3
-                                and field == normal_field_slots[axis]
-                            ):
-                                if face[axis] % 2 == 0 and value > 0.0:
-                                    value = 0.0
-                                elif face[axis] % 2 == 1 and value < 0.0:
-                                    value = 0.0
+                            value = transform_physical_halo_value_c(
+                                value,
+                                field,
+                                normal_field_slots[axis],
+                                face[axis],
+                                mode[axis],
+                            )
                         payload[primary, field, i, j, k] = value

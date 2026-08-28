@@ -3,11 +3,11 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: HPL-001 explicit level-1 halo relation/source-slot planning.
-- Current capability: Phase B shared physical halo coordinate/value semantics extraction; TOP-002 implementation is paused.
+- Last completed capability: PBC-001 per-axis physical boundary coordinate/value rules.
+- Current capability: HAX-001 explicit plan-consuming same-level halo application; TOP-002 implementation is paused.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
-- Unresolved differences: HPL-001 extracted HAL-002 relation/source-slot planning, but pure same-level transfer and shared HAL-001 physical transforms remain before HAL-002 can be reclassified from Red to retained Fused.  The preserved TOP draft remains Red and paused.  STO-002 is Yellow before refined support planning; SAM-002/SAM-003 are retained Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Unresolved differences: HPL-001 extracted relation/source planning and PBC-001 extracted shared physical rules; HAX-001 pure same-level plan application remains before HAL-002 can be reclassified from Red to retained Fused.  The preserved TOP draft remains Red and paused.  STO-002 is Yellow before refined support planning; SAM-002/SAM-003 are retained Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
 
@@ -156,15 +156,20 @@
   but regressed multiple broad-halo kernels by more than 20%, so it was rejected.
   The public plan is retained for new composition while the existing optimized
   HAL-002 wrapper remains unchanged as the aggregate comparator.
+- PBC-001 defines one explicit physical face/mode through a safe layer-based
+  source index and an exact binary64 value transform.  Face eligibility and
+  multi-axis order remain HAL responsibilities; aggregate Cython loops consume
+  shared `inline noexcept nogil` rules without runtime callbacks.
 
 ## Next Work
 
 M0 and the pre-M1 functional/migration/performance protocols are complete, and
 FST-001 reconstructs refined 3D hierarchy and leaf order.  Phase A decomposition
-audit is complete and HPL-001 extracted the first HAL-002 decision.  The next
-work extracts shared physical coordinate/value rules and a pure plan-consuming
-same-level transfer, then re-audits/splits the preserved TOP drafts into
-separately owned FST-conformance, contact, balance, and optional materialization capabilities,
+audit is complete; HPL-001 and PBC-001 extracted relation planning and physical
+rules.  The next work completes HAX-001 pure plan-consuming same-level transfer,
+then re-audits/splits the preserved TOP drafts into
+separately owned FST-conformance, contact, balance, and optional materialization
+capabilities,
 followed by refined geometry, directional relation/support planning,
 restriction/prolongation, refined halos, sampling, a native selective `.dat`
 adapter, and real-data bounded integration.
@@ -174,6 +179,7 @@ adapter, and real-data bounded integration.
 ```text
 .venv/bin/python rewrite/build_ext.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_fst_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_003.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_int_001.py
@@ -181,10 +187,12 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_003.py --repeats 31
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/fst_001.py --repeats 15 --reference-limit 50000 --dat data/weno509_sub_0000.dat --dat-repeats 31 --current-repeats 5
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/hpl_001.py --repeats 31
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/pbc_001.py --calls 10000 --repeats 9
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
 `evidence/PERF-001.md`. STO-003 composition evidence remains in
 `evidence/STO-003.md`; FST-001 refined reconstruction evidence is in
 `evidence/FST-001.md`; HPL-001 decomposition evidence is in
-`evidence/HPL-001.md`; INT-001 and M0 evidence remains in `evidence/INT-001.md`.
+`evidence/HPL-001.md`; PBC-001 evidence is in `evidence/PBC-001.md`;
+INT-001 and M0 evidence remains in `evidence/INT-001.md`.

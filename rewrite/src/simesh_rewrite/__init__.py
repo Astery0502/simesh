@@ -49,6 +49,10 @@ from .halos import (
     fill_physical_halos,
     fill_same_level_halos,
 )
+from .boundary_rules import (
+    physical_halo_source_index,
+    transform_physical_halo_value,
+)
 from .halo_plans import (
     fill_level1_halo_relation_plan,
     level1_halo_relation_plan,
@@ -107,6 +111,7 @@ __all__ = [
     "plan_level1_chunk",
     "plan_level1_halo_chunk",
     "place_level1_blocks",
+    "physical_halo_source_index",
     "ravel_cell",
     "required_input_region",
     "read_blocks_into",
@@ -115,6 +120,7 @@ __all__ = [
     "scaled_difference_into",
     "scatter_blocks_from",
     "supports_output_region",
+    "transform_physical_halo_value",
     "unravel_cell",
     "valid_output_region",
     "validate_access_requirement",
