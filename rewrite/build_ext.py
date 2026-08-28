@@ -47,6 +47,11 @@ def main() -> None:
             include_dirs=[np.get_include()],
         ),
         Extension(
+            "simesh_rewrite._contacts",
+            [str(ROOT / "src/simesh_rewrite/_contacts.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
             "simesh_rewrite._geometry",
             [str(ROOT / "src/simesh_rewrite/_geometry.pyx")],
             include_dirs=[np.get_include()],

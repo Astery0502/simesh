@@ -25,6 +25,7 @@ from .topology import (
 )
 from .forest import RefinedForest, fill_refined_forest, refined_forest
 from .forest_conformance import validate_refined_forest_arrays
+from .contacts import fill_refined_contact_targets, refined_contact_targets
 from .storage import gather_blocks_into, scatter_blocks_from
 from .blockio import (
     BlockReader,
@@ -96,6 +97,7 @@ __all__ = [
     "fill_level1_morton",
     "fill_level1_halo_relation_plan",
     "fill_refined_forest",
+    "fill_refined_contact_targets",
     "fill_physical_halos",
     "fill_same_level_halos",
     "finalize_field_sum",
@@ -105,6 +107,7 @@ __all__ = [
     "level1_halo_relation_plan",
     "level1_face_neighbors",
     "refined_forest",
+    "refined_contact_targets",
     "level1_block_geometry",
     "minimum_face_closed_slots",
     "minimum_halo_closed_slots",

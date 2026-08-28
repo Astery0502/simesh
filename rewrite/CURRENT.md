@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: FST-002 reusable refined-forest artifact conformance.
-- Current capability: TOP-002 exact batched refined contact target lookup, proposed.
+- Last completed capability: TOP-002 exact batched refined contact target lookup.
+- Current capability: BAL-001 global Cartesian 3D all-touch two-to-one balance, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  STO-002 is Yellow before refined support planning; SAM-002/SAM-003 are retained Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
@@ -166,14 +166,18 @@
   conformance once per unchanged artifact lifecycle and returns exact maximum
   level.  MOR mathematical key order remains an upstream MOR-001 precondition;
   FST-002 proves dense inverse/root-row alignment without overclaiming it.
+- TOP-002 returns raw adjacent covering nodes for explicit leaf/direction
+  queries after one FST-002 lifecycle validation.  It accepts unbalanced
+  contacts, assigns no kind, retains no cache, and leaves balance/mixed
+  operation/support policy to BAL/REL/STO.
 
 ## Next Work
 
 M0 and the pre-M1 functional/migration/performance protocols are complete, and
 FST-001 reconstructs refined 3D hierarchy and leaf order.  Phase A decomposition
-audit is complete, all Red findings are resolved/split, and FST-002 conformance
-is complete.  The next work is TOP-002 raw contact lookup, followed by BAL-001,
-refined geometry, directional relation/support planning,
+audit is complete and FST-002/TOP-002 establish validated raw contacts.  The
+next work is BAL-001 all-touch balance, followed by refined geometry,
+directional relation/support planning,
 restriction/prolongation, refined halos, sampling, a native selective `.dat`
 adapter, and real-data bounded integration.
 
@@ -182,6 +186,7 @@ adapter, and real-data bounded integration.
 ```text
 .venv/bin/python rewrite/build_ext.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_fst_002.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_top_002.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hax_001.py
@@ -195,6 +200,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/hpl_001.py --repe
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/pbc_001.py --calls 10000 --repeats 9
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/hax_001.py --repeats 21
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/fst_002.py --repeats 31 --reference-limit 50000 --dat data/weno509_sub_0000.dat
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/top_002.py --max-level 5 --repeats 15 --reference-limit 20000 --dat data/weno509_sub_0000.dat
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
@@ -205,4 +211,5 @@ Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
 HAX-001 strategy evidence is in `evidence/HAX-001.md`; INT-001 and M0 evidence
 remains in `evidence/INT-001.md`.  FST-002 evidence is in
 `evidence/FST-002.md`; the TOP boundary split is recorded in
-`evidence/TOP-BOUNDARY-REAUDIT.md`.
+`evidence/TOP-BOUNDARY-REAUDIT.md`; TOP-002 evidence is in
+`evidence/TOP-002.md`.

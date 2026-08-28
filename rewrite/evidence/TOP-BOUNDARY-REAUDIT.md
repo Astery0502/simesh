@@ -45,7 +45,7 @@ FST-001 -> FST-002 -> TOP-002 -> BAL-001
 TOP-002 + BAL-001 -> later REL-001 -> STO-004
 ```
 
-FST-002 is now complete with independent reference, corruption/lifecycle
-coverage, real-tree evidence, and allocation-free scaling.  TOP-002 is the next
-executable capability and receives no implementation until its contact contract
-passes independent review.
+FST-002 and TOP-002 are now complete with independent references, lifecycle/
+corruption coverage, real-tree/current evidence, and allocation-free scaling.
+BAL-001 is the next executable capability and owns only the global all-touch
+level-gap policy.

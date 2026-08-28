@@ -48,14 +48,14 @@ complete.
 | --- | --- | --- | --- |
 | FST-001 | Validated Cartesian 3D refined forest reconstruction | MOR-001 | complete |
 | FST-002 | Reusable refined-forest artifact conformance | FST-001 | complete |
-| TOP-002 | Exact batched refined contact target lookup | FST-002 | proposed |
+| TOP-002 | Exact batched refined contact target lookup | FST-002 | complete |
 | BAL-001 | Global Cartesian 3D all-touch two-to-one balance | TOP-002 | proposed |
 | TOP-003 | Optional balanced refined six-face materialization | TOP-002, BAL-001 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
-validates an unchanged artifact lifecycle once.  TOP-002 is now the next
-dependency-ready capability and owns raw contact semantics,
-BAL-001 owns admissibility, and TOP-003 is implemented only if a consumer and
+validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
+semantics and is complete.  BAL-001 is now the next dependency-ready capability
+and owns admissibility, while TOP-003 is implemented only if a consumer and
 cached-versus-on-demand evidence justify retaining it.  Refined geometry may
 consume validated FST artifacts without depending on balance or face caches.
 
