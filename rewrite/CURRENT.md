@@ -4,10 +4,10 @@
 
 - Active milestone: M1 Cartesian 3D refined AMR.
 - Last completed capability: FST-001 validated refined forest reconstruction.
-- Current capability: none; TOP-002 refined leaf face topology and two-to-one balance is next.
+- Current capability: Phase B HAL-002 decomposition refinement; TOP-002 implementation is paused.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
 - Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
-- Unresolved differences: none for FST-001.  The only available real refined Cartesian 3D `.dat` is staggered, so it is retained as forest/tree metadata evidence without broadening payload support; the later M1 vertical slice still needs an explicitly supported regular-field reader contract or a generated non-staggered fixture.
+- Unresolved differences: Phase A classifies HAL-002 and the preserved untracked TOP-002 draft as Red.  HAL-002 must be incrementally decomposed with its optimized wrapper retained; TOP must then split FST conformance, contact semantics, BAL-001, and optional face materialization before implementation.  STO-002 is Yellow before refined support planning; SAM-002/SAM-003 are retained Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
 
@@ -137,13 +137,25 @@
   location/classification, global 26-direction two-to-one balance, and retained
   six-face topology materialization. Split independently variable decisions
   (for example BAL-001 versus TOP-002) instead of freezing them as one contract.
+- The complete Phase A audit is `evidence/DECOMPOSITION-AUDIT.md`: sixteen
+  capabilities are Green, STO-002 is Yellow, SAM-002/SAM-003 are retained
+  Fused, and HAL-002 plus the in-progress TOP draft are Red.
+- HAL-002's Red finding is semantic, not a correctness failure: preserve its
+  tested direct-cell Cython entrypoint while extracting explicit relation/slot
+  planning, pure same-level transfer, shared physical transforms, and a thin
+  composition boundary.
+- The TOP draft's FST conformance, raw contact lookup, global all-touch balance,
+  and retained face cache vary independently.  Phase B will preserve its useful
+  analysis but split those decisions; six kinds plus six `int64` IDs cost
+  `54*L`, correcting the draft's `49*L` calculation.
 
 ## Next Work
 
 M0 and the pre-M1 functional/migration/performance protocols are complete, and
-FST-001 now reconstructs refined 3D hierarchy and leaf order.  The next work is
-an audit of the in-progress TOP-002 design/contract under `DECOMPOSITION.md`,
-then the resulting separately owned balance/contact/topology capabilities,
+FST-001 reconstructs refined 3D hierarchy and leaf order.  Phase A decomposition
+audit is complete.  The next work is the incremental HAL-002 Red refinement,
+then re-audit/split of the preserved TOP drafts into separately owned
+FST-conformance, contact, balance, and optional materialization capabilities,
 followed by refined geometry, directional relation/support planning,
 restriction/prolongation, refined halos, sampling, a native selective `.dat`
 adapter, and real-data bounded integration.

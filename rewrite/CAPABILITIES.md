@@ -50,6 +50,15 @@ FST-001 supplies explicit flat preorder hierarchy and leaf maps.  TOP-002 is
 the next dependency-ready capability; refined geometry can then proceed from
 FST-001 while directional relation planning proceeds from TOP-002.
 
+Decomposition audit checkpoint: HAL-002 is Red and must be incrementally
+refined before M1 implementation resumes.  The preserved untracked TOP-002
+draft is also Red and must split reusable FST conformance, exact contact
+semantics, BAL-001, and optional face materialization before contract freeze.
+STO-002 is Yellow with a mandatory split trigger before refined support
+planning.  SAM-002 and SAM-003 are retained Fused implementations whose missing
+semantic boundaries are extracted at refined sampling.  See
+`evidence/DECOMPOSITION-AUDIT.md`.
+
 ## Later Milestones
 
 The planned dependency sequence is:
