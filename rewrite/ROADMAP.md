@@ -60,7 +60,8 @@ and refined support union/bounded planning are complete.  Ratio-two
 cell-average restriction, the independent current three-point limiter, and
 ratio-two limited prolongation and refined source-slot resolution are also
 complete.  REL already supplies action classification; refined target-region
-planning is complete, and refined child-phase planning is next.
+and child-phase planning are also complete.  Source/workspace geometry and
+value application are next.
 Six-face TOP-003 caching remains optional and requires repeated-consumer
 performance justification.
 

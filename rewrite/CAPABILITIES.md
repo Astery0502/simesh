@@ -63,7 +63,8 @@ complete.
 | PRL-001 | Cartesian 3D ratio-two limited prolongation | FND-001, RST-001, LIM-001 | complete |
 | RSL-001 | Accepted refined relation source-slot resolution | REL-001, STO-004 | complete |
 | TGT-001 | Directed halo target boxes | FND-001 | complete |
-| RPH-001 | Refined relation child-phase codes | FST-002, REL-001, RSL-001 | proposed |
+| RPH-001 | Refined relation child-phase codes | FST-002, REL-001, RSL-001 | complete |
+| RSG-001 | Refined transfer source/workspace geometry | FND-001, REL-001, TGT-001, RPH-001 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -88,7 +89,8 @@ coarse reach without a slope cache.  RSL-001 provides bounded source-slot
 identity without kind policy.  The proposed RAC-001 action enum was retired
 because REL kind/mask already determines it.  Combined RTP-001 failed the
 five-question gate and split into now-complete TGT-001 directed boxes and
-proposed RPH-001 ratio-two phases before workspace/value application.
+now-complete RPH-001 ratio-two phases.  RSG-001 is next and owns the still-
+missing source/workspace geometry before value application.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

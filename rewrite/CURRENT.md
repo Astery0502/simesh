@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: TGT-001 directed halo target boxes.
-- Current capability: RPH-001 refined relation child-phase codes, proposed.
+- Last completed capability: RPH-001 refined relation child-phase codes.
+- Current capability: RSG-001 refined transfer source/workspace geometry, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/RST-001.md`, `contracts/LIM-001.md`, `contracts/PRL-001.md`, `contracts/RSL-001.md`, `contracts/TGT-001.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/RST-001.md`, `contracts/LIM-001.md`, `contracts/PRL-001.md`, `contracts/RSL-001.md`, `contracts/TGT-001.md`, `contracts/RPH-001.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  The STO-002 Yellow finding is resolved by WSP/PRI/FCL/HCL with wrappers retained.  SAM-002/SAM-003 remain Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
@@ -341,6 +341,19 @@
   unchecked versus 29.333 us for the reference, with zero retained traced bytes
   and a 1,360-byte peak.  One native materialization plus 100,000 scans is 2.09x
   faster than repeated native derivation, so the tiny artifact is retained.
+- RPH-001 is the independently extracted refinement-phase function.  COARSER
+  emits primary parity and validates the actual reduced-coordinate coarse source
+  `floor((primary+r)/2)`; it does not import current all-axis send scheduling.
+  FINER emits selected source parity in strict canonical child order, with
+  physical-mask axes neutral and exact `255` for non-ratio/inactive columns.
+- Standard `S=P=232,D=26` RPH writes 24,128 bytes and reaches 81.285 million
+  checked/899.097 million unchecked records/s versus 0.531 million reference,
+  with zero retained traced bytes and a 1,728-byte peak.  One materialization
+  plus twenty native scans is 3.55x faster than repeated native derivation.
+- All WENO capacities produce the same cumulative 2,351,856 phase bytes and
+  exact checked/unchecked/reference arrays; peak artifacts remain
+  2,392--68,744 bytes.  RPH has no TGT runtime dependency, box, action, PBC,
+  workspace, payload, or numerical policy.
 
 ## Next Work
 
@@ -354,10 +367,10 @@ HCL-001 full-halo closure, STO-004 refined support union/bounded planning, and
 RST-001 ratio-two restriction, LIM-001 limiting, PRL-001 prolongation, and
 RSL-001 accepted source-slot resolution are complete.  RAC-001 was retired as a
 redundant rename of REL kind/mask, and combined RTP-001 split at the
-five-question gate.  TGT-001 directed boxes are complete.  Next is RPH-001
-refined child phases, followed by workspace/value application, complete refined
-halos, sampling, a native selective `.dat` adapter, and real-data bounded
-integration.
+five-question gate.  TGT-001 directed boxes and RPH-001 refined child phases are
+complete.  Next is RSG-001 source/workspace geometry, followed by value
+application, complete refined halos, sampling, a native selective `.dat`
+adapter, and real-data bounded integration.
 
 ## Latest Reproduction Commands
 
@@ -378,6 +391,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_prl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_rsl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_tgt_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_rph_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hax_001.py
@@ -405,6 +419,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/lim_001.py --call
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/prl_001.py --repeats 5 --composition-repeats 3
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/rsl_001.py --repeats 5 --action-repeats 10 --weno-capacities 57,64,128,256,512,1024
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/tgt_001.py --repeats 9 --reuse-scans 100000 --reuse-repeats 5
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/rph_001.py --repeats 5 --reuse-scans 20 --weno-capacities 57,64,128,256,512,1024
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
@@ -429,3 +444,4 @@ PRL-001 evidence is in `evidence/PRL-001.md`.
 RSL-001 evidence is in `evidence/RSL-001.md`.
 TGT-001 evidence is in `evidence/TGT-001.md`; the rejected combined boundary is
 recorded in `designs/RTP-001.md`.
+RPH-001 evidence is in `evidence/RPH-001.md`.
