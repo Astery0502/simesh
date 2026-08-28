@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: PRI-001 deterministic ascending primary-prefix planning.
-- Current capability: FCL-001 deterministic direct-face support closure, proposed.
+- Last completed capability: FCL-001 deterministic direct-face support closure.
+- Current capability: HCL-001 deterministic complete one-block halo support closure, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  STO-002 is Yellow before refined support planning; SAM-002/SAM-003 are retained Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
@@ -223,6 +223,14 @@
   directly; all result arrays and reduction bits remain identical.  Canonical
   throughput is 110/438/1,404 million IDs/s at capacities 64/256/1,024, with
   zero retained traced bytes and a fixed 248-byte peak.
+- FCL-001 jointly grows PRI candidates with their unique nonrecursive TOP face
+  union.  It owns face0..5 discovery, promotion, stable support order, greedy
+  maximality/first-fit, suffix/end atomicity, and the exact direct-face
+  minimum-progress helper; it owns no diagonal/full/refined closure or payload.
+- Canonical and legacy `True` paths retain identical 1,797/293/55 chunks and
+  3.457/2.279/1.702 amplification at capacities 64/256/1,024.  Runtime remains
+  about 3.85/2.20/0.94 million primaries/s with zero retained traced bytes and
+  a fixed 576--600-byte peak.
 
 ## Next Work
 
@@ -231,8 +239,8 @@ FST-001 reconstructs refined 3D hierarchy and leaf order.  Phase A decomposition
 audit is complete and FST-002/TOP-002/BAL-001/GEO-002/REL-001 separately
 establish conformance, raw contacts, all-touch admissibility, selected refined
 geometry, and selected relation records.  The STO-002 Yellow trigger is active;
-WSP-001 accounting and PRI-001 primary traversal are complete.  Next is FCL-001
-direct-face closure, followed by explicit full-halo closure before refined
+WSP-001 accounting, PRI-001 primary traversal, and FCL-001 direct-face closure
+are complete.  Next is HCL-001 full-halo closure, the final split before refined
 support planning,
 restriction/prolongation, refined halos, sampling, a native selective `.dat`
 adapter, and real-data bounded integration.
@@ -248,6 +256,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_rel_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_wsp_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pri_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_fcl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hax_001.py
@@ -267,6 +276,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/geo_002.py --max-
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/rel_001.py --max-level 5 --repeats 15 --reference-leaf-limit 100 --chunk-leaves 1024 --dat data/weno509_sub_0000.dat
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/wsp_001.py --calls 10000 --repeats 15
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/pri_001.py --block-count 32768 --capacities 1,8,64,256,1024,32768 --repeats 15
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/fcl_001.py --capacities 64,256,1024 --repeats 15
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
@@ -282,3 +292,4 @@ remains in `evidence/INT-001.md`.  FST-002 evidence is in
 evidence is in `evidence/GEO-002.md`; REL-001 evidence is in
 `evidence/REL-001.md`; WSP-001 evidence is in `evidence/WSP-001.md`.
 PRI-001 evidence is in `evidence/PRI-001.md`.
+FCL-001 evidence is in `evidence/FCL-001.md`.

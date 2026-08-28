@@ -25,7 +25,7 @@ a capability becomes active.
 | GEO-001 | Cartesian 3D block bounds and spacing | TOP-001 | complete |
 | STO-001 | In-memory block source and sink | FND-001 | complete |
 | WSP-001 | Explicit workspace byte and slot-capacity accounting | FND-001 | complete |
-| STO-002 | Bounded workspace with direct-face and full-halo chunk plans | WSP-001, PRI-001, STO-001, TOP-001 | complete |
+| STO-002 | Bounded workspace with direct-face and full-halo chunk plans | WSP-001, PRI-001, FCL-001, STO-001, TOP-001 | complete |
 | STO-003 | Functional block reader/writer adapters and execution substitution | STO-001 | complete |
 | HAL-001 | Non-periodic physical-boundary halo provision | GEO-001, STO-001 | complete |
 | HAL-002 | Same-level sibling halo provision | TOP-001, HAL-001 | complete |
@@ -55,7 +55,8 @@ complete.
 | GEO-002 | Cartesian 3D refined leaf bounds and spacing | FST-002, GEO-001 | complete |
 | REL-001 | Balanced refined directional relation records | TOP-002, BAL-001 | complete |
 | PRI-001 | Deterministic ascending primary-prefix planning | WSP-001 | complete |
-| FCL-001 | Deterministic direct-face support closure | PRI-001, TOP-001 | proposed |
+| FCL-001 | Deterministic direct-face support closure | PRI-001, TOP-001 | complete |
+| HCL-001 | Deterministic complete one-block halo support closure | PRI-001, TOP-001 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -66,8 +67,9 @@ selected directional relation records without support or value-transfer
 policy; its consumer evidence keeps optional TOP-003 deferred.  The STO-002
 Yellow trigger is now active.  WSP-001 is the first incremental extraction
 and is complete.  PRI-001 shared primary traversal is also complete, before the
-remaining direct-face/full-halo closure boundaries and refined STO-004 support.
-FCL-001 direct-face closure is the next extraction.
+then-remaining closure boundaries and refined STO-004 support.  FCL-001
+direct-face closure is complete; HCL-001 full-halo closure is the final STO-002
+Yellow extraction before refined support.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

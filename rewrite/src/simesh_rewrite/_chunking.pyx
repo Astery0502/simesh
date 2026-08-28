@@ -112,6 +112,27 @@ cpdef tuple plan_level1_chunk_unchecked(
             chunk_block_ids[index] = first_primary_id + index
         return primary_count, primary_count
 
+    return plan_direct_face_closed_prefix_unchecked(
+        first_primary_id,
+        face_neighbor_ids,
+        chunk_block_ids,
+    )
+
+
+cpdef tuple plan_direct_face_closed_prefix_unchecked(
+    int64_t first_primary_id,
+    const int64_t[:, ::1] face_neighbor_ids,
+    int64_t[::1] chunk_block_ids,
+):
+    cdef int64_t block_count = face_neighbor_ids.shape[0]
+    cdef int64_t capacity = chunk_block_ids.shape[0]
+    cdef int64_t primary_count = 0
+    cdef int64_t selected_count = 0
+    cdef int64_t candidate, face, neighbor, missing, position, index
+
+    if first_primary_id == block_count:
+        return 0, 0
+
     while first_primary_id + primary_count < block_count:
         candidate = first_primary_id + primary_count
         position = _find_support_id(

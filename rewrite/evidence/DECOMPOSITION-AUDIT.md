@@ -161,5 +161,6 @@ STO-002 Yellow trigger: WSP-001 accounting is extracted first, followed by
 primary traversal and closure boundaries before STO-004.  WSP-001 is now
 complete with legacy chunking wrappers preserved; PRI-001 is the next
 incremental extraction and is now complete with the M0 pass-one consumer
-migrated.  FCL-001 direct-face closure is next.  STO-002 remains Yellow until
-direct-face and full-halo closure ownership is explicit.
+migrated.  FCL-001 direct-face closure is also complete with legacy wrappers
+preserved.  STO-002 remains Yellow until HCL-001 extracts full-halo closure, the
+final unresolved decision.

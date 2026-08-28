@@ -5,12 +5,14 @@ from __future__ import annotations
 import numpy as np
 
 from ._chunking import (
-    minimum_face_closed_slots_unchecked,
     minimum_halo_closed_slots_unchecked,
-    plan_level1_chunk_unchecked,
     plan_level1_halo_chunk_unchecked,
+    plan_direct_face_closed_prefix_unchecked,
 )
-from .foundation import INDEX_DTYPE
+from .face_closure import (
+    _require_face_table,
+    minimum_direct_face_closed_slots,
+)
 from ._primary import fill_ascending_primary_prefix_unchecked
 from .primary import _require_primary_ids
 from .workspace import (
@@ -44,29 +46,13 @@ def workspace_slot_capacity(
     )
 
 
-def _require_face_table(face_neighbor_ids: np.ndarray) -> np.ndarray:
-    if not isinstance(face_neighbor_ids, np.ndarray):
-        raise TypeError("face_neighbor_ids must be a NumPy array")
-    if face_neighbor_ids.dtype != INDEX_DTYPE:
-        raise TypeError("face_neighbor_ids must have dtype int64")
-    if face_neighbor_ids.ndim != 2 or face_neighbor_ids.shape[1] != 6:
-        raise ValueError(
-            "face_neighbor_ids must have shape (block_count, 6), "
-            f"got {face_neighbor_ids.shape}"
-        )
-    if not face_neighbor_ids.flags.c_contiguous:
-        raise ValueError("face_neighbor_ids must be C-contiguous")
-    return face_neighbor_ids
-
-
 def _require_chunk_ids(chunk_block_ids: np.ndarray) -> np.ndarray:
     return _require_primary_ids("chunk_block_ids", chunk_block_ids)
 
 
 def minimum_face_closed_slots(face_neighbor_ids: np.ndarray) -> int:
-    """Return capacity sufficient for any single direct-face closure."""
-    face_neighbor_ids = _require_face_table(face_neighbor_ids)
-    return int(minimum_face_closed_slots_unchecked(face_neighbor_ids))
+    """Compatibility wrapper for FCL-001 minimum direct-face capacity."""
+    return minimum_direct_face_closed_slots(face_neighbor_ids)
 
 
 def minimum_halo_closed_slots(face_neighbor_ids: np.ndarray) -> int:
@@ -111,10 +97,9 @@ def plan_level1_chunk(
 
     return tuple(
         int(value)
-        for value in plan_level1_chunk_unchecked(
+        for value in plan_direct_face_closed_prefix_unchecked(
             first_primary_id,
             face_neighbor_ids,
-            True,
             chunk_block_ids,
         )
     )

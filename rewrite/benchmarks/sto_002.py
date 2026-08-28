@@ -20,6 +20,7 @@ from simesh_rewrite.chunking import (
     plan_level1_halo_chunk,
 )
 from simesh_rewrite.morton import level1_morton
+from simesh_rewrite.face_closure import plan_direct_face_closed_prefix
 from simesh_rewrite.storage import gather_blocks_into
 from simesh_rewrite.topology import level1_face_neighbors
 from simesh_rewrite.workspace import workspace_nbytes, workspace_slot_capacity
@@ -46,11 +47,17 @@ def plan_full_traversal(
                 neighbors,
                 ids,
             )
+        elif closure == "faces":
+            primary_count, selected_count = plan_direct_face_closed_prefix(
+                first,
+                neighbors,
+                ids,
+            )
         else:
             primary_count, selected_count = plan_level1_chunk(
                 first,
                 neighbors,
-                closure == "faces",
+                False,
                 ids,
             )
         first += primary_count
