@@ -25,12 +25,13 @@ from ._sampling import (
     validate_selected_level1_placement_unchecked,
     validate_trilinear_stencils_unchecked,
 )
-from .chunking import plan_level1_chunk, plan_level1_halo_chunk
+from .chunking import plan_level1_halo_chunk
 from .foundation import _require_index_triplet, _require_payload
 from .geometry import _require_float_triplet
 from .halos import fill_physical_halos, fill_same_level_halos
 from .morton import _root_volume
 from .operators import central_difference_into, scaled_difference_into
+from .primary import fill_ascending_primary_prefix
 from .reductions import accumulate_field_sum, finalize_field_sum
 from .sampling import (
     _require_uniform_grid,
@@ -446,10 +447,9 @@ def execute_level1_m0_from_blocks(
     # Actual-ID dry planning and metadata validation.
     first = 0
     while first < block_count:
-        primary_count, _ = plan_level1_chunk(
+        primary_count = fill_ascending_primary_prefix(
             first,
-            face_neighbor_ids,
-            False,
+            block_count,
             ids,
         )
         primary_ids = ids[:primary_count]
@@ -518,10 +518,9 @@ def execute_level1_m0_from_blocks(
     sum_state[0] = 0.0
     first = 0
     while first < block_count:
-        primary_count, selected_count = plan_level1_chunk(
+        primary_count = fill_ascending_primary_prefix(
             first,
-            face_neighbor_ids,
-            False,
+            block_count,
             ids,
         )
         primary_ids = ids[:primary_count]

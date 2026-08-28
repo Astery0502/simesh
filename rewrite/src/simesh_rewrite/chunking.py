@@ -11,6 +11,8 @@ from ._chunking import (
     plan_level1_halo_chunk_unchecked,
 )
 from .foundation import INDEX_DTYPE
+from ._primary import fill_ascending_primary_prefix_unchecked
+from .primary import _require_primary_ids
 from .workspace import (
     _require_nonnegative_integer,
     workspace_nbytes as _workspace_nbytes,
@@ -58,15 +60,7 @@ def _require_face_table(face_neighbor_ids: np.ndarray) -> np.ndarray:
 
 
 def _require_chunk_ids(chunk_block_ids: np.ndarray) -> np.ndarray:
-    if not isinstance(chunk_block_ids, np.ndarray):
-        raise TypeError("chunk_block_ids must be a NumPy array")
-    if chunk_block_ids.dtype != INDEX_DTYPE:
-        raise TypeError("chunk_block_ids must have dtype int64")
-    if chunk_block_ids.ndim != 1 or not chunk_block_ids.flags.c_contiguous:
-        raise ValueError("chunk_block_ids must be a C-contiguous vector")
-    if not chunk_block_ids.flags.writeable:
-        raise ValueError("chunk_block_ids must be writable")
-    return chunk_block_ids
+    return _require_primary_ids("chunk_block_ids", chunk_block_ids)
 
 
 def minimum_face_closed_slots(face_neighbor_ids: np.ndarray) -> int:
@@ -105,12 +99,22 @@ def plan_level1_chunk(
     ):
         raise ValueError("chunk capacity must be positive before the end")
 
+    if not include_face_closure:
+        primary_count = int(
+            fill_ascending_primary_prefix_unchecked(
+                first_primary_id,
+                face_neighbor_ids.shape[0],
+                chunk_block_ids,
+            )
+        )
+        return primary_count, primary_count
+
     return tuple(
         int(value)
         for value in plan_level1_chunk_unchecked(
             first_primary_id,
             face_neighbor_ids,
-            include_face_closure,
+            True,
             chunk_block_ids,
         )
     )

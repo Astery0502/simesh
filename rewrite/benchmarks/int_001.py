@@ -15,9 +15,10 @@ from numpy.lib.format import open_memmap
 import numpy as np
 
 import simesh_rewrite.pipeline as pipeline_module
-from simesh_rewrite.chunking import plan_level1_chunk, plan_level1_halo_chunk
+from simesh_rewrite.chunking import plan_level1_halo_chunk
 from simesh_rewrite.morton import level1_morton
 from simesh_rewrite.pipeline import execute_level1_m0
+from simesh_rewrite.primary import fill_ascending_primary_prefix
 from simesh_rewrite.topology import level1_face_neighbors
 
 
@@ -64,7 +65,7 @@ def planner_stats(capacity: int, faces: np.ndarray) -> dict:
     first = 0
     no_chunks = 0
     while first < faces.shape[0]:
-        primary, _ = plan_level1_chunk(first, faces, False, ids)
+        primary = fill_ascending_primary_prefix(first, faces.shape[0], ids)
         first += primary
         no_chunks += 1
 
@@ -85,7 +86,7 @@ def planner_stats(capacity: int, faces: np.ndarray) -> dict:
 
 def profile_call(call) -> tuple[tuple[float, int], float, dict]:
     names = (
-        "plan_level1_chunk",
+        "fill_ascending_primary_prefix",
         "plan_level1_halo_chunk",
         "read_blocks_into",
         "scaled_difference_into",
@@ -116,7 +117,7 @@ def profile_call(call) -> tuple[tuple[float, int], float, dict]:
 
         def operation(*args, **kwargs):
             if (
-                name == "plan_level1_chunk"
+                name == "fill_ascending_primary_prefix"
                 and state["phase"] == "preflight"
                 and state["dry_halo_complete"]
                 and int(args[0]) == 0

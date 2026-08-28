@@ -57,6 +57,7 @@ from .chunking import (
     plan_level1_halo_chunk,
 )
 from .workspace import workspace_nbytes, workspace_slot_capacity
+from .primary import fill_ascending_primary_prefix
 from .halos import (
     BoundaryMode,
     common_physical_valid_region,
@@ -103,6 +104,7 @@ __all__ = [
     "execute_level1_m0",
     "execute_level1_m0_from_blocks",
     "fill_balanced_refined_relations",
+    "fill_ascending_primary_prefix",
     "common_physical_valid_region",
     "central_difference_into",
     "fill_level1_face_neighbors",

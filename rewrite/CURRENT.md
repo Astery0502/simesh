@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: WSP-001 explicit workspace byte and slot-capacity accounting.
-- Current capability: PRI-001 deterministic ascending primary-prefix planning, proposed.
+- Last completed capability: PRI-001 deterministic ascending primary-prefix planning.
+- Current capability: FCL-001 deterministic direct-face support closure, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  STO-002 is Yellow before refined support planning; SAM-002/SAM-003 are retained Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
@@ -214,6 +214,15 @@
   remain bit/error-identical.  The 2 MiB composition still returns 31 slots and
   exactly 2,031,864 allocated bytes.  Forward/inverse calls remain about
   2.60/2.75 us with a fixed 1,053-byte traced peak.
+- PRI-001 fills the maximal dense ascending primary prefix from explicit
+  `first`, `block_count`, and caller capacity.  It owns end/zero-capacity,
+  prefix/suffix, maximality, and exactly-once identity but no topology, budget,
+  support, transfer, or scheduling.
+- The legacy no-closure STO wrapper preserves every validation and returns
+  `(count,count)` after delegation.  M0 dry preflight and pass one use PRI
+  directly; all result arrays and reduction bits remain identical.  Canonical
+  throughput is 110/438/1,404 million IDs/s at capacities 64/256/1,024, with
+  zero retained traced bytes and a fixed 248-byte peak.
 
 ## Next Work
 
@@ -221,10 +230,10 @@ M0 and the pre-M1 functional/migration/performance protocols are complete, and
 FST-001 reconstructs refined 3D hierarchy and leaf order.  Phase A decomposition
 audit is complete and FST-002/TOP-002/BAL-001/GEO-002/REL-001 separately
 establish conformance, raw contacts, all-touch admissibility, selected refined
-geometry, and selected relation records.  The STO-002 Yellow trigger is active,
-and WSP-001 accounting is complete.  Next is PRI-001 shared ascending primary
-planning, followed by explicit direct-face and full-halo closure boundaries
-before refined support planning,
+geometry, and selected relation records.  The STO-002 Yellow trigger is active;
+WSP-001 accounting and PRI-001 primary traversal are complete.  Next is FCL-001
+direct-face closure, followed by explicit full-halo closure before refined
+support planning,
 restriction/prolongation, refined halos, sampling, a native selective `.dat`
 adapter, and real-data bounded integration.
 
@@ -238,6 +247,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_geo_002.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_rel_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_wsp_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pri_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hax_001.py
@@ -256,6 +266,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/bal_001.py --max-
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/geo_002.py --max-level 5 --repeats 15 --reference-leaf-limit 600 --chunk-leaves 4096 --dat data/weno509_sub_0000.dat
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/rel_001.py --max-level 5 --repeats 15 --reference-leaf-limit 100 --chunk-leaves 1024 --dat data/weno509_sub_0000.dat
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/wsp_001.py --calls 10000 --repeats 15
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/pri_001.py --block-count 32768 --capacities 1,8,64,256,1024,32768 --repeats 15
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
@@ -270,3 +281,4 @@ remains in `evidence/INT-001.md`.  FST-002 evidence is in
 `evidence/TOP-002.md`; BAL-001 evidence is in `evidence/BAL-001.md`; GEO-002
 evidence is in `evidence/GEO-002.md`; REL-001 evidence is in
 `evidence/REL-001.md`; WSP-001 evidence is in `evidence/WSP-001.md`.
+PRI-001 evidence is in `evidence/PRI-001.md`.
