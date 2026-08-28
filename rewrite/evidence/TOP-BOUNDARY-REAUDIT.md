@@ -51,4 +51,5 @@ size-dependent validation scratch.  BAL-001 rejects the known face-balanced
 diagonal violation and owns only the global all-touch level-gap policy.
 TOP-003 remains deferred because
 no immediate consumer yet justifies `54*L` retained bytes over measured
-on-demand contacts; refined geometry proceeds independently.
+on-demand contacts.  Refined geometry is complete independently; REL-001 is the
+first concrete relation consumer that may remeasure the optional cache choice.

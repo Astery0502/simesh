@@ -51,14 +51,17 @@ complete.
 | TOP-002 | Exact batched refined contact target lookup | FST-002 | complete |
 | BAL-001 | Global Cartesian 3D all-touch two-to-one balance | TOP-002 | complete |
 | TOP-003 | Optional balanced refined six-face materialization | TOP-002, BAL-001 | proposed |
-| GEO-002 | Cartesian 3D refined leaf bounds and spacing | FST-002, GEO-001 | proposed |
+| GEO-002 | Cartesian 3D refined leaf bounds and spacing | FST-002, GEO-001 | complete |
+| REL-001 | Balanced refined directional relation records | TOP-002, BAL-001 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
 semantics, and BAL-001 independently owns all-touch admissibility; both are
-complete.  TOP-003 is implemented only if a consumer and cached-versus-on-demand
-evidence justify retaining it.  GEO-002 is next and consumes validated FST
-artifacts without depending on balance or face caches.
+complete.  GEO-002 is also complete and consumes validated FST artifacts
+without depending on balance or face caches.  REL-001 is next and owns
+directional relation records without support or value-transfer policy.  It
+must compare on-demand TOP-002 use with optional TOP-003 before any face cache
+is retained.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

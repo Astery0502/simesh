@@ -53,8 +53,9 @@ out-of-core execution.
 
 Status: in progress.  FST-001 reconstruction, FST-002 artifact conformance,
 TOP-002 raw contact lookup, and BAL-001 all-touch balance are complete.  Refined
-leaf geometry is next.  Six-face TOP-003 caching remains optional and requires
-consumer/performance justification.
+leaf geometry is also complete; balanced directional relation records are next.
+Six-face TOP-003 caching remains optional and requires consumer/performance
+justification.
 
 Before refined halo work, complete the functional-composition checkpoint:
 

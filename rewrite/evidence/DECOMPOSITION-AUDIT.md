@@ -154,5 +154,6 @@ independently validated and measured conformance, contact, and admissibility
 functions.  TOP-003 remains an
 optional materialization boundary rather than an implied continuation: it may
 activate only when a concrete relation consumer and cached-versus-on-demand
-measurement justify `54*L` retained bytes.  GEO-002 is the next
-dependency-ready capability and does not inherit balance or cache policy.
+measurement justify `54*L` retained bytes.  GEO-002 is now complete without a
+balance or cache dependency.  REL-001 is the next capability and must keep
+relation meaning separate from support and value-transfer policy.
