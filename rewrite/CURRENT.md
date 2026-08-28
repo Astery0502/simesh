@@ -114,12 +114,36 @@
   node/leaf maps.  It rejects malformed streams and unrepresentable complete
   level grids before output mutation and deliberately leaves two-to-one
   balance and neighbor classes to TOP-002.
+- Every non-trivial capability passes the five questions in `DECOMPOSITION.md`:
+  singular semantics, independent validation, independent substitution,
+  independent measurement, and separation of semantic meaning from
+  policy/execution.
+- A function that makes an independently variable decision outside its stated
+  semantic responsibility must split that decision into an explicit semantic,
+  planning, policy, adapter, or execution boundary.
+- Earlier nonconforming implementations are refined progressively when they are
+  depended on, extended, substituted, optimized, integrated, found defective,
+  or audited for cutover. Preserve behavior and compatibility wrappers, prove
+  equivalence, measure, and migrate consumers incrementally; do not perform
+  stylistic big-bang rewrites.
+- Independent decomposition audit found FST-001 broadly conforming: forest
+  reconstruction is one semantic responsibility, validation/fill are atomic
+  phases, and its allocating/caller-buffered functions are valid separate
+  boundaries. Do not reopen it wholesale. If multiple consumers need arbitrary
+  FST artifact validation, add one reusable conformance boundary rather than
+  duplicating structural validation.
+- The uncommitted TOP-002 draft predates the decomposition gate. Before
+  implementation, separately assess FST artifact revalidation, exact contact
+  location/classification, global 26-direction two-to-one balance, and retained
+  six-face topology materialization. Split independently variable decisions
+  (for example BAL-001 versus TOP-002) instead of freezing them as one contract.
 
 ## Next Work
 
 M0 and the pre-M1 functional/migration/performance protocols are complete, and
 FST-001 now reconstructs refined 3D hierarchy and leaf order.  The next work is
-TOP-002 compact refined face topology and two-to-one balance validation,
+an audit of the in-progress TOP-002 design/contract under `DECOMPOSITION.md`,
+then the resulting separately owned balance/contact/topology capabilities,
 followed by refined geometry, directional relation/support planning,
 restriction/prolongation, refined halos, sampling, a native selective `.dat`
 adapter, and real-data bounded integration.

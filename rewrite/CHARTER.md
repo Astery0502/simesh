@@ -95,6 +95,7 @@ backend implements the same kernel contracts directly.
 13. Keep resident, bounded, cached, and future framework-specific execution as strategies over shared contracts rather than separate scientific implementations.
 14. Track migration by supported feature and public workflow; do not use file counts or line-for-line translation as evidence of parity.
 15. Define high performance through reproducible kernel, composition, workflow, memory, I/O, and parallel measurements against explicit baselines.
+16. Decompose by semantic decision ownership: independently variable decisions outside a function's stated meaning become explicit semantic, planning, policy, adapter, or execution boundaries.
 
 ## Performance Outcome
 

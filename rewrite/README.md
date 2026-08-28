@@ -28,11 +28,13 @@ case, not an afterthought.
 4. `CAPABILITIES.md` -- the current dependency-ordered building blocks.
 5. `ROADMAP.md` -- staged support matrix and milestone outcomes.
 6. `WORKFLOW.md` -- how one capability is designed, specified, implemented, composed, and optimized.
-7. `FUNCTIONAL_COMPOSITION.md` -- stable boundaries for storage, execution,
+7. `DECOMPOSITION.md` -- the five-question capability gate, decision ownership,
+   and progressive refinement of earlier implementations.
+8. `FUNCTIONAL_COMPOSITION.md` -- stable boundaries for storage, execution,
    halo planning, compute kernels, and alternative framework implementations.
-8. `SOURCE_MIGRATION.md` -- feature-parity inventory from current source to
+9. `SOURCE_MIGRATION.md` -- feature-parity inventory from current source to
    final canonical replacement.
-9. `PERFORMANCE.md` -- benchmark levels, baselines, metrics, recording, and
+10. `PERFORMANCE.md` -- benchmark levels, baselines, metrics, recording, and
    regression policy.
 
 Non-trivial design notes are added under `designs/` while alternatives are
@@ -48,6 +50,10 @@ a concrete use.
 Continue the functional AMR rewrite under rewrite/.
 
 Follow rewrite/AGENTS.md and the current checkpoint in rewrite/CURRENT.md.
+Apply the five-question and decision-ownership gate in rewrite/DECOMPOSITION.md
+before implementing or extending each non-trivial capability. Audit in-progress
+work created under earlier rules before continuing it; preserve valid work and
+refine it incrementally rather than resetting it.
 Work through dependency-ready capabilities across M1--M7 toward the complete
 supported-feature migration and final cutover gates in SOURCE_MIGRATION.md.
 Preserve numerical behavior, keep the new implementation isolated until its

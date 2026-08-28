@@ -18,6 +18,10 @@ Read, in order:
 3. `CAPABILITIES.md`
 4. the design note and contract for the selected capability, if they exist
 
+Read `DECOMPOSITION.md` before selecting, splitting, extending, or implementing
+any non-trivial capability, and before refining work created under earlier
+rules. No non-trivial implementation begins until the five-question gate and
+decision-ownership inventory pass or a justified exception is recorded.
 Read `FUNCTIONAL_COMPOSITION.md` before adding a storage backend, execution
 strategy, framework adapter, halo family, or cross-capability executor.
 Read `SOURCE_MIGRATION.md` when selecting a milestone, adding/removing public
@@ -36,6 +40,14 @@ checkpoint. Do not reread every process document on every work cycle.
 - A capability is ready only when every dependency is `complete`, unless its ledger entry explicitly states a lower required status.
 - For a non-trivial capability, explore alternatives in a short design note, then freeze the selected behavior in a contract before implementation.
 - For a simple capability, use one concise contract and start implementation without extra design ceremony.
+- Apply `DECOMPOSITION.md` before freezing a non-trivial contract. If a
+  function makes an independently variable decision outside its stated
+  semantics, split that decision into an explicit semantic, planning, policy,
+  adapter, or execution boundary.
+- Refine earlier nonconforming implementations incrementally: freeze behavior,
+  inventory decisions, extract boundaries, retain compatibility wrappers,
+  prove equivalence, measure, then migrate consumers. Do not perform stylistic
+  big-bang rewrites.
 - Keep inputs, outputs, ownership, mutation, valid regions, and error behavior explicit.
 - Keep external storage/framework state at adapter boundaries. Numerical
   kernels receive canonical buffers and explicit metadata, never file handles,

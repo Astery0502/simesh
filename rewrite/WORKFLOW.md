@@ -5,19 +5,20 @@
 For one ready capability:
 
 1. Recover the relevant behavior from the current implementation and domain meaning.
-2. For a non-trivial capability, write a short design note under `designs/` that compares the real alternatives and their composition, memory, and performance trade-offs.
-3. Select an approach and write or refine its stable contract under `contracts/`.
-4. Define exact outputs, floating-point comparisons, and focused invariants.
-5. Build the smallest clear Python or NumPy reference when it adds independent evidence.
-6. Implement the simplest Cython form with explicit inputs, outputs, and workspace.
-7. Compare intermediate artifacts, not only the final user-visible result.
-8. Integrate with the immediate lower-level producer and next higher-level consumer.
-9. Measure the performance and memory dimensions relevant to this capability and its new composed path.
-10. Explore optimized or fused variants only after the simple implementation and composition are correct.
-11. Run the capability tests, all established rewrite regression and integration tests, and relevant current-implementation comparisons.
-12. Update the capability ledger and current checkpoint.
-13. Inspect the working and staged diffs, then stage only the active capability and checkpoint files.
-14. Create one cohesive Git commit for the completed capability.
+2. Apply the five-question and decision-ownership gate in `DECOMPOSITION.md`; split independently variable meanings before implementation.
+3. For a non-trivial capability, write a short design note under `designs/` that compares the real alternatives and their composition, memory, and performance trade-offs.
+4. Select an approach and write or refine its stable contract under `contracts/`.
+5. Define exact outputs, floating-point comparisons, and focused invariants.
+6. Build the smallest clear Python or NumPy reference when it adds independent evidence.
+7. Implement the simplest Cython form with explicit inputs, outputs, and workspace.
+8. Compare intermediate artifacts, not only the final user-visible result.
+9. Integrate with the immediate lower-level producer and next higher-level consumer.
+10. Measure the performance and memory dimensions relevant to this capability and its new composed path.
+11. Explore optimized or fused variants only after the simple implementation and composition are correct.
+12. Run the capability tests, all established rewrite regression and integration tests, and relevant current-implementation comparisons.
+13. Update the capability ledger and current checkpoint.
+14. Inspect the working and staged diffs, then stage only the active capability and checkpoint files.
+15. Create one cohesive Git commit for the completed capability.
 
 Keep this cycle proportional. A simple index transform does not need a report;
 a refined ghost algorithm or out-of-core executor does.
@@ -31,6 +32,17 @@ be discarded as evidence improves.
 A contract is the selected specification. It defines the behavior that the
 implementation and its consumers may rely on. Implementation starts only after
 that contract is clear enough to test.
+
+Capability size is semantic, not textual. Use `DECOMPOSITION.md` to record the
+owned and non-owned decisions and to distinguish coherent validation/loop cases
+from independently variable policy, planning, storage, or execution choices.
+If the five-question gate fails, split before implementation or record a
+specific exception in the design with evidence.
+
+Existing work is refined progressively at dependency, substitution,
+optimization, integration, defect, or cutover boundaries. Preserve validated
+behavior and compatibility wrappers while extracting functions; do not reopen
+completed work for stylistic purity alone.
 
 Do not require separate design and contract files for trivial capabilities. Do
 not turn design notes into long reports. Their purpose is to preserve the
