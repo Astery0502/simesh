@@ -39,6 +39,17 @@ a capability becomes active.
 All Foundation, functional-composition checkpoint, and M0 capabilities are
 complete.
 
+## M1: Cartesian 3D Refined AMR
+
+| ID | Capability | Depends on | Status |
+| --- | --- | --- | --- |
+| FST-001 | Validated Cartesian 3D refined forest reconstruction | MOR-001 | complete |
+| TOP-002 | Refined leaf face topology and two-to-one balance | FST-001 | proposed |
+
+FST-001 supplies explicit flat preorder hierarchy and leaf maps.  TOP-002 is
+the next dependency-ready capability; refined geometry can then proceed from
+FST-001 while directional relation planning proceeds from TOP-002.
+
 ## Later Milestones
 
 The planned dependency sequence is:

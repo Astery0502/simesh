@@ -51,6 +51,9 @@ out-of-core execution.
 
 ## M1: Cartesian 3D Refined AMR
 
+Status: in progress.  FST-001 refined forest reconstruction is complete;
+refined face topology and balance validation are next.
+
 Before refined halo work, complete the functional-composition checkpoint:
 
 - expose block readers and writers as explicit coarse-grained function

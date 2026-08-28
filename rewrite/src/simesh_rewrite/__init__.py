@@ -23,6 +23,7 @@ from .topology import (
     fill_level1_face_neighbors,
     level1_face_neighbors,
 )
+from .forest import RefinedForest, fill_refined_forest, refined_forest
 from .storage import gather_blocks_into, scatter_blocks_from
 from .blockio import (
     BlockReader,
@@ -71,6 +72,7 @@ __all__ = [
     "INDEX_DTYPE",
     "PAYLOAD_DTYPE",
     "PHYSICAL_BOUNDARY_ID",
+    "RefinedForest",
     "copy_region_into",
     "array_block_reader",
     "array_block_writer",
@@ -81,6 +83,7 @@ __all__ = [
     "fill_level1_face_neighbors",
     "fill_level1_block_geometry",
     "fill_level1_morton",
+    "fill_refined_forest",
     "fill_physical_halos",
     "fill_same_level_halos",
     "finalize_field_sum",
@@ -88,6 +91,7 @@ __all__ = [
     "interior_region",
     "level1_morton",
     "level1_face_neighbors",
+    "refined_forest",
     "level1_block_geometry",
     "minimum_face_closed_slots",
     "minimum_halo_closed_slots",

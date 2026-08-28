@@ -2,12 +2,12 @@
 
 ## State
 
-- Active milestone: M0 complete.
-- Last completed capability: MIG-001/PERF-001 migration and performance protocol checkpoint.
-- Current capability: none; M1 may start from refined forest/topology semantics.
-- Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, independent references, and explicit functional block reader/writer substitution over resident, mapped, or future external state.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
-- Unresolved differences: none.
+- Active milestone: M1 Cartesian 3D refined AMR.
+- Last completed capability: FST-001 validated refined forest reconstruction.
+- Current capability: none; TOP-002 refined leaf face topology and two-to-one balance is next.
+- Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Unresolved differences: none for FST-001.  The only available real refined Cartesian 3D `.dat` is staggered, so it is retained as forest/tree metadata evidence without broadening payload support; the later M1 vertical slice still needs an explicitly supported regular-field reader contract or a generated non-staggered fixture.
 
 ## Decisions Already Established
 
@@ -104,24 +104,39 @@
 - Hot paths declare comparator, workload, hypothesis, metrics, and material
   regression before final optimization; raw runs stay ignored while compact
   benchmark evidence is committed.
+- A refined 3D forest is a Boolean preorder stream containing exactly one
+  complete octree per level-1 MOR rank; stream positions are node IDs and
+  preorder leaves are canonical zero-based field-block IDs.
+- Refined child columns are `x + 2*y + 4*z`; logical coordinates use
+  `2*parent + child_bit`, levels start at one, and AMRVAC one-based conversion
+  remains at the file boundary.
+- FST-001 uses flat caller-owned parent/child, level/coordinate, root, and
+  node/leaf maps.  It rejects malformed streams and unrepresentable complete
+  level grids before output mutation and deliberately leaves two-to-one
+  balance and neighbor classes to TOP-002.
 
 ## Next Work
 
-M0 and the pre-M1 functional/migration/performance protocols are complete. The
-next roadmap work is M1 refined forest reconstruction and topology, followed by
-geometry, support/relation planning, restriction/prolongation, refined halos,
-sampling, a native selective `.dat` adapter, and real-data bounded integration.
+M0 and the pre-M1 functional/migration/performance protocols are complete, and
+FST-001 now reconstructs refined 3D hierarchy and leaf order.  The next work is
+TOP-002 compact refined face topology and two-to-one balance validation,
+followed by refined geometry, directional relation/support planning,
+restriction/prolongation, refined halos, sampling, a native selective `.dat`
+adapter, and real-data bounded integration.
 
 ## Latest Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_fst_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_003.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_int_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_003.py --repeats 31
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/fst_001.py --repeats 15 --reference-limit 50000 --dat data/weno509_sub_0000.dat --dat-repeats 31 --current-repeats 5
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
 `evidence/PERF-001.md`. STO-003 composition evidence remains in
-`evidence/STO-003.md`; INT-001 and M0 evidence remains in `evidence/INT-001.md`.
+`evidence/STO-003.md`; FST-001 refined reconstruction evidence is in
+`evidence/FST-001.md`; INT-001 and M0 evidence remains in `evidence/INT-001.md`.
