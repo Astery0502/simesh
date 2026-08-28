@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: RST-001 Cartesian 3D ratio-two cell-average restriction.
-- Current capability: LIM-001 Cartesian three-point limited-slope primitive, proposed.
+- Last completed capability: LIM-001 Cartesian three-point limited-slope primitive.
+- Current capability: PRL-001 Cartesian 3D ratio-two limited prolongation, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/RST-001.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/RST-001.md`, `contracts/LIM-001.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  The STO-002 Yellow finding is resolved by WSP/PRI/FCL/HCL with wrappers retained.  SAM-002/SAM-003 remain Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
@@ -274,6 +274,21 @@
   canonical inputs.  At capacity 256 the exact 528-leaf path uses 3.78 MB
   working memory; Python source extraction dominates at 4.20 ms while gather
   and RST take 0.236/0.189 ms, so later transfer planning owns that optimization.
+- LIM-001 freezes the current scalar limiter as separate `center-left` and
+  `right-center` differences, their left-to-right sum and `0.5` multiplication,
+  strict comparison-based sign/minimum branches, nonpositive clamp, and literal
+  positive-zero fallback.  It is not a doubled-slope monotonized-central rule.
+- All NaN inputs and every zero-return path produce exact positive zero;
+  same-sign infinities may survive, centered overflow can still clip to a finite
+  one-sided value, and limiting subnormals are preserved.  Production/reference
+  outputs match across the complete branch/IEEE evidence matrix.
+- LIM exposes one exact-type-validated scalar operation and one shared
+  `inline noexcept nogil` rule for PRL.  It owns no axis, reach, eta, region,
+  reconstruction, slope array, cache, or workspace decision.
+- The descriptive scalar boundary reaches 2.525 million validated calls/s,
+  versus 5.471 million unchecked and 0.660 million reference calls/s, with zero
+  retained traced bytes and a 48-byte peak.  Meaningful inline throughput and
+  the normal regression gate begin in PRL; no array slope strategy is retained.
 
 ## Next Work
 
@@ -284,10 +299,10 @@ establish conformance, raw contacts, all-touch admissibility, selected refined
 geometry, and selected relation records.  The STO-002 Yellow trigger is resolved:
 WSP-001 accounting, PRI-001 primary traversal, FCL-001 direct-face closure, and
 HCL-001 full-halo closure, STO-004 refined support union/bounded planning, and
-RST-001 ratio-two cell-average restriction are complete.  Next is LIM-001, the
-independently substitutable current three-point limited-slope rule, followed by
-ratio-two prolongation, refined transfer planning/halos, sampling, a native
-selective `.dat` adapter, and real-data bounded integration.
+RST-001 ratio-two cell-average restriction and LIM-001 three-point limiter are
+complete.  Next is PRL-001 ratio-two limited prolongation, followed by refined
+transfer planning/halos, sampling, a native selective `.dat` adapter, and
+real-data bounded integration.
 
 ## Latest Reproduction Commands
 
@@ -304,6 +319,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hcl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_004.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_rst_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_lim_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hax_001.py
@@ -327,6 +343,7 @@ PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/fcl_001.py --capaciti
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/hcl_001.py --capacities 64,256,1024 --repeats 15
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/sto_004.py --capacities 57,64,128,256,1024 --repeats 3 --dat data/weno509_sub_0000.dat
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/rst_001.py --repeats 31 --composition-repeats 7 --composition-capacities 64,128,256
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/lim_001.py --calls 1000000 --repeats 3
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
@@ -346,3 +363,4 @@ FCL-001 evidence is in `evidence/FCL-001.md`.
 HCL-001 evidence is in `evidence/HCL-001.md`.
 STO-004 evidence is in `evidence/STO-004.md`.
 RST-001 evidence is in `evidence/RST-001.md`.
+LIM-001 evidence is in `evidence/LIM-001.md`.

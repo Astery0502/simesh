@@ -59,7 +59,8 @@ complete.
 | HCL-001 | Deterministic complete one-block halo support closure | PRI-001, TOP-001 | complete |
 | STO-004 | Balanced refined support union and bounded primary planning | WSP-001, PRI-001, REL-001 | complete |
 | RST-001 | Cartesian 3D ratio-two cell-average restriction | FND-001, STO-001, STO-004 | complete |
-| LIM-001 | Cartesian three-point limited-slope primitive | FND-001, RST-001 | proposed |
+| LIM-001 | Cartesian three-point limited-slope primitive | FND-001, RST-001 | complete |
+| PRL-001 | Cartesian 3D ratio-two limited prolongation | FND-001, RST-001, LIM-001 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -77,8 +78,10 @@ kernel depends only on FND layout, while STO-001/STO-004 provide its immediate
 bounded gather composition.
 RST-001 now freezes the current eight-value ratio-two average independently of
 relation/slot/halo policy and composes it with explicit FINER-source gathering.
-LIM-001 is next; it extracts the independently variable three-point slope rule
-before ratio-two prolongation.
+LIM-001 now extracts the independently variable three-point slope rule as a
+validated scalar plus allocation-free shared inline implementation.  PRL-001 is
+next and owns ratio-two indexing, eta, reconstruction, regions, and coarse
+reach without introducing a slope cache by default.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

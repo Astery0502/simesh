@@ -40,6 +40,7 @@ from .refined_support import (
     plan_balanced_refined_support_prefix,
 )
 from .restriction import restrict_cartesian_2to1_into
+from .limiter import three_point_limited_slope
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
@@ -164,6 +165,7 @@ __all__ = [
     "scaled_difference_into",
     "scatter_blocks_from",
     "supports_output_region",
+    "three_point_limited_slope",
     "transform_physical_halo_value",
     "unravel_cell",
     "valid_output_region",
