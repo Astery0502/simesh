@@ -24,7 +24,8 @@ a capability becomes active.
 | TOP-001 | Validated level-1 topology | MOR-001 | complete |
 | GEO-001 | Cartesian 3D block bounds and spacing | TOP-001 | complete |
 | STO-001 | In-memory block source and sink | FND-001 | complete |
-| STO-002 | Bounded workspace with direct-face and full-halo chunk plans | STO-001, TOP-001 | complete |
+| WSP-001 | Explicit workspace byte and slot-capacity accounting | FND-001 | complete |
+| STO-002 | Bounded workspace with direct-face and full-halo chunk plans | WSP-001, STO-001, TOP-001 | complete |
 | STO-003 | Functional block reader/writer adapters and execution substitution | STO-001 | complete |
 | HAL-001 | Non-periodic physical-boundary halo provision | GEO-001, STO-001 | complete |
 | HAL-002 | Same-level sibling halo provision | TOP-001, HAL-001 | complete |
@@ -53,7 +54,7 @@ complete.
 | TOP-003 | Optional balanced refined six-face materialization | TOP-002, BAL-001 | proposed |
 | GEO-002 | Cartesian 3D refined leaf bounds and spacing | FST-002, GEO-001 | complete |
 | REL-001 | Balanced refined directional relation records | TOP-002, BAL-001 | complete |
-| WSP-001 | Explicit workspace byte and slot-capacity accounting | STO-002 | proposed |
+| PRI-001 | Deterministic ascending primary-prefix planning | WSP-001 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -63,7 +64,8 @@ without depending on balance or face caches.  REL-001 is complete and owns
 selected directional relation records without support or value-transfer
 policy; its consumer evidence keeps optional TOP-003 deferred.  The STO-002
 Yellow trigger is now active.  WSP-001 is the first incremental extraction
-before shared primary traversal/closure boundaries and refined STO-004 support.
+and is complete.  PRI-001 extracts shared primary traversal next, before the
+direct-face/full-halo closure boundaries and refined STO-004 support.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

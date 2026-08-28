@@ -55,9 +55,8 @@ from .chunking import (
     minimum_halo_closed_slots,
     plan_level1_chunk,
     plan_level1_halo_chunk,
-    workspace_nbytes,
-    workspace_slot_capacity,
 )
+from .workspace import workspace_nbytes, workspace_slot_capacity
 from .halos import (
     BoundaryMode,
     common_physical_valid_region,

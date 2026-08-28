@@ -54,7 +54,8 @@ out-of-core execution.
 Status: in progress.  Refined forest reconstruction/conformance, raw contact
 lookup, all-touch balance, leaf geometry, and balanced directional relation
 records are complete.  The triggered STO-002 workspace/traversal/closure
-decomposition precedes refined support planning.
+decomposition precedes refined support planning: workspace accounting is
+extracted, and shared primary-prefix planning is next.
 Six-face TOP-003 caching remains optional and requires repeated-consumer
 performance justification.
 

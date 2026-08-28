@@ -18,11 +18,11 @@ import numpy as np
 from simesh_rewrite.chunking import (
     plan_level1_chunk,
     plan_level1_halo_chunk,
-    workspace_nbytes,
 )
 from simesh_rewrite.morton import level1_morton
 from simesh_rewrite.storage import gather_blocks_into
 from simesh_rewrite.topology import level1_face_neighbors
+from simesh_rewrite.workspace import workspace_nbytes, workspace_slot_capacity
 
 
 def i3(*values: int) -> np.ndarray:
@@ -71,8 +71,12 @@ def plan_full_traversal(
 def memmap_stream(block_count: int, budget_bytes: int) -> dict:
     field_count = 2
     block_shape = i3(16, 16, 16)
-    per_slot = workspace_nbytes(1, field_count, block_shape)
-    capacity = min(block_count, budget_bytes // per_slot)
+    capacity = workspace_slot_capacity(
+        budget_bytes,
+        block_count,
+        field_count,
+        block_shape,
+    )
     managed_bytes = workspace_nbytes(capacity, field_count, block_shape)
     with tempfile.TemporaryDirectory() as directory:
         path = os.path.join(directory, "blocks.npy")

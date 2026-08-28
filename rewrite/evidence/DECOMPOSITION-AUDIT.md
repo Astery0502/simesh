@@ -158,4 +158,7 @@ measurement justify `54*L` retained bytes.  GEO-002 is now complete without a
 balance or cache dependency.  REL-001 is also complete with relation meaning
 separate from support and value-transfer policy.  Its completion activates the
 STO-002 Yellow trigger: WSP-001 accounting is extracted first, followed by
-primary traversal and closure boundaries before STO-004.
+primary traversal and closure boundaries before STO-004.  WSP-001 is now
+complete with legacy chunking wrappers preserved; PRI-001 is the next
+incremental extraction.  STO-002 remains Yellow until the traversal and
+direct-face/full-halo closure ownership is explicit.

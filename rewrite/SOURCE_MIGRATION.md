@@ -37,7 +37,7 @@ No canonical feature may remain merely `inventoried` at final cutover.
 
 | Feature family | Current authority | Rewrite state | Planned closure |
 | --- | --- | --- | --- |
-| Array/index/layout conventions | `amrvac/layouts.py`, canonical array APIs | Core 3D conventions complete; singleton-z pending | M2 and M6 |
+| Array/index/layout conventions | `amrvac/layouts.py`, canonical array APIs | Core 3D conventions and canonical payload/ID workspace accounting complete; singleton-z pending | M2 and M6 |
 | Morton, forest, leaf traversal, connectivity | `utils/lib/amr/morton.pyx`, `forest.pyx` | Level-1/refined 3D reconstruction, conformance, contacts, all-touch balance, and selected direction/source records complete; optional face cache deferred | M1 support/transfer integration, then M2 quadtree and M3 periodic |
 | Mesh geometry and coordinate bookkeeping | `utils/lib/amr/mesh.pyx` | Level-1 and refined Cartesian 3D bounds/spacing complete; refined centers remain sampling-owned | M1 sampling integration, then M2/M3 |
 | Physical, sibling, coarse/fine and periodic halos | `amrvac/boundary.py`, `mesh.pyx` | Physical/level-1 sibling complete with explicit plan/rule/application boundaries and retained fused path | M1 refined, then M2 and M3 |
