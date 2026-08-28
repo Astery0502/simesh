@@ -155,5 +155,7 @@ functions.  TOP-003 remains an
 optional materialization boundary rather than an implied continuation: it may
 activate only when a concrete relation consumer and cached-versus-on-demand
 measurement justify `54*L` retained bytes.  GEO-002 is now complete without a
-balance or cache dependency.  REL-001 is the next capability and must keep
-relation meaning separate from support and value-transfer policy.
+balance or cache dependency.  REL-001 is also complete with relation meaning
+separate from support and value-transfer policy.  Its completion activates the
+STO-002 Yellow trigger: WSP-001 accounting is extracted first, followed by
+primary traversal and closure boundaries before STO-004.

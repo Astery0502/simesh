@@ -42,7 +42,7 @@ STO-004 owns support union/order/capacity/traversal.  They remain separate.
 ```text
 FST-001 -> FST-002 -> TOP-002 -> BAL-001
                               -> optional TOP-003 after BAL-001
-TOP-002 + BAL-001 -> later REL-001 -> STO-004
+TOP-002 + BAL-001 -> REL-001 (complete) -> STO-004
 ```
 
 FST-002, TOP-002, and BAL-001 are complete with independent references,
@@ -52,4 +52,7 @@ diagonal violation and owns only the global all-touch level-gap policy.
 TOP-003 remains deferred because
 no immediate consumer yet justifies `54*L` retained bytes over measured
 on-demand contacts.  Refined geometry is complete independently; REL-001 is the
-first concrete relation consumer that may remeasure the optional cache choice.
+first concrete relation consumer and is now complete.  Its real workload finds
+only 24.8% reduced-face records; a six-face cache costs 1,221,156 retained bytes
+and cannot amortize its construction on one pass.  TOP-003 therefore remains
+deferred until a repeated transfer/halo consumer supplies composed evidence.

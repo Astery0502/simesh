@@ -27,6 +27,14 @@ from .forest import RefinedForest, fill_refined_forest, refined_forest
 from .forest_conformance import validate_refined_forest_arrays
 from .contacts import fill_refined_contact_targets, refined_contact_targets
 from .balance import validate_refined_all_touch_2to1
+from .relations import (
+    RELATION_COARSER,
+    RELATION_FINER,
+    RELATION_PHYSICAL,
+    RELATION_SAME,
+    balanced_refined_relations,
+    fill_balanced_refined_relations,
+)
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
@@ -95,6 +103,7 @@ __all__ = [
     "apply_level1_same_level_halo_plan",
     "execute_level1_m0",
     "execute_level1_m0_from_blocks",
+    "fill_balanced_refined_relations",
     "common_physical_valid_region",
     "central_difference_into",
     "fill_level1_face_neighbors",
@@ -115,6 +124,7 @@ __all__ = [
     "refined_forest",
     "refined_leaf_geometry",
     "refined_contact_targets",
+    "balanced_refined_relations",
     "level1_block_geometry",
     "minimum_face_closed_slots",
     "minimum_halo_closed_slots",
@@ -139,6 +149,10 @@ __all__ = [
     "validate_access_requirement",
     "validate_refined_all_touch_2to1",
     "validate_refined_forest_arrays",
+    "RELATION_PHYSICAL",
+    "RELATION_COARSER",
+    "RELATION_SAME",
+    "RELATION_FINER",
     "workspace_nbytes",
     "workspace_slot_capacity",
     "write_blocks_from",
