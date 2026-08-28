@@ -60,7 +60,8 @@ complete.
 | STO-004 | Balanced refined support union and bounded primary planning | WSP-001, PRI-001, REL-001 | complete |
 | RST-001 | Cartesian 3D ratio-two cell-average restriction | FND-001, STO-001, STO-004 | complete |
 | LIM-001 | Cartesian three-point limited-slope primitive | FND-001, RST-001 | complete |
-| PRL-001 | Cartesian 3D ratio-two limited prolongation | FND-001, RST-001, LIM-001 | proposed |
+| PRL-001 | Cartesian 3D ratio-two limited prolongation | FND-001, RST-001, LIM-001 | complete |
+| RSL-001 | Accepted refined relation source-slot resolution | REL-001, STO-004 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -80,8 +81,10 @@ RST-001 now freezes the current eight-value ratio-two average independently of
 relation/slot/halo policy and composes it with explicit FINER-source gathering.
 LIM-001 now extracts the independently variable three-point slope rule as a
 validated scalar plus allocation-free shared inline implementation.  PRL-001 is
-next and owns ratio-two indexing, eta, reconstruction, regions, and coarse
-reach without introducing a slope cache by default.
+PRL-001 now owns ratio-two indexing, exact phase eta, limited reconstruction,
+regions, and coarse reach without a slope cache.  RSL-001 is next and resolves
+accepted REL sources against the STO-selected vector before higher transfer
+planning chooses targets, phases, or workspace actions.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

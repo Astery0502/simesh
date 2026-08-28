@@ -57,8 +57,9 @@ records are complete.  The triggered STO-002 workspace/traversal/closure
 decomposition precedes refined support planning: workspace accounting, shared
 primary-prefix planning, direct-face closure, complete one-block halo closure,
 and refined support union/bounded planning are complete.  Ratio-two
-cell-average restriction and the independent current three-point limiter are
-also complete.  Ratio-two limited prolongation is next.
+cell-average restriction, the independent current three-point limiter, and
+ratio-two limited prolongation are also complete.  Refined source-slot and
+transfer planning are next.
 Six-face TOP-003 caching remains optional and requires repeated-consumer
 performance justification.
 
