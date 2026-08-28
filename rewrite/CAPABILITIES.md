@@ -30,7 +30,7 @@ a capability becomes active.
 | HAL-002 | Same-level sibling halo provision | TOP-001, HAL-001 | complete |
 | HPL-001 | Explicit level-1 halo relation and selected-source plan | TOP-001, STO-002 | complete |
 | PBC-001 | Per-axis Cartesian physical boundary coordinate/value rules | HAL-001 | complete |
-| HAX-001 | Apply an explicit level-1 same-level halo plan | HPL-001, PBC-001 | proposed |
+| HAX-001 | Apply an explicit level-1 same-level halo plan | HPL-001, PBC-001 | complete |
 | SAM-001 | Exact level-1 block placement | GEO-001, STO-001 | complete |
 | SAM-002 | Zero-order uniform sampling | GEO-001, STO-001 | complete |
 | SAM-003 | Trilinear uniform sampling | HAL-002, GEO-001 | complete |
@@ -53,12 +53,11 @@ FST-001 supplies explicit flat preorder hierarchy and leaf maps.  TOP-002 is
 the next dependency-ready capability; refined geometry can then proceed from
 FST-001 while directional relation planning proceeds from TOP-002.
 
-Decomposition audit checkpoint: HAL-002 is Red and is being incrementally
-refined before M1 implementation resumes.  HPL-001 has extracted its
-relation/source-slot planning decision and PBC-001 has extracted shared
-physical coordinate/value rules; the explicit plan-application boundary
-HAX-001 remains.  The preserved untracked TOP-002
-draft is also Red and must split reusable FST conformance, exact contact
+Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
+HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;
+HAL-002 is retained as the measured Fused compatibility implementation.  The
+preserved untracked TOP-002 draft remains Red and must split reusable FST
+conformance and exact contact
 semantics, BAL-001, and optional face materialization before contract freeze.
 STO-002 is Yellow with a mandatory split trigger before refined support
 planning.  SAM-002 and SAM-003 are retained Fused implementations whose missing

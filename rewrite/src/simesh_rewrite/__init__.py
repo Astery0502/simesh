@@ -57,6 +57,7 @@ from .halo_plans import (
     fill_level1_halo_relation_plan,
     level1_halo_relation_plan,
 )
+from .halo_apply import apply_level1_same_level_halo_plan
 from .sampling import (
     place_level1_blocks,
     sample_level1_trilinear,
@@ -84,6 +85,7 @@ __all__ = [
     "copy_region_into",
     "array_block_reader",
     "array_block_writer",
+    "apply_level1_same_level_halo_plan",
     "execute_level1_m0",
     "execute_level1_m0_from_blocks",
     "common_physical_valid_region",

@@ -131,3 +131,13 @@ the simple composition.  Until that concrete trigger, both remain unchanged.
 No other completed capability blocks TOP work.  Green capabilities remain
 unchanged; Yellow/Fused triggers above are durable requirements for their later
 consumers and final cutover audit.
+
+## Phase B HAL-002 Resolution
+
+The Red HAL-002 finding is resolved incrementally without replacing the fast
+entrypoint: HPL-001 extracts relation/source-slot planning, PBC-001 extracts
+physical coordinate/value rules, and HAX-001 extracts explicit plan application.
+Old/fused, new/composed, and independent references agree bitwise; kernel and
+composition trade-offs are recorded in their evidence.  HAL-002 is now retained
+Fused rather than Red.  The in-progress TOP draft is the only remaining Red
+finding and is next for boundary re-audit/split.

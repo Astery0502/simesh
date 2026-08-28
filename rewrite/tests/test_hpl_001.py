@@ -9,8 +9,10 @@ from simesh_rewrite.halo_plans import (
     level1_halo_relation_plan,
 )
 from simesh_rewrite.halo_plans_reference import (
-    fill_same_level_halos_from_plan_reference,
     level1_halo_relation_plan_reference,
+)
+from simesh_rewrite.halo_apply_reference import (
+    apply_level1_same_level_halo_plan_reference,
 )
 from simesh_rewrite.halos import fill_physical_halos, fill_same_level_halos
 from simesh_rewrite.morton import level1_morton
@@ -167,7 +169,7 @@ def test_plan_reference_consumer_matches_retained_hal002_bitwise() -> None:
         normals,
     )
     expected = payload.copy()
-    fill_same_level_halos_from_plan_reference(
+    apply_level1_same_level_halo_plan_reference(
         expected,
         lower,
         upper,

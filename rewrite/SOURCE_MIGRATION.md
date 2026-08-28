@@ -40,7 +40,7 @@ No canonical feature may remain merely `inventoried` at final cutover.
 | Array/index/layout conventions | `amrvac/layouts.py`, canonical array APIs | Core 3D conventions complete; singleton-z pending | M2 and M6 |
 | Morton, forest, leaf traversal, connectivity | `utils/lib/amr/morton.pyx`, `forest.pyx` | Level-1 and refined 3D forest reconstruction complete; refined connectivity pending | M1 refined topology, M2 quadtree, M3 periodic |
 | Mesh geometry and coordinate bookkeeping | `utils/lib/amr/mesh.pyx` | Level-1 3D complete | M1/M2/M3 |
-| Physical, sibling, coarse/fine and periodic halos | `amrvac/boundary.py`, `mesh.pyx` | Physical and level-1 sibling complete; relation plan and physical scalar rules extracted | Finish HAX-001/HAL-002 decomposition, then M1 refined, M2, M3 |
+| Physical, sibling, coarse/fine and periodic halos | `amrvac/boundary.py`, `mesh.pyx` | Physical/level-1 sibling complete with explicit plan/rule/application boundaries and retained fused path | M1 refined, then M2 and M3 |
 | Exact/uniform sampling and uniform-to-SFC placement | `mesh.pyx`, `amrvac_uniform.py` | Level-1 3D placement/zero/trilinear complete | M1/M2/M3/M5 |
 | Pointwise, stencil, reduction and diagnostics | `derived_fields.py`, `mesh.pyx`, legacy diagnostic evidence | Representative contracts complete | M4 |
 | Derived-field registration/materialization and field selectors | `amrvac_dataset.py`, `derived_fields.py` | Not migrated | M4 and M6 |

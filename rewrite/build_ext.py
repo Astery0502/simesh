@@ -67,6 +67,11 @@ def main() -> None:
             include_dirs=[np.get_include()],
         ),
         Extension(
+            "simesh_rewrite._halo_apply",
+            [str(ROOT / "src/simesh_rewrite/_halo_apply.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
             "simesh_rewrite._sampling",
             [str(ROOT / "src/simesh_rewrite/_sampling.pyx")],
             include_dirs=[np.get_include()],
