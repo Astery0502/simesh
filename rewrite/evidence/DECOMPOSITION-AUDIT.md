@@ -163,4 +163,6 @@ complete with legacy chunking wrappers preserved; PRI-001 is the next
 incremental extraction and is now complete with the M0 pass-one consumer
 migrated.  FCL-001 direct-face closure is also complete with legacy wrappers
 preserved.  STO-002 remains Yellow until HCL-001 extracts full-halo closure, the
-final unresolved decision.
+final unresolved decision.  HCL-001 is now complete with the M0 pass-two
+consumer migrated.  STO-002 is reclassified as a retained compatibility
+composition over WSP/PRI/FCL/HCL; its Yellow finding is resolved before STO-004.

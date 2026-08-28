@@ -15,7 +15,7 @@ from numpy.lib.format import open_memmap
 import numpy as np
 
 import simesh_rewrite.pipeline as pipeline_module
-from simesh_rewrite.chunking import plan_level1_halo_chunk
+from simesh_rewrite.halo_closure import plan_level1_halo_closed_prefix
 from simesh_rewrite.morton import level1_morton
 from simesh_rewrite.pipeline import execute_level1_m0
 from simesh_rewrite.primary import fill_ascending_primary_prefix
@@ -73,7 +73,7 @@ def planner_stats(capacity: int, faces: np.ndarray) -> dict:
     halo_chunks = 0
     selected_total = 0
     while first < faces.shape[0]:
-        primary, selected = plan_level1_halo_chunk(first, faces, ids)
+        primary, selected = plan_level1_halo_closed_prefix(first, faces, ids)
         first += primary
         selected_total += selected
         halo_chunks += 1
@@ -87,7 +87,7 @@ def planner_stats(capacity: int, faces: np.ndarray) -> dict:
 def profile_call(call) -> tuple[tuple[float, int], float, dict]:
     names = (
         "fill_ascending_primary_prefix",
-        "plan_level1_halo_chunk",
+        "plan_level1_halo_closed_prefix",
         "read_blocks_into",
         "scaled_difference_into",
         "write_blocks_from",
@@ -125,7 +125,7 @@ def profile_call(call) -> tuple[tuple[float, int], float, dict]:
                 state["phase"] = "pass_one"
                 state["pass_one_start"] = time.perf_counter()
             elif (
-                name == "plan_level1_halo_chunk"
+                name == "plan_level1_halo_closed_prefix"
                 and state["phase"] == "pass_one"
                 and int(args[0]) == 0
             ):
@@ -138,7 +138,7 @@ def profile_call(call) -> tuple[tuple[float, int], float, dict]:
             finally:
                 totals[active_phase][name] += time.perf_counter() - started
             if (
-                name == "plan_level1_halo_chunk"
+                name == "plan_level1_halo_closed_prefix"
                 and active_phase == "preflight"
                 and int(args[0]) + int(result[0]) >= args[1].shape[0]
             ):

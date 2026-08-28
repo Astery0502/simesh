@@ -14,7 +14,7 @@ from .blockio import (
     read_blocks_into,
     write_blocks_from,
 )
-from ._chunking import minimum_halo_closed_slots_unchecked
+from ._chunking import minimum_level1_halo_closed_slots_unchecked
 from ._geometry import validate_selected_geometry_unchecked
 from ._halos import (
     duplicate_block_id_index_unchecked,
@@ -25,10 +25,10 @@ from ._sampling import (
     validate_selected_level1_placement_unchecked,
     validate_trilinear_stencils_unchecked,
 )
-from .chunking import plan_level1_halo_chunk
 from .foundation import _require_index_triplet, _require_payload
 from .geometry import _require_float_triplet
 from .halos import fill_physical_halos, fill_same_level_halos
+from .halo_closure import plan_level1_halo_closed_prefix
 from .morton import _root_volume
 from .operators import central_difference_into, scaled_difference_into
 from .primary import fill_ascending_primary_prefix
@@ -419,7 +419,7 @@ def execute_level1_m0_from_blocks(
         (budget_bytes - 8) // bytes_per_slot,
     )
     minimum_capacity = int(
-        minimum_halo_closed_slots_unchecked(face_neighbor_ids)
+        minimum_level1_halo_closed_slots_unchecked(face_neighbor_ids)
     )
     if capacity < minimum_capacity:
         raise ValueError(
@@ -473,7 +473,7 @@ def execute_level1_m0_from_blocks(
 
     first = 0
     while first < block_count:
-        primary_count, selected_count = plan_level1_halo_chunk(
+        primary_count, selected_count = plan_level1_halo_closed_prefix(
             first,
             face_neighbor_ids,
             ids,
@@ -591,7 +591,7 @@ def execute_level1_m0_from_blocks(
     # Pass two.
     first = 0
     while first < block_count:
-        primary_count, selected_count = plan_level1_halo_chunk(
+        primary_count, selected_count = plan_level1_halo_closed_prefix(
             first,
             face_neighbor_ids,
             ids,

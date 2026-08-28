@@ -25,11 +25,11 @@ a capability becomes active.
 | GEO-001 | Cartesian 3D block bounds and spacing | TOP-001 | complete |
 | STO-001 | In-memory block source and sink | FND-001 | complete |
 | WSP-001 | Explicit workspace byte and slot-capacity accounting | FND-001 | complete |
-| STO-002 | Bounded workspace with direct-face and full-halo chunk plans | WSP-001, PRI-001, FCL-001, STO-001, TOP-001 | complete |
+| STO-002 | Bounded workspace and chunk compatibility wrappers | WSP-001, PRI-001, FCL-001, HCL-001, STO-001, TOP-001 | complete |
 | STO-003 | Functional block reader/writer adapters and execution substitution | STO-001 | complete |
 | HAL-001 | Non-periodic physical-boundary halo provision | GEO-001, STO-001 | complete |
-| HAL-002 | Same-level sibling halo provision | TOP-001, HAL-001 | complete |
-| HPL-001 | Explicit level-1 halo relation and selected-source plan | TOP-001, STO-002 | complete |
+| HAL-002 | Same-level sibling halo provision | TOP-001, HCL-001, HAL-001 | complete |
+| HPL-001 | Explicit level-1 halo relation and selected-source plan | TOP-001, HCL-001 | complete |
 | PBC-001 | Per-axis Cartesian physical boundary coordinate/value rules | HAL-001 | complete |
 | HAX-001 | Apply an explicit level-1 same-level halo plan | HPL-001, PBC-001 | complete |
 | SAM-001 | Exact level-1 block placement | GEO-001, STO-001 | complete |
@@ -56,7 +56,8 @@ complete.
 | REL-001 | Balanced refined directional relation records | TOP-002, BAL-001 | complete |
 | PRI-001 | Deterministic ascending primary-prefix planning | WSP-001 | complete |
 | FCL-001 | Deterministic direct-face support closure | PRI-001, TOP-001 | complete |
-| HCL-001 | Deterministic complete one-block halo support closure | PRI-001, TOP-001 | proposed |
+| HCL-001 | Deterministic complete one-block halo support closure | PRI-001, TOP-001 | complete |
+| STO-004 | Balanced refined support union and bounded primary planning | WSP-001, PRI-001, REL-001 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -65,19 +66,19 @@ complete.  GEO-002 is also complete and consumes validated FST artifacts
 without depending on balance or face caches.  REL-001 is complete and owns
 selected directional relation records without support or value-transfer
 policy; its consumer evidence keeps optional TOP-003 deferred.  The STO-002
-Yellow trigger is now active.  WSP-001 is the first incremental extraction
-and is complete.  PRI-001 shared primary traversal is also complete, before the
-then-remaining closure boundaries and refined STO-004 support.  FCL-001
-direct-face closure is complete; HCL-001 full-halo closure is the final STO-002
-Yellow extraction before refined support.
+Yellow trigger activated the now-complete extraction sequence: WSP-001
+accounting, PRI-001 primary traversal, FCL-001 direct-face closure, and HCL-001
+full-halo closure.  STO-002 is now a retained compatibility composition;
+STO-004 refined support is next.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;
 HAL-002 is retained as the measured Fused compatibility implementation.  The
 preserved TOP drafts have now been split into the M1 capabilities above; no Red
 combined TOP contract remains.
-STO-002 is Yellow with a mandatory split trigger before refined support
-planning.  SAM-002 and SAM-003 are retained Fused implementations whose missing
+The STO-002 Yellow trigger is resolved by WSP-001, PRI-001, FCL-001, and
+HCL-001 with compatibility wrappers preserved.  SAM-002 and SAM-003 are
+retained Fused implementations whose missing
 semantic boundaries are extracted at refined sampling.  See
 `evidence/DECOMPOSITION-AUDIT.md`.
 

@@ -91,6 +91,12 @@ cpdef int64_t minimum_halo_closed_slots_unchecked(
     return maximum
 
 
+cpdef int64_t minimum_level1_halo_closed_slots_unchecked(
+    const int64_t[:, ::1] face_neighbor_ids,
+):
+    return minimum_halo_closed_slots_unchecked(face_neighbor_ids)
+
+
 cpdef tuple plan_level1_chunk_unchecked(
     int64_t first_primary_id,
     const int64_t[:, ::1] face_neighbor_ids,
@@ -189,11 +195,24 @@ cpdef tuple plan_level1_halo_chunk_unchecked(
     const int64_t[:, ::1] face_neighbor_ids,
     int64_t[::1] chunk_block_ids,
 ):
+    return plan_level1_halo_closed_prefix_unchecked(
+        first_primary_id,
+        face_neighbor_ids,
+        chunk_block_ids,
+    )
+
+
+cpdef tuple plan_level1_halo_closed_prefix_unchecked(
+    int64_t first_primary_id,
+    const int64_t[:, ::1] face_neighbor_ids,
+    int64_t[::1] chunk_block_ids,
+):
     cdef int64_t block_count = face_neighbor_ids.shape[0]
     cdef int64_t capacity = chunk_block_ids.shape[0]
     cdef int64_t primary_count = 0
     cdef int64_t selected_count = 0
-    cdef int64_t candidate, neighbor, missing, position, index
+    cdef int64_t candidate, neighbor, missing, position, index, new_count
+    cdef int64_t new_support[26]
     cdef int dx, dy, dz
 
     if first_primary_id == block_count:
@@ -208,6 +227,7 @@ cpdef tuple plan_level1_halo_chunk_unchecked(
             candidate,
         )
         missing = 1 if position < 0 else 0
+        new_count = 0
         for dz in range(-1, 2):
             for dy in range(-1, 2):
                 for dx in range(-1, 2):
@@ -228,6 +248,8 @@ cpdef tuple plan_level1_halo_chunk_unchecked(
                         neighbor,
                     ):
                         missing += 1
+                        new_support[new_count] = neighbor
+                        new_count += 1
 
         if selected_count + missing > capacity:
             if primary_count == 0:
@@ -245,26 +267,8 @@ cpdef tuple plan_level1_halo_chunk_unchecked(
         primary_count += 1
         selected_count += 1
 
-        for dz in range(-1, 2):
-            for dy in range(-1, 2):
-                for dx in range(-1, 2):
-                    if dx == 0 and dy == 0 and dz == 0:
-                        continue
-                    neighbor = _walk_direction(
-                        candidate,
-                        dx,
-                        dy,
-                        dz,
-                        face_neighbor_ids,
-                    )
-                    if neighbor >= 0 and not _is_selected(
-                        first_primary_id,
-                        primary_count,
-                        chunk_block_ids,
-                        selected_count,
-                        neighbor,
-                    ):
-                        chunk_block_ids[selected_count] = neighbor
-                        selected_count += 1
+        for index in range(new_count):
+            chunk_block_ids[selected_count] = new_support[index]
+            selected_count += 1
 
     return primary_count, selected_count

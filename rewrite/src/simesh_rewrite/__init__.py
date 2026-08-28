@@ -62,6 +62,10 @@ from .face_closure import (
     minimum_direct_face_closed_slots,
     plan_direct_face_closed_prefix,
 )
+from .halo_closure import (
+    minimum_level1_halo_closed_slots,
+    plan_level1_halo_closed_prefix,
+)
 from .halos import (
     BoundaryMode,
     common_physical_valid_region,
@@ -134,12 +138,14 @@ __all__ = [
     "minimum_face_closed_slots",
     "minimum_direct_face_closed_slots",
     "minimum_halo_closed_slots",
+    "minimum_level1_halo_closed_slots",
     "make_block_reader",
     "make_block_writer",
     "merge_field_sums",
     "plan_level1_chunk",
     "plan_direct_face_closed_prefix",
     "plan_level1_halo_chunk",
+    "plan_level1_halo_closed_prefix",
     "place_level1_blocks",
     "physical_halo_source_index",
     "ravel_cell",

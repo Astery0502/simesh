@@ -3,11 +3,11 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: FCL-001 deterministic direct-face support closure.
-- Current capability: HCL-001 deterministic complete one-block halo support closure, proposed.
+- Last completed capability: HCL-001 deterministic complete one-block halo support closure.
+- Current capability: STO-004 balanced refined support union and bounded primary planning, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
-- Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  STO-002 is Yellow before refined support planning; SAM-002/SAM-003 are retained Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  The STO-002 Yellow finding is resolved by WSP/PRI/FCL/HCL with wrappers retained.  SAM-002/SAM-003 remain Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
 
@@ -54,10 +54,10 @@
 - HAL-001 maps only from valid interior cells, composes incident rules x then y then z, and fills each slot's exact physical envelope in place.
 - The common FND valid box is the intersection of slot envelopes; reflected depth beyond the interior and missing no-inflow metadata are rejected.
 - HAL-002 maps each sibling-dependent primary halo cell directly from one selected interior, uses fixed 27-slot stack lookup, and never reads or mutates support halos.
-- HAL-002 requires complete STO-002 one-block closure and halo widths no larger than the interior extent, then establishes the full padded valid box for the primary prefix.
+- HAL-002 requires complete HCL-001 one-block closure and halo widths no larger than the interior extent, then establishes the full padded valid box for the primary prefix.
 - Mixed sibling/physical transforms retain HAL-001's deterministic x/y/z order; this intentionally differs from the current pass-ordered kernel only where no-inflow and antisymmetry do not commute.
 - SAM-001 places a selected valid block region by exact integer cell boxes into field-first native uniform output; no floating geometry comparison is used.
-- Reordered and repeated placement is deterministic in slot order, while bounded STO-002 primary traversal gives exactly-once disjoint native-grid coverage.
+- Reordered and repeated placement is deterministic in slot order, while bounded PRI-001 primary traversal gives exactly-once disjoint native-grid coverage.
 - SAM-002 defines output centers with separate binary64 operations and assigns exact face ties to the highest canonical native cell, giving one deterministic block owner.
 - Sample bounds must lie inside the domain; outer-center-collapsed grids are rejected, while GEO-valid coincident internal faces use the explicit highest-face rule.
 - SAM-001 native dispatch requires a separately amortized exact owner proof and is not repeated inside bounded SAM-002 chunk calls.
@@ -231,6 +231,15 @@
   3.457/2.279/1.702 amplification at capacities 64/256/1,024.  Runtime remains
   about 3.85/2.20/0.94 million primaries/s with zero retained traced bytes and
   a fixed 576--600-byte peak.
+- HCL-001 owns complete clipped level-1 one-block `3x3x3` closure: 26 x-fast
+  directions, fixed x/y/z face walks, physical clipping, promotion/order,
+  greedy maximality, and exact topology-specific progress up to 27 slots.  HAL
+  still owns width/reach and values; refined REL-source union belongs STO-004.
+- A fixed 26-ID C stack removes the redundant accepted-trial second walk while
+  preserving every selected ID.  HCL reaches 1.59/0.80/0.39 million primaries/s
+  at capacities 64/256/1,024, about 1.7--1.9x the recorded baseline, with zero
+  retained traced bytes and a fixed 576--600-byte peak.  M0 pass-two artifacts
+  and reduction remain bit-identical within the composed runtime gate.
 
 ## Next Work
 
@@ -238,10 +247,10 @@ M0 and the pre-M1 functional/migration/performance protocols are complete, and
 FST-001 reconstructs refined 3D hierarchy and leaf order.  Phase A decomposition
 audit is complete and FST-002/TOP-002/BAL-001/GEO-002/REL-001 separately
 establish conformance, raw contacts, all-touch admissibility, selected refined
-geometry, and selected relation records.  The STO-002 Yellow trigger is active;
-WSP-001 accounting, PRI-001 primary traversal, and FCL-001 direct-face closure
-are complete.  Next is HCL-001 full-halo closure, the final split before refined
-support planning,
+geometry, and selected relation records.  The STO-002 Yellow trigger is resolved:
+WSP-001 accounting, PRI-001 primary traversal, FCL-001 direct-face closure, and
+HCL-001 full-halo closure are complete.  Next is STO-004 refined support union
+and bounded planning, followed by
 restriction/prolongation, refined halos, sampling, a native selective `.dat`
 adapter, and real-data bounded integration.
 
@@ -257,6 +266,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_wsp_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pri_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_fcl_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hcl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hax_001.py
@@ -277,6 +287,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/rel_001.py --max-
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/wsp_001.py --calls 10000 --repeats 15
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/pri_001.py --block-count 32768 --capacities 1,8,64,256,1024,32768 --repeats 15
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/fcl_001.py --capacities 64,256,1024 --repeats 15
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/hcl_001.py --capacities 64,256,1024 --repeats 15
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
@@ -293,3 +304,4 @@ evidence is in `evidence/GEO-002.md`; REL-001 evidence is in
 `evidence/REL-001.md`; WSP-001 evidence is in `evidence/WSP-001.md`.
 PRI-001 evidence is in `evidence/PRI-001.md`.
 FCL-001 evidence is in `evidence/FCL-001.md`.
+HCL-001 evidence is in `evidence/HCL-001.md`.

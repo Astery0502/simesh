@@ -5,14 +5,14 @@ from __future__ import annotations
 import numpy as np
 
 from ._chunking import (
-    minimum_halo_closed_slots_unchecked,
-    plan_level1_halo_chunk_unchecked,
+    plan_level1_halo_closed_prefix_unchecked,
     plan_direct_face_closed_prefix_unchecked,
 )
 from .face_closure import (
     _require_face_table,
     minimum_direct_face_closed_slots,
 )
+from .halo_closure import minimum_level1_halo_closed_slots
 from ._primary import fill_ascending_primary_prefix_unchecked
 from .primary import _require_primary_ids
 from .workspace import (
@@ -56,9 +56,8 @@ def minimum_face_closed_slots(face_neighbor_ids: np.ndarray) -> int:
 
 
 def minimum_halo_closed_slots(face_neighbor_ids: np.ndarray) -> int:
-    """Return capacity sufficient for any one-block 3x3x3 halo closure."""
-    face_neighbor_ids = _require_face_table(face_neighbor_ids)
-    return int(minimum_halo_closed_slots_unchecked(face_neighbor_ids))
+    """Compatibility wrapper for HCL-001 minimum full-halo capacity."""
+    return minimum_level1_halo_closed_slots(face_neighbor_ids)
 
 
 def plan_level1_chunk(
@@ -127,7 +126,7 @@ def plan_level1_halo_chunk(
         raise ValueError("chunk capacity must be positive before the end")
     return tuple(
         int(value)
-        for value in plan_level1_halo_chunk_unchecked(
+        for value in plan_level1_halo_closed_prefix_unchecked(
             first_primary_id,
             face_neighbor_ids,
             chunk_block_ids,
