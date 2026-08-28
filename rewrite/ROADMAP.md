@@ -38,6 +38,16 @@ out-of-core execution.
 
 ## M1: Cartesian 3D Refined AMR
 
+Before refined halo work, complete the functional-composition checkpoint:
+
+- expose block readers and writers as explicit coarse-grained function
+  adapters over canonical buffers;
+- retain array/memmap behavior as one backend rather than a semantic
+  dependency;
+- keep resident and bounded traversal as interchangeable execution strategies;
+- separate halo requirements, support closure, relation planning, and value
+  transfer before adding coarse/fine behavior.
+
 Add:
 
 - validated parent/child reconstruction;
@@ -46,6 +56,10 @@ Add:
 - refined ghost provision;
 - refined zero-order and trilinear sampling;
 - refined real-data comparison.
+
+M1 storage and halo implementations must compose through the same canonical
+contracts. Native AMRVAC, mapped, resident, cached, or other adapters may alter
+I/O and scheduling but not refined numerical semantics.
 
 ## M2: Cartesian 2D
 

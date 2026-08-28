@@ -24,6 +24,16 @@ from .topology import (
     level1_face_neighbors,
 )
 from .storage import gather_blocks_into, scatter_blocks_from
+from .blockio import (
+    BlockReader,
+    BlockWriter,
+    array_block_reader,
+    array_block_writer,
+    make_block_reader,
+    make_block_writer,
+    read_blocks_into,
+    write_blocks_from,
+)
 from .chunking import (
     minimum_face_closed_slots,
     minimum_halo_closed_slots,
@@ -49,18 +59,23 @@ from .reductions import (
     finalize_field_sum,
     merge_field_sums,
 )
-from .pipeline import execute_level1_m0
+from .pipeline import execute_level1_m0, execute_level1_m0_from_blocks
 
 __all__ = [
     "AccessPattern",
     "accumulate_field_sum",
     "AXIS_NAMES",
     "BoundaryMode",
+    "BlockReader",
+    "BlockWriter",
     "INDEX_DTYPE",
     "PAYLOAD_DTYPE",
     "PHYSICAL_BOUNDARY_ID",
     "copy_region_into",
+    "array_block_reader",
+    "array_block_writer",
     "execute_level1_m0",
+    "execute_level1_m0_from_blocks",
     "common_physical_valid_region",
     "central_difference_into",
     "fill_level1_face_neighbors",
@@ -76,12 +91,15 @@ __all__ = [
     "level1_block_geometry",
     "minimum_face_closed_slots",
     "minimum_halo_closed_slots",
+    "make_block_reader",
+    "make_block_writer",
     "merge_field_sums",
     "plan_level1_chunk",
     "plan_level1_halo_chunk",
     "place_level1_blocks",
     "ravel_cell",
     "required_input_region",
+    "read_blocks_into",
     "sample_level1_zero_order",
     "sample_level1_trilinear",
     "scaled_difference_into",
@@ -92,4 +110,5 @@ __all__ = [
     "validate_access_requirement",
     "workspace_nbytes",
     "workspace_slot_capacity",
+    "write_blocks_from",
 ]

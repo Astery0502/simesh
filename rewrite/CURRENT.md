@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M0 complete.
-- Last completed capability: INT-001.
-- Current capability: none; no M0 work remains.
-- Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path plus independent references.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Last completed capability: STO-003 functional composition checkpoint.
+- Current capability: none; no pre-M1 composition work remains.
+- Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, independent references, and explicit functional block reader/writer substitution over resident, mapped, or future external state.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: none.
 
 ## Decisions Already Established
@@ -76,6 +76,21 @@
 - INT-001 uses separate no-closure and full-halo passes with one padded payload, one ID vector, one reused output workspace, and one persistent reduction scalar.
 - Managed raw bytes are exactly `8*S*(F*Pvol+Bvol+1)+8`; source mapping/page cache, fixed controls, topology, and five final outputs are outside that budget and reported separately.
 - Full semantic topology and actual-ID dry-plan validation complete before any result mutation; successful execution fully overwrites every sink/grid.
+- External storage/framework state belongs behind coarse-grained functional
+  reader/writer adapters; numerical kernels receive only canonical buffers and
+  explicit metadata.
+- A block adapter is frozen explicit state, canonical shape, one transfer
+  function, and exposed memory-alias arrays; no global backend registry or
+  hidden dispatch is used.
+- Python adapter functions run once per planned transfer and never inside
+  Cython cell, stencil, or block hot loops.
+- `execute_level1_m0(...)` remains the stable array/memmap compatibility
+  surface and delegates to `execute_level1_m0_from_blocks(...)`.
+- Full-capacity resident and bounded functional strategies use the same
+  numerical contracts and produce bit-identical M0 artifacts.
+- HAL-001 and HAL-002 remain physical and level-1 same-level primitives; M1
+  must separately compose access reach, support planning, relation
+  classification, same-level copy, prolongation, and restriction.
 
 ## Next Work
 
@@ -87,9 +102,11 @@ is outside this completed goal.
 
 ```text
 .venv/bin/python rewrite/build_ext.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_003.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_int_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/int_001.py --repeats 7
+PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/sto_003.py --repeats 31
 ```
 
-INT-001 and M0 completion evidence is recorded in `evidence/INT-001.md`.
+STO-003 composition evidence is recorded in `evidence/STO-003.md`; INT-001 and
+M0 completion evidence remains in `evidence/INT-001.md`.

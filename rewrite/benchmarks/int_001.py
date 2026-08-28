@@ -87,9 +87,9 @@ def profile_call(call) -> tuple[tuple[float, int], float, dict]:
     names = (
         "plan_level1_chunk",
         "plan_level1_halo_chunk",
-        "gather_blocks_into",
+        "read_blocks_into",
         "scaled_difference_into",
-        "scatter_blocks_from",
+        "write_blocks_from",
         "place_level1_blocks",
         "sample_level1_zero_order",
         "accumulate_field_sum",

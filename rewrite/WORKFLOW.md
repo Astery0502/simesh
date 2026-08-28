@@ -82,6 +82,35 @@ Keep the separate reference kernels even when the production path uses a fused
 implementation. A fused path must preserve the contracts of the capabilities it
 combines.
 
+## Alternative Implementations And Adapters
+
+An implementation is replaceable only when the substitution boundary is
+explicit and the alternatives share one conformance suite. Use coarse-grained
+Python function adapters for storage or framework transfer at chunk boundaries;
+keep Cython cell and block loops free of Python callbacks.
+
+For a new backend or execution strategy:
+
+1. identify the existing semantic contract it must preserve;
+2. keep backend state, shape, ownership, alias information, and transfer
+   callable explicit;
+3. transfer into or out of canonical caller-owned buffers unless the backend
+   independently implements the complete compute contract;
+4. run the same exact/numerical tests through every implementation;
+5. measure adapter overhead, transfer amplification, retained state, peak
+   memory, and failure behavior separately from kernel runtime;
+6. retain a simple resident-array path as the reference composition.
+
+Do not add global backend registries, inheritance frameworks, dynamic kernel
+dispatch in hot loops, or framework-specific branches inside domain kernels.
+Add a small adapter only when a concrete implementation needs it.
+
+Halo evolution follows the same rule. Operator reach determines requirements;
+topology and geometry determine source relations; a support planner determines
+what must be resident; physical, same-level, prolongation, restriction, and
+periodic functions determine values; the executor composes them. Each layer is
+tested independently and no layer infers another from hidden state.
+
 Stop the current optimization cycle when the implementation is correct,
 integrated, and useful on the runtime-memory-complexity trade-off, and the next
 credible variant does not provide a material improvement. Record valuable

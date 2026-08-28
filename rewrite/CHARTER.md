@@ -37,11 +37,36 @@ This does not require immutable large arrays. In-place writes and reusable
 buffers are expected where they improve performance and preserve a clear
 contract.
 
+## Composition And Substitution
+
+Functional structure is also the rewrite's portability boundary. Domain
+semantics must be expressible as explicit functions over plain metadata and
+caller-owned buffers so storage, execution, and compute implementations can be
+replaced independently.
+
+- Storage adapters move selected regions between an external representation
+  and the canonical workspace; they do not define topology, halo, sampling, or
+  operator semantics.
+- Execution strategies decide resident versus bounded traversal, caching, and
+  scheduling; they do not change numerical contracts.
+- Compute kernels consume canonical buffers and explicit plans; they do not
+  inspect file handles, memory maps, framework objects, or implicit global
+  state.
+- Alternative implementations are interchangeable only after they pass the
+  same contract and composition tests. A shared function name alone is not a
+  portability guarantee.
+
+Python callables may be injected at block/chunk orchestration boundaries, where
+their state and side effects are explicit. They must not be invoked from cell,
+stencil, or block hot loops in Cython. Framework-specific arrays are converted
+or transferred at an adapter boundary unless a separately validated compute
+backend implements the same kernel contracts directly.
+
 ## Design Principles
 
 1. Establish semantics before optimization.
 2. Separate logical fields, physical storage, operator requirements, and execution plans.
-3. Separate topology, geometry, ghost-value rules, and ghost storage.
+3. Separate topology, geometry, halo requirements, support planning, value rules, and halo storage.
 4. Keep Python orchestration out of Cython hot loops.
 5. Prefer simple typed kernels with explicit buffers over hidden mutable classes.
 6. Keep a clear reference path before introducing fused or parallel variants.
@@ -50,6 +75,8 @@ contract.
 9. Add abstractions only after concrete capabilities demonstrate a shared need.
 10. Keep the development process light; do not add hashes, signatures, authentication, or defensive ceremony.
 11. Build from low-level semantic functions upward, then optimize both individual kernels and their composed execution paths.
+12. Make implementation substitution explicit at coarse orchestration boundaries, not through hidden dispatch inside numerical kernels.
+13. Keep resident, bounded, cached, and future framework-specific execution as strategies over shared contracts rather than separate scientific implementations.
 
 ## Support Sequence
 

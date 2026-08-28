@@ -4,6 +4,16 @@ from __future__ import annotations
 
 import numpy as np
 
+from .blockio import (
+    BlockReader,
+    BlockWriter,
+    _require_block_reader,
+    _require_block_writer,
+    array_block_reader,
+    array_block_writer,
+    read_blocks_into,
+    write_blocks_from,
+)
 from ._chunking import minimum_halo_closed_slots_unchecked
 from ._geometry import validate_selected_geometry_unchecked
 from ._halos import (
@@ -29,11 +39,7 @@ from .sampling import (
     sample_level1_trilinear,
     sample_level1_zero_order,
 )
-from .storage import (
-    _require_index_vector,
-    gather_blocks_into,
-    scatter_blocks_from,
-)
+from .storage import _require_index_vector
 from .topology import _require_mapping_input
 
 
@@ -78,13 +84,13 @@ def _product(name: str, shape: np.ndarray) -> int:
     return result
 
 
-def _require_result_backing(
+def _require_result_writer(
     name: str,
-    value: np.ndarray,
+    value: BlockWriter,
     block_count: int,
     block_shape: tuple[int, int, int],
-) -> np.ndarray:
-    value = _require_payload(name, value, writable=True)
+) -> BlockWriter:
+    value = _require_block_writer(value)
     expected = (block_count, 1, *block_shape)
     if value.shape != expected:
         raise ValueError(f"{name} must have shape {expected}, got {value.shape}")
@@ -92,22 +98,25 @@ def _require_result_backing(
 
 
 def _validate_result_nonoverlap(
-    backing: np.ndarray,
-    results: tuple[np.ndarray, ...],
+    reader: BlockReader,
+    writers: tuple[BlockWriter, ...],
+    grids: tuple[np.ndarray, ...],
     metadata: tuple[np.ndarray, ...],
 ) -> None:
-    for index, result in enumerate(results):
-        if np.shares_memory(result, backing) or any(
-            np.shares_memory(result, value) for value in metadata
-        ):
+    input_arrays = (*reader.memory_arrays, *metadata)
+    output_arrays = tuple(
+        array for writer in writers for array in writer.memory_arrays
+    ) + grids
+    for index, result in enumerate(output_arrays):
+        if any(np.shares_memory(result, value) for value in input_arrays):
             raise ValueError("pipeline results must not overlap inputs or metadata")
-        for other in results[index + 1 :]:
+        for other in output_arrays[index + 1 :]:
             if np.shares_memory(result, other):
                 raise ValueError("pipeline results must be pairwise nonoverlapping")
 
 
-def execute_level1_m0(
-    backing: np.ndarray,
+def execute_level1_m0_from_blocks(
+    reader: BlockReader,
     field_ids: np.ndarray,
     domain_lower: np.ndarray,
     domain_upper: np.ndarray,
@@ -127,18 +136,21 @@ def execute_level1_m0(
     sample_lower: np.ndarray,
     sample_upper: np.ndarray,
     budget_bytes: int,
-    pointwise_backing: np.ndarray,
-    stencil_backing: np.ndarray,
+    pointwise_writer: BlockWriter,
+    stencil_writer: BlockWriter,
     native_grid: np.ndarray,
     zero_grid: np.ndarray,
     trilinear_grid: np.ndarray,
 ) -> tuple[float, int]:
-    """Execute the complete bounded Cartesian level-1 M0 workflow."""
+    """Execute M0 through explicit coarse-grained reader/writer functions."""
     budget_bytes = _require_budget(budget_bytes)
-    backing = _require_payload("backing", backing, writable=False)
+    reader = _require_block_reader(reader)
     field_ids = _require_index_vector("field_ids", field_ids)
     if field_ids.shape[0] == 0:
         raise ValueError("field_ids must select at least one field")
+    for index, field_id in enumerate(field_ids):
+        if field_id < 0 or field_id >= reader.shape[1]:
+            raise ValueError(f"field_ids entry {index} is out of range")
     domain_lower = _require_float_triplet("domain_lower", domain_lower)
     domain_upper = _require_float_triplet("domain_upper", domain_upper)
     domain_cell_counts = _require_index_triplet(
@@ -156,11 +168,11 @@ def execute_level1_m0(
         dtype=np.int64,
     )
     block_count = _root_volume(root_shape)
-    if backing.shape[0] != block_count:
-        raise ValueError("backing block axis must equal root-grid volume")
+    if reader.shape[0] != block_count:
+        raise ValueError("reader block axis must equal root-grid volume")
     block_shape = tuple(int(value) for value in block_cell_counts)
-    if backing.shape[2:] != block_shape:
-        raise ValueError("backing spatial shape must equal block_cell_counts")
+    if reader.shape[2:] != block_shape:
+        raise ValueError("reader spatial shape must equal block_cell_counts")
     coord_to_rank = _require_mapping_input(
         "coord_to_rank",
         coord_to_rank,
@@ -173,15 +185,15 @@ def execute_level1_m0(
     )
     face_neighbor_ids = _require_face_table(face_neighbor_ids, block_count)
 
-    pointwise_backing = _require_result_backing(
-        "pointwise_backing",
-        pointwise_backing,
+    pointwise_writer = _require_result_writer(
+        "pointwise_writer",
+        pointwise_writer,
         block_count,
         block_shape,
     )
-    stencil_backing = _require_result_backing(
-        "stencil_backing",
-        stencil_backing,
+    stencil_writer = _require_result_writer(
+        "stencil_writer",
+        stencil_writer,
         block_count,
         block_shape,
     )
@@ -215,14 +227,9 @@ def execute_level1_m0(
         sample_lower,
         sample_upper,
     )
-    results = (
-        pointwise_backing,
-        stencil_backing,
-        native_grid,
-        zero_grid,
-        trilinear_grid,
-    )
-    _validate_result_nonoverlap(backing, results, metadata)
+    writers = (pointwise_writer, stencil_writer)
+    grids = (native_grid, zero_grid, trilinear_grid)
+    _validate_result_nonoverlap(reader, writers, grids, metadata)
 
     if np.any(block_cell_counts > _INDEX_MAX - 2):
         raise OverflowError("padded block shape does not fit in int64")
@@ -255,8 +262,8 @@ def execute_level1_m0(
     preflight_state = np.array([0.0], dtype=np.float64)
 
     # Fixed lower-boundary preflight before topology proof or bulk allocation.
-    gather_blocks_into(
-        backing,
+    read_blocks_into(
+        reader,
         zero,
         block_cell_counts,
         empty_ids,
@@ -275,13 +282,13 @@ def execute_level1_m0(
         0,
         zero,
     )
-    scatter_blocks_from(
+    write_blocks_from(
+        pointwise_writer,
         empty_output,
         zero,
         block_cell_counts,
         empty_ids,
         field_zero,
-        pointwise_backing,
         zero,
     )
     place_level1_blocks(
@@ -349,13 +356,13 @@ def execute_level1_m0(
         0,
         zero,
     )
-    scatter_blocks_from(
+    write_blocks_from(
+        stencil_writer,
         empty_output,
         zero,
         block_cell_counts,
         empty_ids,
         field_zero,
-        stencil_backing,
         zero,
     )
     sample_level1_trilinear(
@@ -518,8 +525,8 @@ def execute_level1_m0(
             ids,
         )
         primary_ids = ids[:primary_count]
-        gather_blocks_into(
-            backing,
+        read_blocks_into(
+            reader,
             zero,
             block_cell_counts,
             primary_ids,
@@ -538,13 +545,13 @@ def execute_level1_m0(
             0,
             zero,
         )
-        scatter_blocks_from(
+        write_blocks_from(
+            pointwise_writer,
             output_workspace[:primary_count],
             zero,
             block_cell_counts,
             primary_ids,
             field_zero,
-            pointwise_backing,
             zero,
         )
         place_level1_blocks(
@@ -592,8 +599,8 @@ def execute_level1_m0(
         )
         selected_ids = ids[:selected_count]
         primary_ids = ids[:primary_count]
-        gather_blocks_into(
-            backing,
+        read_blocks_into(
+            reader,
             zero,
             block_cell_counts,
             selected_ids,
@@ -633,13 +640,13 @@ def execute_level1_m0(
             0,
             zero,
         )
-        scatter_blocks_from(
+        write_blocks_from(
+            stencil_writer,
             output_workspace[:primary_count],
             zero,
             block_cell_counts,
             primary_ids,
             field_zero,
-            stencil_backing,
             zero,
         )
         sample_level1_trilinear(
@@ -662,3 +669,62 @@ def execute_level1_m0(
         first += primary_count
 
     return finalize_field_sum(sum_state), capacity
+
+
+def execute_level1_m0(
+    backing: np.ndarray,
+    field_ids: np.ndarray,
+    domain_lower: np.ndarray,
+    domain_upper: np.ndarray,
+    domain_cell_counts: np.ndarray,
+    block_cell_counts: np.ndarray,
+    coord_to_rank: np.ndarray,
+    rank_to_coord: np.ndarray,
+    face_neighbor_ids: np.ndarray,
+    boundary_modes: np.ndarray,
+    normal_field_slots: np.ndarray,
+    pointwise_left_field: int,
+    pointwise_right_field: int,
+    pointwise_scale: float,
+    stencil_field: int,
+    stencil_axis: int,
+    reduction_field: int,
+    sample_lower: np.ndarray,
+    sample_upper: np.ndarray,
+    budget_bytes: int,
+    pointwise_backing: np.ndarray,
+    stencil_backing: np.ndarray,
+    native_grid: np.ndarray,
+    zero_grid: np.ndarray,
+    trilinear_grid: np.ndarray,
+) -> tuple[float, int]:
+    """Execute M0 with resident-array or ``numpy.memmap`` adapters."""
+    # Preserve the stable INT-001 array surface as a compatibility composition.
+    budget_bytes = _require_budget(budget_bytes)
+    return execute_level1_m0_from_blocks(
+        array_block_reader(backing),
+        field_ids,
+        domain_lower,
+        domain_upper,
+        domain_cell_counts,
+        block_cell_counts,
+        coord_to_rank,
+        rank_to_coord,
+        face_neighbor_ids,
+        boundary_modes,
+        normal_field_slots,
+        pointwise_left_field,
+        pointwise_right_field,
+        pointwise_scale,
+        stencil_field,
+        stencil_axis,
+        reduction_field,
+        sample_lower,
+        sample_upper,
+        budget_bytes,
+        array_block_writer(pointwise_backing),
+        array_block_writer(stencil_backing),
+        native_grid,
+        zero_grid,
+        trilinear_grid,
+    )

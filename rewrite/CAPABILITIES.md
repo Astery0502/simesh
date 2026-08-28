@@ -23,6 +23,7 @@ a capability becomes active.
 | GEO-001 | Cartesian 3D block bounds and spacing | TOP-001 | complete |
 | STO-001 | In-memory block source and sink | FND-001 | complete |
 | STO-002 | Bounded workspace with direct-face and full-halo chunk plans | STO-001, TOP-001 | complete |
+| STO-003 | Functional block reader/writer adapters and execution substitution | STO-001 | complete |
 | HAL-001 | Non-periodic physical-boundary halo provision | GEO-001, STO-001 | complete |
 | HAL-002 | Same-level sibling halo provision | TOP-001, HAL-001 | complete |
 | SAM-001 | Exact level-1 block placement | GEO-001, STO-001 | complete |
@@ -33,7 +34,8 @@ a capability becomes active.
 | RED-001 | Streaming associative reduction | FND-002, STO-002 | complete |
 | INT-001 | M0 end-to-end numerical and bounded-memory path | SAM-003, OPR-001, OPR-002, RED-001 | complete |
 
-All Foundation and M0 capabilities are complete.
+All Foundation, functional-composition checkpoint, and M0 capabilities are
+complete.
 
 ## Later Milestones
 

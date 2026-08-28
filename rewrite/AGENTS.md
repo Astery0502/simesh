@@ -18,6 +18,9 @@ Read, in order:
 3. `CAPABILITIES.md`
 4. the design note and contract for the selected capability, if they exist
 
+Read `FUNCTIONAL_COMPOSITION.md` before adding a storage backend, execution
+strategy, framework adapter, halo family, or cross-capability executor.
+
 Resume from `CURRENT.md`; do not reconstruct or redesign the whole project on
 every turn. Read `ROADMAP.md` when choosing or revising a milestone. Read
 `WORKFLOW.md` when starting a capability, changing a contract, or preparing a
@@ -30,6 +33,18 @@ checkpoint. Do not reread every process document on every work cycle.
 - For a non-trivial capability, explore alternatives in a short design note, then freeze the selected behavior in a contract before implementation.
 - For a simple capability, use one concise contract and start implementation without extra design ceremony.
 - Keep inputs, outputs, ownership, mutation, valid regions, and error behavior explicit.
+- Keep external storage/framework state at adapter boundaries. Numerical
+  kernels receive canonical buffers and explicit metadata, never file handles,
+  memory maps, dataset objects, or implicit backend dispatch.
+- Prefer free functions over stateful service objects. When a callable backend
+  needs state, carry the callable, state, shape, and alias information in a
+  small immutable descriptor and pass that descriptor explicitly.
+- Treat resident, bounded, cached, and framework-specific execution as
+  replaceable strategies. Validate every strategy against the same semantic
+  reference before optimizing it independently.
+- Decompose halos into access requirements, support planning, topology
+  relations, value-transfer rules, and workspace mutation. Do not grow the
+  level-1 same-level kernel into a refined/periodic dispatcher.
 - Use Cython typed memoryviews, C structs, pointers, or contiguous arrays where appropriate.
 - Do not use Python callbacks in hot loops.
 - Do not allocate inside cell, stencil, or block hot loops unless measurement justifies it.

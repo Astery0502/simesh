@@ -22,6 +22,8 @@ case, not an afterthought.
 4. `CAPABILITIES.md` -- the current dependency-ordered building blocks.
 5. `ROADMAP.md` -- staged support matrix and milestone outcomes.
 6. `WORKFLOW.md` -- how one capability is designed, specified, implemented, composed, and optimized.
+7. `FUNCTIONAL_COMPOSITION.md` -- stable boundaries for storage, execution,
+   halo planning, compute kernels, and alternative framework implementations.
 
 Non-trivial design notes are added under `designs/` while alternatives are
 still being explored. Stable capability specifications are added under

@@ -8,10 +8,12 @@ from numpy.lib.format import open_memmap
 
 from simesh.utils.lib.amr.forest import AMRForest
 from simesh.utils.lib.amr.mesh import AMRMesh
+from simesh_rewrite.blockio import make_block_reader, make_block_writer
 from simesh_rewrite.halos import fill_physical_halos, fill_same_level_halos
 from simesh_rewrite.morton import level1_morton
 from simesh_rewrite.operators import central_difference_into, scaled_difference_into
-from simesh_rewrite.pipeline import execute_level1_m0
+from simesh_rewrite.pipeline import execute_level1_m0, execute_level1_m0_from_blocks
+from simesh_rewrite.storage import gather_blocks_into, scatter_blocks_from
 from simesh_rewrite.reductions import accumulate_field_sum, finalize_field_sum
 from simesh_rewrite.sampling import (
     place_level1_blocks,
@@ -294,6 +296,170 @@ def create_memmap_case(tmp_path: Path):
         "zero_shape": (7, 6, 5),
         "trilinear_shape": (6, 5, 4),
     }
+
+
+class CountingBlockStorage:
+    def __init__(self, data: np.ndarray):
+        self.data = data
+        self.calls = 0
+
+
+def counting_read_blocks(
+    state: CountingBlockStorage,
+    source_lower: np.ndarray,
+    source_upper: np.ndarray,
+    block_ids: np.ndarray,
+    field_ids: np.ndarray,
+    destination: np.ndarray,
+    destination_lower: np.ndarray,
+) -> None:
+    state.calls += 1
+    gather_blocks_into(
+        state.data,
+        source_lower,
+        source_upper,
+        block_ids,
+        field_ids,
+        destination,
+        destination_lower,
+    )
+
+
+def counting_write_blocks(
+    state: CountingBlockStorage,
+    source: np.ndarray,
+    source_lower: np.ndarray,
+    source_upper: np.ndarray,
+    block_ids: np.ndarray,
+    field_ids: np.ndarray,
+    destination_lower: np.ndarray,
+) -> None:
+    state.calls += 1
+    scatter_blocks_from(
+        source,
+        source_lower,
+        source_upper,
+        block_ids,
+        field_ids,
+        state.data,
+        destination_lower,
+    )
+
+
+def execute_from_functional_adapters(
+    case,
+    budget: int,
+    outputs: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+):
+    source_state = CountingBlockStorage(case["backing"])
+    pointwise_state = CountingBlockStorage(outputs[0])
+    stencil_state = CountingBlockStorage(outputs[1])
+    reader = make_block_reader(
+        source_state,
+        source_state.data.shape,
+        counting_read_blocks,
+        memory_arrays=(source_state.data,),
+    )
+    pointwise_writer = make_block_writer(
+        pointwise_state,
+        pointwise_state.data.shape,
+        counting_write_blocks,
+        memory_arrays=(pointwise_state.data,),
+    )
+    stencil_writer = make_block_writer(
+        stencil_state,
+        stencil_state.data.shape,
+        counting_write_blocks,
+        memory_arrays=(stencil_state.data,),
+    )
+    result = execute_level1_m0_from_blocks(
+        reader,
+        case["field_ids"],
+        case["domain_lower"],
+        case["domain_upper"],
+        case["domain_counts"],
+        case["block_counts"],
+        case["coord_to_rank"],
+        case["rank_to_coord"],
+        case["neighbors"],
+        case["modes"],
+        case["normals"],
+        0,
+        1,
+        0.5,
+        2,
+        0,
+        1,
+        case["sample_lower"],
+        case["sample_upper"],
+        budget,
+        pointwise_writer,
+        stencil_writer,
+        outputs[2],
+        outputs[3],
+        outputs[4],
+    )
+    return result, source_state.calls, pointwise_state.calls, stencil_state.calls
+
+
+def test_functional_backends_and_resident_strategy_match_bounded_array_path(
+    tmp_path: Path,
+) -> None:
+    case = create_memmap_case(tmp_path)
+    backing = case["backing"]
+    field_count = len(case["field_ids"])
+    per_slot = managed_bytes_per_slot(field_count, case["block_counts"])
+
+    bounded_outputs = make_outputs(
+        backing.shape[0],
+        field_count,
+        case["block_counts"],
+        case["domain_counts"],
+        case["zero_shape"],
+        case["trilinear_shape"],
+    )
+    bounded_result = execute(
+        backing,
+        case["field_ids"],
+        case["domain_lower"],
+        case["domain_upper"],
+        case["domain_counts"],
+        case["block_counts"],
+        case["coord_to_rank"],
+        case["rank_to_coord"],
+        case["neighbors"],
+        case["modes"],
+        case["normals"],
+        case["sample_lower"],
+        case["sample_upper"],
+        8 + 27 * per_slot,
+        bounded_outputs,
+    )
+
+    resident_outputs = make_outputs(
+        backing.shape[0],
+        field_count,
+        case["block_counts"],
+        case["domain_counts"],
+        case["zero_shape"],
+        case["trilinear_shape"],
+    )
+    (resident_result, read_calls, point_calls, stencil_calls) = (
+        execute_from_functional_adapters(
+            case,
+            8 + backing.shape[0] * per_slot,
+            resident_outputs,
+        )
+    )
+    assert bounded_result[0].hex() == resident_result[0].hex()
+    assert bounded_result[1] == 27
+    assert resident_result[1] == backing.shape[0]
+    for actual, expected in zip(resident_outputs, bounded_outputs, strict=True):
+        assert_bits_equal(actual, expected)
+    # Empty preflight plus one read per resident pass; one empty and one real write.
+    assert read_calls == 3
+    assert point_calls == 2
+    assert stencil_calls == 2
 
 
 def test_memmap_two_capacities_match_full_reference_and_overwrite_all(tmp_path: Path) -> None:
