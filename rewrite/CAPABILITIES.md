@@ -61,7 +61,8 @@ complete.
 | RST-001 | Cartesian 3D ratio-two cell-average restriction | FND-001, STO-001, STO-004 | complete |
 | LIM-001 | Cartesian three-point limited-slope primitive | FND-001, RST-001 | complete |
 | PRL-001 | Cartesian 3D ratio-two limited prolongation | FND-001, RST-001, LIM-001 | complete |
-| RSL-001 | Accepted refined relation source-slot resolution | REL-001, STO-004 | proposed |
+| RSL-001 | Accepted refined relation source-slot resolution | REL-001, STO-004 | complete |
+| RAC-001 | Refined relation transfer-action classification | REL-001, RSL-001 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -84,7 +85,9 @@ validated scalar plus allocation-free shared inline implementation.  PRL-001 is
 PRL-001 now owns ratio-two indexing, exact phase eta, limited reconstruction,
 regions, and coarse reach without a slope cache.  RSL-001 is next and resolves
 accepted REL sources against the STO-selected vector before higher transfer
-planning chooses targets, phases, or workspace actions.
+planning chooses targets, phases, or workspace actions.  RSL-001 now provides
+that bounded identity artifact without kind policy.  RAC-001 is next and owns
+only the relation-record-to-transfer-action decision before region planning.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

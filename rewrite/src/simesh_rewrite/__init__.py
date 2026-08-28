@@ -42,6 +42,7 @@ from .refined_support import (
 from .restriction import restrict_cartesian_2to1_into
 from .limiter import three_point_limited_slope
 from .prolongation import prolong_cartesian_2to1_into
+from .relation_slots import resolve_refined_relation_source_slots
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
@@ -162,6 +163,7 @@ __all__ = [
     "required_input_region",
     "read_blocks_into",
     "restrict_cartesian_2to1_into",
+    "resolve_refined_relation_source_slots",
     "sample_level1_zero_order",
     "sample_level1_trilinear",
     "scaled_difference_into",
