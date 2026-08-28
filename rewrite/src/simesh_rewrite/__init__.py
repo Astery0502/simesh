@@ -35,6 +35,10 @@ from .relations import (
     balanced_refined_relations,
     fill_balanced_refined_relations,
 )
+from .refined_support import (
+    maximum_balanced_refined_support_slots,
+    plan_balanced_refined_support_prefix,
+)
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
@@ -139,6 +143,7 @@ __all__ = [
     "minimum_direct_face_closed_slots",
     "minimum_halo_closed_slots",
     "minimum_level1_halo_closed_slots",
+    "maximum_balanced_refined_support_slots",
     "make_block_reader",
     "make_block_writer",
     "merge_field_sums",
@@ -146,6 +151,7 @@ __all__ = [
     "plan_direct_face_closed_prefix",
     "plan_level1_halo_chunk",
     "plan_level1_halo_closed_prefix",
+    "plan_balanced_refined_support_prefix",
     "place_level1_blocks",
     "physical_halo_source_index",
     "ravel_cell",

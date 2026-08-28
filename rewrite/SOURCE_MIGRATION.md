@@ -37,8 +37,8 @@ No canonical feature may remain merely `inventoried` at final cutover.
 
 | Feature family | Current authority | Rewrite state | Planned closure |
 | --- | --- | --- | --- |
-| Array/index/layout conventions | `amrvac/layouts.py`, canonical array APIs | Core 3D conventions, workspace accounting, dense primary traversal, direct-face and complete level-1 halo closure complete; singleton-z pending | M1 refined support, then M2/M6 |
-| Morton, forest, leaf traversal, connectivity | `utils/lib/amr/morton.pyx`, `forest.pyx` | Level-1/refined 3D reconstruction, conformance, contacts, all-touch balance, and selected direction/source records complete; optional face cache deferred | M1 support/transfer integration, then M2 quadtree and M3 periodic |
+| Array/index/layout conventions | `amrvac/layouts.py`, canonical array APIs | Core 3D conventions, workspace accounting, dense primary traversal, level-1 closures, and refined source-union planning complete; singleton-z pending | M1 transfer integration, then M2/M6 |
+| Morton, forest, leaf traversal, connectivity | `utils/lib/amr/morton.pyx`, `forest.pyx` | Level-1/refined 3D reconstruction, conformance, contacts, all-touch balance, selected direction/source records, and bounded support planning complete; optional face cache deferred | M1 transfer integration, then M2 quadtree and M3 periodic |
 | Mesh geometry and coordinate bookkeeping | `utils/lib/amr/mesh.pyx` | Level-1 and refined Cartesian 3D bounds/spacing complete; refined centers remain sampling-owned | M1 sampling integration, then M2/M3 |
 | Physical, sibling, coarse/fine and periodic halos | `amrvac/boundary.py`, `mesh.pyx` | Physical/level-1 sibling complete with explicit plan/rule/application boundaries and retained fused path | M1 refined, then M2 and M3 |
 | Exact/uniform sampling and uniform-to-SFC placement | `mesh.pyx`, `amrvac_uniform.py` | Level-1 3D placement/zero/trilinear complete | M1/M2/M3/M5 |

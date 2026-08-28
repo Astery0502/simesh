@@ -57,7 +57,8 @@ complete.
 | PRI-001 | Deterministic ascending primary-prefix planning | WSP-001 | complete |
 | FCL-001 | Deterministic direct-face support closure | PRI-001, TOP-001 | complete |
 | HCL-001 | Deterministic complete one-block halo support closure | PRI-001, TOP-001 | complete |
-| STO-004 | Balanced refined support union and bounded primary planning | WSP-001, PRI-001, REL-001 | proposed |
+| STO-004 | Balanced refined support union and bounded primary planning | WSP-001, PRI-001, REL-001 | complete |
+| RST-001 | Cartesian 3D ratio-two cell-average restriction | FND-001, STO-001, STO-004 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -68,8 +69,11 @@ selected directional relation records without support or value-transfer
 policy; its consumer evidence keeps optional TOP-003 deferred.  The STO-002
 Yellow trigger activated the now-complete extraction sequence: WSP-001
 accounting, PRI-001 primary traversal, FCL-001 direct-face closure, and HCL-001
-full-halo closure.  STO-002 is now a retained compatibility composition;
-STO-004 refined support is next.
+full-halo closure.  STO-002 is now a retained compatibility composition.
+STO-004 now supplies exact bounded refined source union, primary progress, and
+one-row capacity bounds without owning transfer semantics.  RST-001 is next;
+its numerical kernel depends only on FND layout, while STO-001/STO-004 provide
+the immediate bounded gather composition required for completion.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: HCL-001 deterministic complete one-block halo support closure.
-- Current capability: STO-004 balanced refined support union and bounded primary planning, proposed.
+- Last completed capability: STO-004 balanced refined support union and bounded primary planning.
+- Current capability: RST-001 Cartesian 3D ratio-two cell-average restriction, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  The STO-002 Yellow finding is resolved by WSP/PRI/FCL/HCL with wrappers retained.  SAM-002/SAM-003 remain Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
@@ -240,6 +240,21 @@
   at capacities 64/256/1,024, about 1.7--1.9x the recorded baseline, with zero
   retained traced bytes and a fixed 576--600-byte peak.  M0 pass-two artifacts
   and reduction remain bit-identical within the composed runtime gate.
+- STO-004 greedily plans the maximal dense refined primary prefix whose ordered
+  unique union of REL source leaves fits explicit selected capacity.  Exactly
+  `min(capacity, remaining)` candidate rows prove global maximality; accepted
+  primaries precede stable first-discovery support, and future support is
+  promoted without disturbing the rest of the order.
+- STO-004 validates the complete counts/source representation before mutation,
+  keeps first-fit failure atomic, and exposes the exact bounded one-primary
+  progress maximum.  Canonical balanced all-26 Cartesian 3D input has achieved
+  universal bound 57; the real WENO forest's exact maximum is 53.
+- The fixed-stack canonical planner retains no size-dependent scratch.  A
+  bounded sliding REL/plan/gather composition generates each real relation row
+  once, retains 52,326--940,032 metadata bytes at measured capacities, and is
+  10.9--23.3% faster than exact-workload naive regeneration.  A whole-tree REL
+  cache is rejected because its 20,578,740 bytes exceed current retained
+  connectivity and are unnecessary for bounded execution.
 
 ## Next Work
 
@@ -249,10 +264,11 @@ audit is complete and FST-002/TOP-002/BAL-001/GEO-002/REL-001 separately
 establish conformance, raw contacts, all-touch admissibility, selected refined
 geometry, and selected relation records.  The STO-002 Yellow trigger is resolved:
 WSP-001 accounting, PRI-001 primary traversal, FCL-001 direct-face closure, and
-HCL-001 full-halo closure are complete.  Next is STO-004 refined support union
-and bounded planning, followed by
-restriction/prolongation, refined halos, sampling, a native selective `.dat`
-adapter, and real-data bounded integration.
+HCL-001 full-halo closure and STO-004 refined support union/bounded planning are
+complete.  Next is RST-001, the independently substitutable ratio-two
+cell-average restriction kernel, followed by limiter/prolongation semantics,
+refined transfer planning/halos, sampling, a native selective `.dat` adapter,
+and real-data bounded integration.
 
 ## Latest Reproduction Commands
 
@@ -267,6 +283,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pri_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_fcl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hcl_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_004.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hax_001.py
@@ -288,6 +305,7 @@ PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/wsp_001.py --calls 10
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/pri_001.py --block-count 32768 --capacities 1,8,64,256,1024,32768 --repeats 15
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/fcl_001.py --capacities 64,256,1024 --repeats 15
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/hcl_001.py --capacities 64,256,1024 --repeats 15
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/sto_004.py --capacities 57,64,128,256,1024 --repeats 3 --dat data/weno509_sub_0000.dat
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
@@ -305,3 +323,4 @@ evidence is in `evidence/GEO-002.md`; REL-001 evidence is in
 PRI-001 evidence is in `evidence/PRI-001.md`.
 FCL-001 evidence is in `evidence/FCL-001.md`.
 HCL-001 evidence is in `evidence/HCL-001.md`.
+STO-004 evidence is in `evidence/STO-004.md`.
