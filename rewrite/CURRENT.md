@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: RSL-001 accepted refined relation source-slot resolution.
-- Current capability: RAC-001 refined relation transfer-action classification, proposed.
+- Last completed capability: TGT-001 directed halo target boxes.
+- Current capability: RPH-001 refined relation child-phase codes, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/RST-001.md`, `contracts/LIM-001.md`, `contracts/PRL-001.md`, `contracts/RSL-001.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/RST-001.md`, `contracts/LIM-001.md`, `contracts/PRL-001.md`, `contracts/RSL-001.md`, `contracts/TGT-001.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  The STO-002 Yellow finding is resolved by WSP/PRI/FCL/HCL with wrappers retained.  SAM-002/SAM-003 remain Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
@@ -325,6 +325,22 @@
   native repeated resolutions.  WENO peak slot bytes remain 19,136--549,952;
   larger capacities lower selected amplification but deepen per-pass lookup,
   leaving the capacity/action trade-off to later transfer planning.
+- RAC-001 was retired before implementation because REL kind/mask already
+  bijectively determines the base transfer action.  Combined RTP-001 then
+  failed the five-question gate: direction boxes and refinement phases have
+  disjoint inputs, outputs, validation, substitution, and reasons to change.
+- TGT-001 is the extracted direction-box function.  For each direction axis it
+  selects requested-lower/interior/interior-upper intervals, giving exact
+  half-open face/edge/corner boxes.  Canonical 26 boxes are pairwise disjoint
+  and cover the requested envelope outside the interior; asymmetric, empty,
+  and valid singleton axes are supported.
+- Canonical current level-one behavior matches all 26 TGT boxes on the interior
+  leaf of a `3x3x3` forest with unique neighbor constants.  The unsafe current
+  singleton physical-status table access is excluded, not valid rewrite input.
+- Canonical TGT writes exactly 1,248 bytes in 5.708 us checked/1.000 us
+  unchecked versus 29.333 us for the reference, with zero retained traced bytes
+  and a 1,360-byte peak.  One native materialization plus 100,000 scans is 2.09x
+  faster than repeated native derivation, so the tiny artifact is retained.
 
 ## Next Work
 
@@ -336,10 +352,12 @@ geometry, and selected relation records.  The STO-002 Yellow trigger is resolved
 WSP-001 accounting, PRI-001 primary traversal, FCL-001 direct-face closure, and
 HCL-001 full-halo closure, STO-004 refined support union/bounded planning, and
 RST-001 ratio-two restriction, LIM-001 limiting, PRL-001 prolongation, and
-RSL-001 accepted source-slot resolution are complete.  Next is RAC-001 relation
-transfer-action classification, followed by region planning/application,
-complete refined halos, sampling, a native selective `.dat` adapter, and
-real-data bounded integration.
+RSL-001 accepted source-slot resolution are complete.  RAC-001 was retired as a
+redundant rename of REL kind/mask, and combined RTP-001 split at the
+five-question gate.  TGT-001 directed boxes are complete.  Next is RPH-001
+refined child phases, followed by workspace/value application, complete refined
+halos, sampling, a native selective `.dat` adapter, and real-data bounded
+integration.
 
 ## Latest Reproduction Commands
 
@@ -359,6 +377,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_lim_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_prl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_rsl_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_tgt_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hax_001.py
@@ -385,6 +404,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/rst_001.py --repe
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/lim_001.py --calls 1000000 --repeats 3
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/prl_001.py --repeats 5 --composition-repeats 3
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/rsl_001.py --repeats 5 --action-repeats 10 --weno-capacities 57,64,128,256,512,1024
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/tgt_001.py --repeats 9 --reuse-scans 100000 --reuse-repeats 5
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
@@ -407,3 +427,5 @@ RST-001 evidence is in `evidence/RST-001.md`.
 LIM-001 evidence is in `evidence/LIM-001.md`.
 PRL-001 evidence is in `evidence/PRL-001.md`.
 RSL-001 evidence is in `evidence/RSL-001.md`.
+TGT-001 evidence is in `evidence/TGT-001.md`; the rejected combined boundary is
+recorded in `designs/RTP-001.md`.
