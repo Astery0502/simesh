@@ -4,10 +4,10 @@
 
 - Active milestone: M1 Cartesian 3D refined AMR.
 - Last completed capability: HAX-001 explicit plan-consuming same-level halo application.
-- Current capability: re-audit and split the preserved TOP-002 drafts before implementation.
+- Current capability: FST-002 reusable refined-forest artifact conformance, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
 - Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/GEO-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
-- Unresolved differences: HAL-002's Red finding is resolved and it is retained Fused over HPL/PBC/HAX semantics.  The preserved TOP draft is the only Red finding and remains paused until its FST conformance, contact semantics, BAL-001, and optional materialization decisions are split.  STO-002 is Yellow before refined support planning; SAM-002/SAM-003 are retained Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
+- Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  STO-002 is Yellow before refined support planning; SAM-002/SAM-003 are retained Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
 
@@ -132,22 +132,16 @@
   boundaries. Do not reopen it wholesale. If multiple consumers need arbitrary
   FST artifact validation, add one reusable conformance boundary rather than
   duplicating structural validation.
-- The uncommitted TOP-002 draft predates the decomposition gate. Before
-  implementation, separately assess FST artifact revalidation, exact contact
-  location/classification, global 26-direction two-to-one balance, and retained
-  six-face topology materialization. Split independently variable decisions
-  (for example BAL-001 versus TOP-002) instead of freezing them as one contract.
-- The complete Phase A audit is `evidence/DECOMPOSITION-AUDIT.md`: sixteen
-  capabilities are Green, STO-002 is Yellow, SAM-002/SAM-003 are retained
-  Fused, and HAL-002 plus the in-progress TOP draft are Red.
-- HAL-002's Red finding is semantic, not a correctness failure: preserve its
-  tested direct-cell Cython entrypoint while extracting explicit relation/slot
-  planning, pure same-level transfer, shared physical transforms, and a thin
-  composition boundary.
-- The TOP draft's FST conformance, raw contact lookup, global all-touch balance,
-  and retained face cache vary independently.  Phase B will preserve its useful
-  analysis but split those decisions; six kinds plus six `int64` IDs cost
-  `54*L`, correcting the draft's `49*L` calculation.
+- The pre-decomposition TOP draft combined FST conformance, raw contact lookup,
+  global all-touch balance, and retained face caching.  Phase B preserved its
+  analysis under `designs/TOP-003-*` and split those decisions into FST-002,
+  TOP-002, BAL-001, and optional TOP-003; a six-face cache costs `54*L`, not the
+  draft's `49*L`.
+- At the Phase A checkpoint, sixteen capabilities were Green, STO-002 Yellow,
+  SAM-002/SAM-003 retained Fused, and HAL-002 plus the TOP draft Red.  HPL/PBC/
+  HAX resolved HAL-002 to retained Fused, and the TOP re-audit split its Red
+  boundary before implementation.  `evidence/DECOMPOSITION-AUDIT.md` records
+  both resolutions.
 - HPL-001 maps each primary's full x-fast 27-direction cube to an explicit
   selected source slot and three-bit physical-axis mask.  Center/pure physical
   directions use source `-1`; mixed directions retain their full direction and
@@ -164,15 +158,18 @@
   in x/y/z order.  It is the simple substitutable level-1 value path; HAL-002
   remains the measured Fused wrapper because explicit checked plan+apply ranges
   from 0.49x to 1.31x its runtime across standard cases.
+- TOP boundary re-audit preserves the original cache drafts under
+  `designs/TOP-003-*` and assigns independent decisions to FST-002 conformance,
+  TOP-002 raw contact lookup, BAL-001 all-touch balance, and optional TOP-003
+  face materialization.  REL/STO retain operation/support planning.
 
 ## Next Work
 
 M0 and the pre-M1 functional/migration/performance protocols are complete, and
 FST-001 reconstructs refined 3D hierarchy and leaf order.  Phase A decomposition
-audit is complete and HAL-002's Red finding is resolved through HPL/PBC/HAX.
-The next work re-audits/splits the preserved TOP drafts into
-separately owned FST-conformance, contact, balance, and optional materialization
-capabilities, followed by refined geometry, directional relation/support planning,
+audit is complete and all Red findings are resolved or split.  The next work is
+FST-002 reusable artifact conformance, followed by TOP-002 raw contact lookup,
+BAL-001, refined geometry, directional relation/support planning,
 restriction/prolongation, refined halos, sampling, a native selective `.dat`
 adapter, and real-data bounded integration.
 
@@ -200,4 +197,5 @@ Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
 `evidence/FST-001.md`; HPL-001 decomposition evidence is in
 `evidence/HPL-001.md`; PBC-001 evidence is in `evidence/PBC-001.md`;
 HAX-001 strategy evidence is in `evidence/HAX-001.md`; INT-001 and M0 evidence
-remains in `evidence/INT-001.md`.
+remains in `evidence/INT-001.md`.  The TOP boundary split is recorded in
+`evidence/TOP-BOUNDARY-REAUDIT.md`.

@@ -47,18 +47,22 @@ complete.
 | ID | Capability | Depends on | Status |
 | --- | --- | --- | --- |
 | FST-001 | Validated Cartesian 3D refined forest reconstruction | MOR-001 | complete |
-| TOP-002 | Refined leaf face topology and two-to-one balance | FST-001 | proposed |
+| FST-002 | Reusable refined-forest artifact conformance | FST-001 | proposed |
+| TOP-002 | Exact batched refined contact target lookup | FST-002 | proposed |
+| BAL-001 | Global Cartesian 3D all-touch two-to-one balance | TOP-002 | proposed |
+| TOP-003 | Optional balanced refined six-face materialization | TOP-002, BAL-001 | proposed |
 
-FST-001 supplies explicit flat preorder hierarchy and leaf maps.  TOP-002 is
-the next dependency-ready capability; refined geometry can then proceed from
-FST-001 while directional relation planning proceeds from TOP-002.
+FST-001 supplies explicit flat preorder hierarchy and leaf maps.  FST-002 is
+the next dependency-ready capability.  TOP-002 then owns raw contact semantics,
+BAL-001 owns admissibility, and TOP-003 is implemented only if a consumer and
+cached-versus-on-demand evidence justify retaining it.  Refined geometry may
+consume validated FST artifacts without depending on balance or face caches.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;
 HAL-002 is retained as the measured Fused compatibility implementation.  The
-preserved untracked TOP-002 draft remains Red and must split reusable FST
-conformance and exact contact
-semantics, BAL-001, and optional face materialization before contract freeze.
+preserved TOP drafts have now been split into the M1 capabilities above; no Red
+combined TOP contract remains.
 STO-002 is Yellow with a mandatory split trigger before refined support
 planning.  SAM-002 and SAM-003 are retained Fused implementations whose missing
 semantic boundaries are extracted at refined sampling.  See

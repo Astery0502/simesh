@@ -141,3 +141,13 @@ Old/fused, new/composed, and independent references agree bitwise; kernel and
 composition trade-offs are recorded in their evidence.  HAL-002 is now retained
 Fused rather than Red.  The in-progress TOP draft is the only remaining Red
 finding and is next for boundary re-audit/split.
+
+## Phase B TOP Resolution
+
+The preserved TOP draft has been re-audited and split before implementation:
+FST-002 owns reusable flat-artifact conformance, TOP-002 owns raw contact lookup,
+BAL-001 owns global all-touch admissibility, and optional TOP-003 owns only
+six-face cache materialization.  Original draft analysis is preserved under
+`designs/TOP-003-*`; the incorrect `49*L` formula is superseded by `54*L`.
+No Red capability remains.  FST-002 is the next dependency-ready executable
+capability.

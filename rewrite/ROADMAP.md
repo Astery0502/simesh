@@ -51,8 +51,10 @@ out-of-core execution.
 
 ## M1: Cartesian 3D Refined AMR
 
-Status: in progress.  FST-001 refined forest reconstruction is complete;
-refined face topology and balance validation are next.
+Status: in progress.  FST-001 reconstruction is complete; FST-002 artifact
+conformance, TOP-002 raw contact lookup, and BAL-001 all-touch balance are the
+next separate dependencies.  Six-face TOP-003 caching is optional and requires
+consumer/performance justification.
 
 Before refined halo work, complete the functional-composition checkpoint:
 
