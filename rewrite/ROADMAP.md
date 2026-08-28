@@ -51,9 +51,9 @@ out-of-core execution.
 
 ## M1: Cartesian 3D Refined AMR
 
-Status: in progress.  FST-001 reconstruction and FST-002 artifact conformance
-and TOP-002 raw contact lookup are complete; BAL-001 all-touch balance is next.
-Six-face TOP-003 caching is optional and requires
+Status: in progress.  FST-001 reconstruction, FST-002 artifact conformance,
+TOP-002 raw contact lookup, and BAL-001 all-touch balance are complete.  Refined
+leaf geometry is next.  Six-face TOP-003 caching remains optional and requires
 consumer/performance justification.
 
 Before refined halo work, complete the functional-composition checkpoint:

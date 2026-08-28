@@ -26,6 +26,7 @@ from .topology import (
 from .forest import RefinedForest, fill_refined_forest, refined_forest
 from .forest_conformance import validate_refined_forest_arrays
 from .contacts import fill_refined_contact_targets, refined_contact_targets
+from .balance import validate_refined_all_touch_2to1
 from .storage import gather_blocks_into, scatter_blocks_from
 from .blockio import (
     BlockReader,
@@ -130,6 +131,7 @@ __all__ = [
     "unravel_cell",
     "valid_output_region",
     "validate_access_requirement",
+    "validate_refined_all_touch_2to1",
     "validate_refined_forest_arrays",
     "workspace_nbytes",
     "workspace_slot_capacity",

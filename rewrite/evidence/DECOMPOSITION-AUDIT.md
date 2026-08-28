@@ -149,5 +149,10 @@ FST-002 owns reusable flat-artifact conformance, TOP-002 owns raw contact lookup
 BAL-001 owns global all-touch admissibility, and optional TOP-003 owns only
 six-face cache materialization.  Original draft analysis is preserved under
 `designs/TOP-003-*`; the incorrect `49*L` formula is superseded by `54*L`.
-No Red capability remains.  FST-002 is the next dependency-ready executable
-capability.
+No Red capability remains.  FST-002, TOP-002, and BAL-001 are now complete as
+independently validated and measured conformance, contact, and admissibility
+functions.  TOP-003 remains an
+optional materialization boundary rather than an implied continuation: it may
+activate only when a concrete relation consumer and cached-versus-on-demand
+measurement justify `54*L` retained bytes.  GEO-002 is the next
+dependency-ready capability and does not inherit balance or cache policy.

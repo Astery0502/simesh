@@ -13,10 +13,10 @@ checkpoint.
 
 | ID | Singular responsibility | Owns | Does not own | Five questions | Status |
 | --- | --- | --- | --- | --- | --- |
-| FST-002 | Validate caller-supplied FST-001 flat artifacts. | Preorder/root/child/level/coordinate/leaf-map conformance and exact max level. | Contact, balance, geometry, cache, storage. | yes/yes/yes/yes/yes | next proposed capability |
-| TOP-002 | Return the raw adjacent covering node for explicit leaf/direction queries. | Physical detection and root/child descent to source level. | Conformance, allowed gap, cache/kinds, support/value policy. | yes/yes/yes/yes/yes | proposed after FST-002 |
-| BAL-001 | Enforce global all-touch Cartesian 3D two-to-one balance. | `abs(level_a-level_b)<=1` over face/edge/corner contacts. | Contact discovery, cache representation, halo operations. | yes/yes/yes/yes/yes | proposed after TOP-002 |
-| TOP-003 | Optionally materialize a compact six-face cache for admitted forests. | Face order, kind codes, node-ID representation, retained-memory choice. | Raw lookup, balance, edges/corners, support/value policy. | yes/yes/yes/yes/yes if retention is benchmark-justified | optional after BAL-001 |
+| FST-002 | Validate caller-supplied FST-001 flat artifacts. | Preorder/root/child/level/coordinate/leaf-map conformance and exact max level. | Contact, balance, geometry, cache, storage. | yes/yes/yes/yes/yes | complete |
+| TOP-002 | Return the raw adjacent covering node for explicit leaf/direction queries. | Physical detection and root/child descent to source level. | Conformance, allowed gap, cache/kinds, support/value policy. | yes/yes/yes/yes/yes | complete |
+| BAL-001 | Enforce global all-touch Cartesian 3D two-to-one balance. | `abs(level_a-level_b)<=1` over face/edge/corner contacts. | Contact discovery, cache representation, halo operations. | yes/yes/yes/yes/yes | complete |
+| TOP-003 | Optionally materialize a compact six-face cache for admitted forests. | Face order, kind codes, node-ID representation, retained-memory choice. | Raw lookup, balance, edges/corners, support/value policy. | yes/yes/yes/yes/yes if retention is benchmark-justified | deferred pending consumer evidence |
 
 Later REL-001 owns directional operation records and mixed physical masks;
 STO-004 owns support union/order/capacity/traversal.  They remain separate.
@@ -45,7 +45,10 @@ FST-001 -> FST-002 -> TOP-002 -> BAL-001
 TOP-002 + BAL-001 -> later REL-001 -> STO-004
 ```
 
-FST-002 and TOP-002 are now complete with independent references, lifecycle/
-corruption coverage, real-tree/current evidence, and allocation-free scaling.
-BAL-001 is the next executable capability and owns only the global all-touch
-level-gap policy.
+FST-002, TOP-002, and BAL-001 are complete with independent references,
+lifecycle/corruption coverage, real-tree/current evidence, and no
+size-dependent validation scratch.  BAL-001 rejects the known face-balanced
+diagonal violation and owns only the global all-touch level-gap policy.
+TOP-003 remains deferred because
+no immediate consumer yet justifies `54*L` retained bytes over measured
+on-demand contacts; refined geometry proceeds independently.

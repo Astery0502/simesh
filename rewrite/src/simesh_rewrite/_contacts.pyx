@@ -1,3 +1,5 @@
+# cython: boundscheck=False, wraparound=False
+
 """Typed TOP-002 raw refined contact target lookup."""
 
 import cython
@@ -39,44 +41,20 @@ cpdef void fill_refined_contact_targets_unchecked(
     const int64_t[:, ::1] directions,
     int64_t[::1] target_node_ids,
 ):
-    cdef int64_t query, source_node, level, scale
-    cdef int64_t tx, ty, tz, extent_x, extent_y, extent_z
-    cdef int64_t root_x, root_y, root_z, root_rank
-    cdef int64_t node, depth, shift, child
+    cdef int64_t query
 
     for query in range(source_leaf_ids.shape[0]):
-        source_node = leaf_node_ids[source_leaf_ids[query]]
-        level = node_levels[source_node]
-        scale = (<int64_t>1) << (level - 1)
-        extent_x = root_shape[0] * scale
-        extent_y = root_shape[1] * scale
-        extent_z = root_shape[2] * scale
-        tx = node_coords[source_node, 0] + directions[query, 0]
-        ty = node_coords[source_node, 1] + directions[query, 1]
-        tz = node_coords[source_node, 2] + directions[query, 2]
-        if (
-            tx < 0 or tx >= extent_x
-            or ty < 0 or ty >= extent_y
-            or tz < 0 or tz >= extent_z
-        ):
-            target_node_ids[query] = -1
-            continue
-
-        root_x = tx // scale
-        root_y = ty // scale
-        root_z = tz // scale
-        root_rank = coord_to_rank[root_x, root_y, root_z]
-        node = root_node_ids[root_rank]
-        depth = 1
-        while depth < level:
-            if node_leaf_ids[node] >= 0:
-                break
-            shift = level - depth - 1
-            child = (
-                ((tx >> shift) & 1)
-                + 2 * ((ty >> shift) & 1)
-                + 4 * ((tz >> shift) & 1)
-            )
-            node = child_node_ids[node, child]
-            depth += 1
-        target_node_ids[query] = node
+        target_node_ids[query] = refined_contact_target_c(
+            root_shape,
+            coord_to_rank,
+            root_node_ids,
+            node_levels,
+            node_coords,
+            child_node_ids,
+            node_leaf_ids,
+            leaf_node_ids,
+            source_leaf_ids[query],
+            <int>directions[query, 0],
+            <int>directions[query, 1],
+            <int>directions[query, 2],
+        )

@@ -25,7 +25,7 @@ def _require_index_vector(name: str, value: np.ndarray) -> np.ndarray:
     return value
 
 
-def fill_refined_contact_targets(
+def _require_contact_forest_inputs(
     root_shape: np.ndarray,
     coord_to_rank: np.ndarray,
     root_node_ids: np.ndarray,
@@ -34,11 +34,7 @@ def fill_refined_contact_targets(
     child_node_ids: np.ndarray,
     node_leaf_ids: np.ndarray,
     leaf_node_ids: np.ndarray,
-    source_leaf_ids: np.ndarray,
-    directions: np.ndarray,
-    target_node_ids: np.ndarray,
-) -> None:
-    """Fill raw target nodes for explicit refined leaf/direction queries."""
+) -> tuple[np.ndarray, ...]:
     root_shape = _require_index_triplet("root_shape", root_shape)
     root_count = _root_volume(root_shape)
     root_tuple = tuple(int(value) for value in root_shape)
@@ -62,6 +58,51 @@ def fill_refined_contact_targets(
         "node_leaf_ids", node_leaf_ids, (node_count,)
     )
     leaf_node_ids = _require_index_vector("leaf_node_ids", leaf_node_ids)
+    return (
+        root_shape,
+        coord_to_rank,
+        root_node_ids,
+        node_levels,
+        node_coords,
+        child_node_ids,
+        node_leaf_ids,
+        leaf_node_ids,
+    )
+
+
+def fill_refined_contact_targets(
+    root_shape: np.ndarray,
+    coord_to_rank: np.ndarray,
+    root_node_ids: np.ndarray,
+    node_levels: np.ndarray,
+    node_coords: np.ndarray,
+    child_node_ids: np.ndarray,
+    node_leaf_ids: np.ndarray,
+    leaf_node_ids: np.ndarray,
+    source_leaf_ids: np.ndarray,
+    directions: np.ndarray,
+    target_node_ids: np.ndarray,
+) -> None:
+    """Fill raw target nodes for explicit refined leaf/direction queries."""
+    (
+        root_shape,
+        coord_to_rank,
+        root_node_ids,
+        node_levels,
+        node_coords,
+        child_node_ids,
+        node_leaf_ids,
+        leaf_node_ids,
+    ) = _require_contact_forest_inputs(
+        root_shape,
+        coord_to_rank,
+        root_node_ids,
+        node_levels,
+        node_coords,
+        child_node_ids,
+        node_leaf_ids,
+        leaf_node_ids,
+    )
     source_leaf_ids = _require_index_vector(
         "source_leaf_ids", source_leaf_ids
     )
