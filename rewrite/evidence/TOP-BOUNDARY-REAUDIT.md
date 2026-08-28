@@ -45,6 +45,7 @@ FST-001 -> FST-002 -> TOP-002 -> BAL-001
 TOP-002 + BAL-001 -> later REL-001 -> STO-004
 ```
 
-The next executable capability is FST-002.  TOP-002 receives no implementation
-until FST-002 is complete and its own contact contract passes independent
-review.
+FST-002 is now complete with independent reference, corruption/lifecycle
+coverage, real-tree evidence, and allocation-free scaling.  TOP-002 is the next
+executable capability and receives no implementation until its contact contract
+passes independent review.

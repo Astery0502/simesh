@@ -42,6 +42,11 @@ def main() -> None:
             include_dirs=[np.get_include()],
         ),
         Extension(
+            "simesh_rewrite._forest_conformance",
+            [str(ROOT / "src/simesh_rewrite/_forest_conformance.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
             "simesh_rewrite._geometry",
             [str(ROOT / "src/simesh_rewrite/_geometry.pyx")],
             include_dirs=[np.get_include()],

@@ -24,6 +24,7 @@ from .topology import (
     level1_face_neighbors,
 )
 from .forest import RefinedForest, fill_refined_forest, refined_forest
+from .forest_conformance import validate_refined_forest_arrays
 from .storage import gather_blocks_into, scatter_blocks_from
 from .blockio import (
     BlockReader,
@@ -126,6 +127,7 @@ __all__ = [
     "unravel_cell",
     "valid_output_region",
     "validate_access_requirement",
+    "validate_refined_forest_arrays",
     "workspace_nbytes",
     "workspace_slot_capacity",
     "write_blocks_from",
