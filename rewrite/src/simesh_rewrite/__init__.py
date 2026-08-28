@@ -39,6 +39,7 @@ from .refined_support import (
     maximum_balanced_refined_support_slots,
     plan_balanced_refined_support_prefix,
 )
+from .restriction import restrict_cartesian_2to1_into
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
@@ -157,6 +158,7 @@ __all__ = [
     "ravel_cell",
     "required_input_region",
     "read_blocks_into",
+    "restrict_cartesian_2to1_into",
     "sample_level1_zero_order",
     "sample_level1_trilinear",
     "scaled_difference_into",

@@ -3,10 +3,10 @@
 ## State
 
 - Active milestone: M1 Cartesian 3D refined AMR.
-- Last completed capability: STO-004 balanced refined support union and bounded primary planning.
-- Current capability: RST-001 Cartesian 3D ratio-two cell-average restriction, proposed.
+- Last completed capability: RST-001 Cartesian 3D ratio-two cell-average restriction.
+- Current capability: LIM-001 Cartesian three-point limited-slope primitive, proposed.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
-- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
+- Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/RST-001.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  The STO-002 Yellow finding is resolved by WSP/PRI/FCL/HCL with wrappers retained.  SAM-002/SAM-003 remain Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
 
 ## Decisions Already Established
@@ -255,6 +255,25 @@
   10.9--23.3% faster than exact-workload naive regeneration.  A whole-tree REL
   cache is rejected because its 20,578,740 bytes exceed current retained
   connectivity and are unnecessary for bounded execution.
+- RST-001 maps an explicit even fine box to a translated half-size coarse box
+  and evaluates current Cartesian 3D restriction as eight values in
+  `000,100,010,110,001,101,011,111` order, seven additions, then exact
+  multiplication by `0.125`.  It owns no relation, child phase, scratch,
+  prolongation, or transfer policy.
+- RST validates complete canonical payload/region/overlap state before
+  mutation, accepts contained empty half-open axes, preserves every cell outside
+  the requested output box, and retains no allocation.  Current eligible
+  `datac` interiors, the scalar reference, checked/unchecked kernels, and the
+  exact-order NumPy comparator are bitwise identical.
+- Replacing volatile temporaries with ordinary explicit-statement locals keeps
+  exact bits and improves the standard checked kernel about 5x to 0.199 ms,
+  659.5 million coarse field-cells/s and 47.48 effective GB/s.  A call retains
+  zero traced bytes and peaks at 1,056 bytes.
+- Bounded RST composition extracts only accepted FINER source IDs, maps them to
+  STO-selected slots outside the numerical kernel, and restricts compact
+  canonical inputs.  At capacity 256 the exact 528-leaf path uses 3.78 MB
+  working memory; Python source extraction dominates at 4.20 ms while gather
+  and RST take 0.236/0.189 ms, so later transfer planning owns that optimization.
 
 ## Next Work
 
@@ -264,11 +283,11 @@ audit is complete and FST-002/TOP-002/BAL-001/GEO-002/REL-001 separately
 establish conformance, raw contacts, all-touch admissibility, selected refined
 geometry, and selected relation records.  The STO-002 Yellow trigger is resolved:
 WSP-001 accounting, PRI-001 primary traversal, FCL-001 direct-face closure, and
-HCL-001 full-halo closure and STO-004 refined support union/bounded planning are
-complete.  Next is RST-001, the independently substitutable ratio-two
-cell-average restriction kernel, followed by limiter/prolongation semantics,
-refined transfer planning/halos, sampling, a native selective `.dat` adapter,
-and real-data bounded integration.
+HCL-001 full-halo closure, STO-004 refined support union/bounded planning, and
+RST-001 ratio-two cell-average restriction are complete.  Next is LIM-001, the
+independently substitutable current three-point limited-slope rule, followed by
+ratio-two prolongation, refined transfer planning/halos, sampling, a native
+selective `.dat` adapter, and real-data bounded integration.
 
 ## Latest Reproduction Commands
 
@@ -284,6 +303,7 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_fcl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hcl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_sto_004.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_rst_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hpl_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_pbc_001.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_hax_001.py
@@ -306,6 +326,7 @@ PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/pri_001.py --block-co
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/fcl_001.py --capacities 64,256,1024 --repeats 15
 PYTHONPATH=rewrite/src .venv/bin/python rewrite/benchmarks/hcl_001.py --capacities 64,256,1024 --repeats 15
 PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/sto_004.py --capacities 57,64,128,256,1024 --repeats 3 --dat data/weno509_sub_0000.dat
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/rst_001.py --repeats 31 --composition-repeats 7 --composition-capacities 64,128,256
 ```
 
 Migration/performance audit evidence is recorded in `evidence/MIG-001.md` and
@@ -324,3 +345,4 @@ PRI-001 evidence is in `evidence/PRI-001.md`.
 FCL-001 evidence is in `evidence/FCL-001.md`.
 HCL-001 evidence is in `evidence/HCL-001.md`.
 STO-004 evidence is in `evidence/STO-004.md`.
+RST-001 evidence is in `evidence/RST-001.md`.
