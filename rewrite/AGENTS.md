@@ -36,7 +36,7 @@ checkpoint. Do not reread every process document on every work cycle.
 
 ## Working Rules
 
-- Work on one ready capability at a time.
+- Work on one ready capability at a time inside one active capability group.
 - A capability is ready only when every dependency is `complete`, unless its ledger entry explicitly states a lower required status.
 - For a non-trivial capability, explore alternatives in a short design note, then freeze the selected behavior in a contract before implementation.
 - For a simple capability, use one concise contract and start implementation without extra design ceremony.
@@ -80,6 +80,30 @@ checkpoint. Do not reread every process document on every work cycle.
 - Do not use hashes as workflow, validation, or governance machinery.
 - Avoid speculative defensive checks. Validate demonstrated domain invariants at the boundary that owns them.
 
+## Capability Groups
+
+- A capability group contains two to five dependency-adjacent capabilities that
+  produce one concrete composed outcome. Record the group outcome, member IDs,
+  and closing checks in `CURRENT.md` before implementing its first member.
+- Keep semantic decomposition and contracts capability-sized. Grouping changes
+  validation and checkpoint cadence; it does not merge independently variable
+  decisions back into one function or contract.
+- For each member, complete its contract, reference or invariants, production
+  implementation, focused tests, and immediate composition checks. A member may
+  reach `integrated` before the group gate and reaches `complete` only when the
+  group gate passes.
+- Close the group with one clean rewrite extension build, one accumulated
+  rewrite regression/integration run, one set of relevant current-path
+  comparisons, and one standard benchmark pass covering the group's new hot
+  paths and immediate composed outcome. Do not rerun unaffected standard
+  benchmarks.
+- A one-capability group requires a recorded reason such as a milestone gate,
+  an isolated high-risk hot path, or an external dependency boundary. Do not
+  use singleton groups as the default.
+- If a group gate fails, fix the owning capability, rerun its focused checks,
+  then rerun the failed group gate. Do not repeat already-passing unrelated
+  benchmark profiles.
+
 ## Correctness
 
 Use the minimum combination of evidence that establishes the capability:
@@ -117,23 +141,25 @@ supports the change, update the contract, affected tests, capability state, and
 ## Completion And Checkpoints
 
 A capability is complete only when its contract, implementation, focused tests,
-integration point, and relevant performance or memory evidence agree. Update
-`CAPABILITIES.md` and `CURRENT.md` immediately after completion or a material
-change of direction.
+integration point, relevant performance or memory evidence, and active group
+gate agree. Update `CAPABILITIES.md` and `CURRENT.md` after each member reaches
+`integrated`, after a material change of direction, and when the group closes.
 
-After a capability is complete, create one cohesive Git commit containing its
-design or contract updates, implementation, tests, integration changes, and
-checkpoint updates. Use ordinary Git history as the recovery mechanism. Do not
-maintain separate content hashes, artifact hashes, or integrity manifests.
+After the group gate passes, create one cohesive Git commit containing the
+group's design and contract updates, implementations, tests, integration
+changes, evidence, and checkpoint updates. Use ordinary Git history as the
+recovery mechanism. Do not maintain separate content hashes, artifact hashes,
+or integrity manifests.
 
 Before that commit:
 
-- run the capability's focused tests;
-- run all established rewrite regression and integration tests;
-- run relevant comparisons against the current implementation;
+- run every member's focused tests;
+- build the rewrite extensions once from the complete group state;
+- run all established rewrite regression and integration tests once;
+- run the group's relevant current-path comparisons and standard benchmarks once;
 - inspect `git status`, the working diff, and the staged diff;
-- stage only files belonging to the active rewrite capability and its checkpoint;
+- stage only files belonging to the active capability group and its checkpoint;
 - leave unrelated repository changes unstaged and untouched.
 
-Commit only an executable checkpoint whose staged contents match the completed
-capability.
+Commit only an executable group checkpoint whose staged contents match the
+completed members and recorded group gate.

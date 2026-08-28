@@ -127,7 +127,15 @@ gates.
 
 ## Capability And Milestone Completion
 
-A hot-path capability requires both its kernel benchmark and the immediate
-composed benchmark. A milestone requires at least one real-data workflow plus
-scaling/resource evidence. Public cutover requires same-runner comparisons of
-the canonical user workflows, not a collection of isolated fast kernels.
+A hot-path capability still requires both its kernel benchmark and the
+immediate composed benchmark, but standard profiles run once at the closing
+gate of its active capability group. Several member capabilities may share one
+raw run and group summary when that run reports each member's kernel metrics
+and the composed outcome separately. During member iteration, use focused
+correctness checks and optional smoke profiles rather than repeatedly running
+the standard matrix. Unaffected historical benchmarks are not part of the
+group gate.
+
+A milestone requires at least one real-data workflow plus scaling/resource
+evidence. Public cutover requires same-runner comparisons of the canonical user
+workflows, not a collection of isolated fast kernels.

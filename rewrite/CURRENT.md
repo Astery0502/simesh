@@ -5,6 +5,13 @@
 - Active milestone: M1 Cartesian 3D refined AMR.
 - Last completed capability: SLB-001 Cartesian same-level source-box translation.
 - Current capability: FRP-001 Cartesian FINER restriction placement, proposed.
+- Validation cadence: dependency-adjacent capability groups; focused checks per
+  member and one build/full-regression/current-comparison/standard-benchmark
+  gate per group.
+- Active capability group: not yet frozen.  On resume, define a two-to-five
+  member refined-transfer group beginning with FRP-001 before implementation;
+  refine the later member IDs through the five-question gate without absorbing
+  unrelated refined-halo work.
 - Rewrite implementation: isolated `simesh_rewrite` package with the complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path, functional block substitution, and explicit flat refined-octree reconstruction with dense leaf/SFC maps.
 - Stable contracts: `contracts/FND-001.md`, `contracts/FND-002.md`, `contracts/MIG-001.md`, `contracts/PERF-001.md`, `contracts/MOR-001.md`, `contracts/TOP-001.md`, `contracts/FST-001.md`, `contracts/FST-002.md`, `contracts/TOP-002.md`, `contracts/BAL-001.md`, `contracts/REL-001.md`, `contracts/GEO-001.md`, `contracts/GEO-002.md`, `contracts/WSP-001.md`, `contracts/PRI-001.md`, `contracts/FCL-001.md`, `contracts/HCL-001.md`, `contracts/STO-001.md`, `contracts/STO-002.md`, `contracts/STO-003.md`, `contracts/STO-004.md`, `contracts/RST-001.md`, `contracts/LIM-001.md`, `contracts/PRL-001.md`, `contracts/RSL-001.md`, `contracts/TGT-001.md`, `contracts/RPH-001.md`, `contracts/SLB-001.md`, `contracts/HAL-001.md`, `contracts/HAL-002.md`, `contracts/HPL-001.md`, `contracts/PBC-001.md`, `contracts/HAX-001.md`, `contracts/SAM-001.md`, `contracts/SAM-002.md`, `contracts/SAM-003.md`, `contracts/OPR-001.md`, `contracts/OPR-002.md`, `contracts/RED-001.md`, `contracts/INT-001.md`.
 - Unresolved differences: no Red capability remains.  HAL-002 is retained Fused over HPL/PBC/HAX semantics, and the TOP draft is split into FST-002 conformance, TOP-002 raw contact lookup, BAL-001 admissibility, and optional TOP-003 materialization.  The STO-002 Yellow finding is resolved by WSP/PRI/FCL/HCL with wrappers retained.  SAM-002/SAM-003 remain Fused until refined sampling.  The only available real refined Cartesian 3D `.dat` is staggered, so it remains forest/tree metadata evidence without broadening payload support.
@@ -19,10 +26,10 @@
 - Performance is multi-objective.
 - Agents may revise contracts autonomously through independent sub-agent review.
 - The workflow deliberately avoids hashes and heavy governance.
-- Completed capabilities become cohesive Git checkpoints on the continuing rewrite branch.
+- Completed capability groups become cohesive Git checkpoints on the continuing rewrite branch; individual capabilities remain the semantic and ledger units.
 - Non-trivial capabilities use a short design note before their stable contract; simple capabilities go directly to a concise contract.
 - A capability starts only after its dependencies are complete unless the ledger records a narrower exception.
-- Every capability checkpoint runs the accumulated rewrite regression suite and stages only capability-related files.
+- Every capability runs focused validation; each capability group runs the accumulated rewrite regression, relevant current-path comparisons, and standard benchmark set once before its group checkpoint.
 - Optimization stops after a correct integrated implementation reaches a useful trade-off and further credible variants no longer materially improve it.
 - M0 spatial axes are `(x, y, z)` and rewrite-visible indices are zero-based signed `int64`.
 - Canonical block interchange is C-contiguous `float64` in `(slot, field, x, y, z)` order; slots map to explicit global block IDs.
@@ -387,7 +394,10 @@ complete.  RSG-001 was rejected as fused and SLB-001 same-level source-box
 translation is complete.  Next is FRP-001 FINER restriction placement, followed
 by separate COARSER workspace geometry, value application, complete refined
 halos, sampling, a native selective `.dat` adapter, and real-data bounded
-integration.
+integration.  Before resuming implementation, freeze a two-to-five member
+refined-transfer capability group beginning with FRP-001, record its exact
+focused checks and closing gate here, and keep its later member boundaries
+subject to the five-question decomposition gate.
 
 ## Latest Reproduction Commands
 

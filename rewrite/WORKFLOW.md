@@ -1,5 +1,36 @@
 # Capability Workflow
 
+## Capability Group Cycle
+
+Before implementation, select two to five dependency-adjacent capabilities
+that deliver one concrete composed outcome and record the active group in
+`CURRENT.md`. The group declaration names its member IDs, dependency order,
+outcome, focused checks, full regression command, relevant current-path
+comparisons, and standard benchmark set. Exact later member IDs may be refined
+by the five-question gate before the first member is implemented, but the group
+must not expand beyond five members or absorb unrelated work.
+
+Implement one ready member at a time. A member completes the capability cycle
+below through focused validation and immediate integration, then remains
+`integrated` until the group gate passes. Do not rerun the accumulated suite or
+standard benchmark matrix after each member.
+
+Close the group by:
+
+1. building the rewrite extensions once from the complete group state;
+2. running all member-focused tests and the accumulated rewrite regression and
+   integration suite once;
+3. running the relevant comparisons with the current implementation once;
+4. running one standard benchmark pass for the group's new hot paths and
+   immediate composed outcome, without rerunning unaffected benchmarks;
+5. resolving any failure at its owning capability and rerunning the failed gate;
+6. marking the members `complete`, updating the ledgers and evidence, inspecting
+   the working and staged diffs, and creating one cohesive group checkpoint.
+
+A group may contain one capability only when `CURRENT.md` records why a
+milestone gate, isolated high-risk hot path, or external dependency boundary
+makes batching inappropriate.
+
 ## Capability Cycle
 
 For one ready capability:
@@ -15,10 +46,10 @@ For one ready capability:
 9. Integrate with the immediate lower-level producer and next higher-level consumer.
 10. Measure the performance and memory dimensions relevant to this capability and its new composed path.
 11. Explore optimized or fused variants only after the simple implementation and composition are correct.
-12. Run the capability tests, all established rewrite regression and integration tests, and relevant current-implementation comparisons.
-13. Update the capability ledger and current checkpoint.
-14. Inspect the working and staged diffs, then stage only the active capability and checkpoint files.
-15. Create one cohesive Git commit for the completed capability.
+12. Run the capability's focused tests and immediate reference/composition comparisons; use smoke benchmarks only when useful during iteration.
+13. Update the capability ledger to `integrated` and update the active-group checkpoint.
+14. Continue to the next ready member without rerunning the accumulated suite or standard benchmark matrix.
+15. Mark members `complete` and commit only after the capability group gate passes.
 
 Keep this cycle proportional. A simple index transform does not need a report;
 a refined ghost algorithm or out-of-core executor does.
@@ -95,8 +126,9 @@ changes, workspace reuse, tiling, mapping, caching, streaming, or OpenMP.
 
 For a hot path, record the `PERFORMANCE.md` workload/profile, comparator,
 hypothesis, metrics, and material-regression rule before the final experiment.
-Completion includes the kernel and immediate composed benchmark. Milestones
-also require a real-data/public-workflow benchmark at the level reached so far.
+The active group runs the standard kernel and immediate composed benchmarks
+once at its closing gate. Milestones also require a real-data/public-workflow
+benchmark at the level reached so far.
 
 Choose among useful variants by the relevant combination of runtime,
 throughput, peak memory, allocation behavior, scaling, and conceptual cost.
@@ -162,19 +194,22 @@ the proposal and conclusion concise.
 
 ## Checkpoint Discipline
 
-After each completed capability or material decision, `CURRENT.md` should say:
+During an active capability group and after each material decision, `CURRENT.md`
+should say:
 
 - active milestone;
-- last completed capability;
+- active group outcome and member IDs;
+- last completed group and last integrated capability;
 - current capability and status;
 - important unresolved differences;
 - next ready capability;
-- exact commands needed to reproduce the latest checks.
+- exact commands for focused checks and the closing group gate;
 - source-migration rows and benchmark baselines changed by the checkpoint.
 
-The Git commit created after a completed capability is the durable recovery
-point. Keep commits cohesive and executable. Intermediate experiments do not
-need their own process artifacts or commits unless retaining them is useful for
-an active comparison. Before committing, inspect `git status`, the working diff,
-and the staged diff; run the established rewrite regression suite; and ensure
-that unrelated repository changes remain unstaged.
+The Git commit created after a completed capability group is the durable
+recovery point. Keep group commits cohesive and executable. Intermediate
+experiments and integrated members do not need their own commits unless an
+external interruption requires a clearly labeled recovery checkpoint. Before
+the group commit, inspect `git status`, the working diff, and the staged diff;
+run the group gate; and ensure that unrelated repository changes remain
+unstaged.
