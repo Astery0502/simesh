@@ -28,6 +28,7 @@ a capability becomes active.
 | STO-003 | Functional block reader/writer adapters and execution substitution | STO-001 | complete |
 | HAL-001 | Non-periodic physical-boundary halo provision | GEO-001, STO-001 | complete |
 | HAL-002 | Same-level sibling halo provision | TOP-001, HAL-001 | complete |
+| HPL-001 | Explicit level-1 halo relation and selected-source plan | TOP-001, STO-002 | complete |
 | SAM-001 | Exact level-1 block placement | GEO-001, STO-001 | complete |
 | SAM-002 | Zero-order uniform sampling | GEO-001, STO-001 | complete |
 | SAM-003 | Trilinear uniform sampling | HAL-002, GEO-001 | complete |
@@ -50,8 +51,10 @@ FST-001 supplies explicit flat preorder hierarchy and leaf maps.  TOP-002 is
 the next dependency-ready capability; refined geometry can then proceed from
 FST-001 while directional relation planning proceeds from TOP-002.
 
-Decomposition audit checkpoint: HAL-002 is Red and must be incrementally
-refined before M1 implementation resumes.  The preserved untracked TOP-002
+Decomposition audit checkpoint: HAL-002 is Red and is being incrementally
+refined before M1 implementation resumes.  HPL-001 has extracted its
+relation/source-slot planning decision; explicit shared physical-transform and
+plan-application boundaries remain.  The preserved untracked TOP-002
 draft is also Red and must split reusable FST conformance, exact contact
 semantics, BAL-001, and optional face materialization before contract freeze.
 STO-002 is Yellow with a mandatory split trigger before refined support

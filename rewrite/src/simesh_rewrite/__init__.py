@@ -49,6 +49,10 @@ from .halos import (
     fill_physical_halos,
     fill_same_level_halos,
 )
+from .halo_plans import (
+    fill_level1_halo_relation_plan,
+    level1_halo_relation_plan,
+)
 from .sampling import (
     place_level1_blocks,
     sample_level1_trilinear,
@@ -83,6 +87,7 @@ __all__ = [
     "fill_level1_face_neighbors",
     "fill_level1_block_geometry",
     "fill_level1_morton",
+    "fill_level1_halo_relation_plan",
     "fill_refined_forest",
     "fill_physical_halos",
     "fill_same_level_halos",
@@ -90,6 +95,7 @@ __all__ = [
     "gather_blocks_into",
     "interior_region",
     "level1_morton",
+    "level1_halo_relation_plan",
     "level1_face_neighbors",
     "refined_forest",
     "level1_block_geometry",

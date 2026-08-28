@@ -36,6 +36,74 @@ cdef inline int64_t _find_slot(
     return -1
 
 
+cdef inline int64_t _fill_primary_relation_plan(
+    int64_t block_id,
+    const int64_t[::1] block_ids,
+    const int64_t[:, ::1] face_neighbor_ids,
+    int64_t* source_slots,
+    uint8_t* physical_masks,
+) noexcept:
+    cdef int64_t current_block, neighbor, source_slot, direction_index
+    cdef uint8_t mask
+    cdef bint has_sibling
+    cdef int dx, dy, dz
+
+    for dz in range(-1, 2):
+        for dy in range(-1, 2):
+            for dx in range(-1, 2):
+                direction_index = (dz + 1) * 9 + (dy + 1) * 3 + dx + 1
+                current_block = block_id
+                mask = 0
+                has_sibling = False
+
+                if dx != 0:
+                    neighbor = face_neighbor_ids[
+                        current_block,
+                        0 if dx < 0 else 1,
+                    ]
+                    if neighbor < -1 or neighbor >= face_neighbor_ids.shape[0]:
+                        return 27 + direction_index
+                    if neighbor < 0:
+                        mask |= 1
+                    else:
+                        current_block = neighbor
+                        has_sibling = True
+                if dy != 0:
+                    neighbor = face_neighbor_ids[
+                        current_block,
+                        2 if dy < 0 else 3,
+                    ]
+                    if neighbor < -1 or neighbor >= face_neighbor_ids.shape[0]:
+                        return 27 + direction_index
+                    if neighbor < 0:
+                        mask |= 2
+                    else:
+                        current_block = neighbor
+                        has_sibling = True
+                if dz != 0:
+                    neighbor = face_neighbor_ids[
+                        current_block,
+                        4 if dz < 0 else 5,
+                    ]
+                    if neighbor < -1 or neighbor >= face_neighbor_ids.shape[0]:
+                        return 27 + direction_index
+                    if neighbor < 0:
+                        mask |= 4
+                    else:
+                        current_block = neighbor
+                        has_sibling = True
+
+                physical_masks[direction_index] = mask
+                if not has_sibling:
+                    source_slots[direction_index] = -1
+                    continue
+                source_slot = _find_slot(block_ids, current_block)
+                if source_slot < 0:
+                    return direction_index
+                source_slots[direction_index] = source_slot
+    return -1
+
+
 cpdef int64_t duplicate_block_id_index_unchecked(
     const int64_t[::1] block_ids,
 ):
@@ -45,6 +113,45 @@ cpdef int64_t duplicate_block_id_index_unchecked(
             if block_ids[first] == block_ids[second]:
                 return second
     return -1
+
+
+cpdef int64_t missing_halo_relation_plan_entry_unchecked(
+    int64_t primary_count,
+    const int64_t[::1] block_ids,
+    const int64_t[:, ::1] face_neighbor_ids,
+):
+    cdef int64_t primary, missing_direction
+    cdef int64_t source_slots[27]
+    cdef uint8_t physical_masks[27]
+    for primary in range(primary_count):
+        missing_direction = _fill_primary_relation_plan(
+            block_ids[primary],
+            block_ids,
+            face_neighbor_ids,
+            &source_slots[0],
+            &physical_masks[0],
+        )
+        if missing_direction >= 0:
+            return primary * 54 + missing_direction
+    return -1
+
+
+cpdef void fill_level1_halo_relation_plan_unchecked(
+    int64_t primary_count,
+    const int64_t[::1] block_ids,
+    const int64_t[:, ::1] face_neighbor_ids,
+    int64_t[:, ::1] source_slots,
+    uint8_t[:, ::1] physical_masks,
+):
+    cdef int64_t primary
+    for primary in range(primary_count):
+        _fill_primary_relation_plan(
+            block_ids[primary],
+            block_ids,
+            face_neighbor_ids,
+            &source_slots[primary, 0],
+            &physical_masks[primary, 0],
+        )
 
 
 cpdef int64_t missing_halo_closure_primary_unchecked(
