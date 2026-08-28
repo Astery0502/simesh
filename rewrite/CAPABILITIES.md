@@ -64,7 +64,8 @@ complete.
 | RSL-001 | Accepted refined relation source-slot resolution | REL-001, STO-004 | complete |
 | TGT-001 | Directed halo target boxes | FND-001 | complete |
 | RPH-001 | Refined relation child-phase codes | FST-002, REL-001, RSL-001 | complete |
-| RSG-001 | Refined transfer source/workspace geometry | FND-001, REL-001, TGT-001, RPH-001 | proposed |
+| SLB-001 | Cartesian same-level source-box translation | FND-001, TGT-001 | complete |
+| FRP-001 | Cartesian FINER restriction placement | RST-001, TGT-001, RPH-001 | proposed |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -89,8 +90,11 @@ coarse reach without a slope cache.  RSL-001 provides bounded source-slot
 identity without kind policy.  The proposed RAC-001 action enum was retired
 because REL kind/mask already determines it.  Combined RTP-001 failed the
 five-question gate and split into now-complete TGT-001 directed boxes and
-now-complete RPH-001 ratio-two phases.  RSG-001 is next and owns the still-
-missing source/workspace geometry before value application.
+now-complete RPH-001 ratio-two phases.  Proposed RSG-001 failed decomposition
+and split into now-complete SLB-001 same-level translation, FRP-001 FINER
+restriction placement, and later COARSER workspace geometry; physical widening
+remains PBC-owned.  SLB-001 is a topology-free affine translation from explicit
+target boxes and reduced directions to equal-level source boxes.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

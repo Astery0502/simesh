@@ -45,6 +45,7 @@ from .prolongation import prolong_cartesian_2to1_into
 from .relation_slots import resolve_refined_relation_source_slots
 from .target_boxes import fill_directed_halo_target_boxes
 from .relation_phases import fill_refined_relation_phase_codes
+from .same_level_boxes import fill_same_level_source_boxes
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
@@ -124,6 +125,7 @@ __all__ = [
     "fill_balanced_refined_relations",
     "fill_directed_halo_target_boxes",
     "fill_refined_relation_phase_codes",
+    "fill_same_level_source_boxes",
     "fill_ascending_primary_prefix",
     "common_physical_valid_region",
     "central_difference_into",

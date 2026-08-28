@@ -61,7 +61,9 @@ cell-average restriction, the independent current three-point limiter, and
 ratio-two limited prolongation and refined source-slot resolution are also
 complete.  REL already supplies action classification; refined target-region
 and child-phase planning are also complete.  Source/workspace geometry and
-value application are next.
+value application are next; combined source/workspace geometry split first into
+now-complete same-level translation, FINER placement, and COARSER workspace
+geometry.  FINER placement is next.
 Six-face TOP-003 caching remains optional and requires repeated-consumer
 performance justification.
 
