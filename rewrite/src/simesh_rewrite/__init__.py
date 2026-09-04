@@ -64,6 +64,13 @@ from .completed_primary import (
     execute_selected_refined_halos_with_consumer,
     make_completed_primary_consumer,
 )
+from .completed_halo_sampling import (
+    CachedVectorSamplingStats,
+    CompletedHaloSamplingSession,
+    clear_completed_halo_sampling_session,
+    make_completed_halo_sampling_session,
+    sample_refined_trilinear_vectors_cached,
+)
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
@@ -77,6 +84,10 @@ from .region_selection import (
 from .point_location import (
     fill_refined_point_leaf_ids,
     refined_point_leaf_ids,
+)
+from .hinted_location import (
+    HintedLocationStats,
+    fill_refined_point_leaf_ids_with_hints,
 )
 from .refined_sampling import (
     sample_refined_trilinear_point_groups,
@@ -164,8 +175,11 @@ __all__ = [
     "BoundaryMode",
     "BlockReader",
     "BlockWriter",
+    "CachedVectorSamplingStats",
+    "CompletedHaloSamplingSession",
     "CompletedPrimaryConsumer",
     "CompletedPrimaryExecutionStats",
+    "HintedLocationStats",
     "INDEX_DTYPE",
     "PAYLOAD_DTYPE",
     "PHYSICAL_BOUNDARY_ID",
@@ -180,6 +194,7 @@ __all__ = [
     "apply_coarser_workspace_plan",
     "bind_amrvac_v5_forest",
     "cartesian_curl_into",
+    "clear_completed_halo_sampling_session",
     "count_refined_region_windows",
     "execute_selected_refined_curl_from_blocks",
     "execute_selected_refined_halos_from_blocks",
@@ -205,6 +220,7 @@ __all__ = [
     "fill_refined_forest",
     "fill_refined_leaf_geometry",
     "fill_refined_point_leaf_ids",
+    "fill_refined_point_leaf_ids_with_hints",
     "fill_refined_region_windows",
     "fill_refined_contact_targets",
     "fill_physical_halos",
@@ -230,6 +246,7 @@ __all__ = [
     "maximum_selected_refined_support_slots",
     "make_block_reader",
     "make_block_writer",
+    "make_completed_halo_sampling_session",
     "make_completed_primary_consumer",
     "make_amrvac_v5_block_reader",
     "merge_field_sums",
@@ -252,6 +269,7 @@ __all__ = [
     "sample_level1_trilinear",
     "sample_refined_zero_order_point_groups",
     "sample_refined_trilinear_point_groups",
+    "sample_refined_trilinear_vectors_cached",
     "scaled_difference_into",
     "scatter_blocks_from",
     "supports_output_region",

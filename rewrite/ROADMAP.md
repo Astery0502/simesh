@@ -86,6 +86,11 @@ Cartesian curl, and a stable completed-primary consumer before composing native
 selected output and reduction. The separate streamline location/cache/stepping
 policy is the next M1 vertical slice.
 
+The completed streamline preparation group isolates exact last-owner hints
+and a byte-bounded completed-owner halo sampling session. It retains full RHE
+miss semantics; raw source caching and direction-projected support remain
+separate measured reopen choices before field-line stepping is frozen.
+
 Before refined halo work, complete the functional-composition checkpoint:
 
 - expose block readers and writers as explicit coarse-grained function

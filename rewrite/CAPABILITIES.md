@@ -83,6 +83,8 @@ complete.
 | OPR-003 | Cartesian 3D refined curl | FND-002, OPR-001, OPR-002, GEO-002 | complete |
 | RHC-001 | Synchronous completed refined-primary consumption | RHE-001, STO-003 | complete |
 | LFE-001 | Bounded selected refined curl and regional sum execution | ROI-001, OPR-003, RHC-001, RED-001, GEO-002, DAT-003 | complete |
+| HLO-001 | Exact last-owner hinted refined point ownership | LOC-001, GEO-002 | complete |
+| CHS-001 | Completed refined owner-halo sampling session | HLO-001, RHC-001, SAM-005, DAT-003, WSP-001 | complete |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -165,6 +167,12 @@ completed-primary consumer boundary before composing one bounded curl output
 and streaming component sum. It consumes DAT-003 directly and does not add
 dataset lifecycle, cache policy, streamline stepping, or a generic expression
 engine.
+
+The completed cached refined vector sampling group adds an exact last-owner hint
+before unchanged LOC descent and retains completed one-cell owner halos in one
+explicit serial byte-bounded session. It keeps all-26 RHE miss semantics while
+deferring raw-block caching and direction-projected COARSER/PBC support to
+native streamline evidence.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

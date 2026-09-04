@@ -223,6 +223,32 @@ uniform grid when the representative analysis workflow does not consume it.
   streamline design; batched generic recipes still require a second operator,
   and cache/header indexing awaits the streamline reuse trace.
 
+### Completed Record: Cached Refined Vector Sampling
+
+- Primary analysis workflow and query shape: ordered trilinear magnetic-vector
+  stages for one or many data-dependent field lines, including long same-owner
+  runs, owner transitions, and interleaved divergent seeds.
+- Expected access density and locality: points are sparse relative to the
+  snapshot; coherent runs show about 98% last/completed-owner reuse, while
+  divergent orders expose a small working-set capacity knee.
+- Reusable state and its lifetime: one immutable reader/FST/GEO/ordered-field/
+  PBC lifecycle, one persistent RHE miss workspace, and a byte-bounded completed
+  owner-halo LRU. Dynamic point/group plans remain call-scoped.
+- Dominant expected cost: cache misses still pay all-26 support planning, reads,
+  and halo application; on hits, unchecked exact location plus SAM-005 dominate.
+- Current and structurally different candidate strategies: select exact hinted
+  owner fallback plus completed-halo LRU. Reject per-point checked RPS as the
+  session path; defer stage-only batching, raw-interior LRU, uniform grids, and
+  direction-projected support.
+- Workload-specific metrics and representative consumer: point latency and
+  throughput, hint/fallback and owner reuse, cache hits/misses/evictions, halo
+  fills, selected/support loads, logical/native bytes, capacity/working set,
+  session/call/peak memory, RPS equality, and the following field-line executor.
+- Deferred alternatives and concrete reopen triggers: neighbor transitions only
+  if hierarchy fallbacks remain material after hints; raw caching only if native
+  support rereads dominate miss-heavy traces; direction projection only through
+  a separate proven COARSER/PBC planner when all-26 miss cost remains material.
+
 ## Required Performance Profiles
 
 ### Selected Local Field
