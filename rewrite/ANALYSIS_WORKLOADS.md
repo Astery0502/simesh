@@ -249,6 +249,34 @@ uniform grid when the representative analysis workflow does not consume it.
   support rereads dominate miss-heavy traces; direction projection only through
   a separate proven COARSER/PBC planner when all-26 miss cost remains material.
 
+### Completed Record: Native Refined Field Lines
+
+- Primary analysis workflow and query shape: forward/backward magnetic field
+  lines from one or many finite seeds, fixed physical-arclength steps, accepted-
+  prefix trajectories, and cumulative oriented `integral(B dot dx)`.
+- Expected access density and locality: four data-dependent stages per attempted
+  step, long coherent owner runs for individual seeds, and divergent working
+  sets across stage-major seed batches.
+- Reusable state and its lifetime: one caller-owned CHS snapshot/field/PBC/cache
+  session across calls; SLE stage arrays and active-seed plans are call-scoped;
+  result arrays are caller-owned.
+- Dominant expected cost: cold CHS owner misses/all-26 support and then warm
+  per-stage cache/location/sampling calls; FLN/RK arithmetic is expected to be
+  secondary but is measured as a hot path.
+- Current and structurally different candidate strategies: choose scale-safe
+  unit-tangent RHS, fixed classical RK4, whole-step nonperiodic rejection, and
+  serial stage-major batches. Defer unnormalized time ODEs, Euler/midpoint,
+  adaptive RK, boundary clipping, periodic wrap, and per-seed parallel loops.
+- Workload-specific metrics and representative consumer: trajectory/integral
+  error and convergence, termination codes/stages, point/step latency, hints/
+  fallbacks/transitions, cache and halo fills, logical/native bytes per accepted
+  point, capacity/cold/warm behavior, scratch/session/output/RSS memory, and
+  single/multiple-seed scaling on analytic fields plus real tdm.
+- Deferred alternatives and concrete reopen triggers: direction projection or
+  raw caching only from actual miss-heavy trajectory time/bytes; neighbor lookup
+  only if post-hint LOC remains material; adaptive/parallel execution only after
+  fixed-step error and independent-seed scaling establish a useful target.
+
 ## Required Performance Profiles
 
 ### Selected Local Field

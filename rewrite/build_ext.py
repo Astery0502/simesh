@@ -182,6 +182,16 @@ def main() -> None:
             include_dirs=[np.get_include()],
         ),
         Extension(
+            "simesh_rewrite._field_line_rhs",
+            [str(ROOT / "src/simesh_rewrite/_field_line_rhs.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
+            "simesh_rewrite._rk4",
+            [str(ROOT / "src/simesh_rewrite/_rk4.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
             "simesh_rewrite._operators",
             [str(ROOT / "src/simesh_rewrite/_operators.pyx")],
             include_dirs=[np.get_include()],

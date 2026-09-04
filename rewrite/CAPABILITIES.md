@@ -85,6 +85,10 @@ complete.
 | LFE-001 | Bounded selected refined curl and regional sum execution | ROI-001, OPR-003, RHC-001, RED-001, GEO-002, DAT-003 | complete |
 | HLO-001 | Exact last-owner hinted refined point ownership | LOC-001, GEO-002 | complete |
 | CHS-001 | Completed refined owner-halo sampling session | HLO-001, RHC-001, SAM-005, DAT-003, WSP-001 | complete |
+| FLN-001 | Normalized magnetic field-line RHS | FND-001 | complete |
+| RKS-001 | Fixed classical RK4 augmented-state arithmetic | FND-001 | complete |
+| TRM-001 | Nonperiodic field-line termination policy | FLN-001, RKS-001, LOC-001 | complete |
+| SLE-001 | Cached native refined field-line execution | CHS-001, FLN-001, RKS-001, TRM-001 | complete |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -173,6 +177,12 @@ before unchanged LOC descent and retains completed one-cell owner halos in one
 explicit serial byte-bounded session. It keeps all-26 RHE miss semantics while
 deferring raw-block caching and direction-projected COARSER/PBC support to
 native streamline evidence.
+
+The completed native refined field-line group separates scale-safe normalized
+magnetic RHS and oriented line integral, fixed classical RK4 arithmetic,
+nonperiodic termination/result policy, and serial stage-major CHS scheduling.
+No repository tracer supplies legacy semantics; these are explicit new M1
+contracts rather than a parity claim.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

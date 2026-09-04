@@ -91,6 +91,12 @@ and a byte-bounded completed-owner halo sampling session. It retains full RHE
 miss semantics; raw source caching and direction-projected support remain
 separate measured reopen choices before field-line stepping is frozen.
 
+The completed field-line group freezes normalized unit-arclength magnetic
+tracing, classical fixed-step RK4, explicit nonperiodic termination, and a
+serial stage-major CHS executor. Its native trajectory trace closes the M1
+analysis-priority gate. The M1 horizon review decides remaining cache/support
+reopen work before M2; it has not started at this checkpoint.
+
 Before refined halo work, complete the functional-composition checkpoint:
 
 - expose block readers and writers as explicit coarse-grained function

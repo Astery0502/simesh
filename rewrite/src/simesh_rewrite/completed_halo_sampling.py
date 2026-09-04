@@ -48,6 +48,24 @@ from .workspace import _require_nonnegative_integer
 _INDEX_MAX = int(np.iinfo(np.int64).max)
 
 
+class UnrepresentableRefinedSampleError(ValueError):
+    """A finite owned point has no representable SAM-005 stencil."""
+
+    def __init__(
+        self,
+        point_index: int,
+        owner_slot: int,
+        call_managed_array_bytes: int,
+    ) -> None:
+        self.point_index = int(point_index)
+        self.owner_slot = int(owner_slot)
+        self.call_managed_array_bytes = int(call_managed_array_bytes)
+        super().__init__(
+            "unrepresentable trilinear stencil for "
+            f"point {self.point_index} at owner slot {self.owner_slot}"
+        )
+
+
 class CachedVectorSamplingStats(NamedTuple):
     point_count: int
     inside_point_count: int
@@ -691,8 +709,10 @@ def _validate_point_plan(state, points, plan) -> None:
     if status == 3:
         raise ValueError(f"point {bad_point} is not owned by slot {bad_slot}")
     if status == 4:
-        raise ValueError(
-            f"invalid trilinear stencil for point {bad_point} at slot {bad_slot}"
+        raise UnrepresentableRefinedSampleError(
+            int(bad_point),
+            int(bad_slot),
+            _plan_array_bytes(plan),
         )
     if status != 0:
         raise RuntimeError(f"unexpected refined sampling status {status}")

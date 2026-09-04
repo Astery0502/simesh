@@ -67,6 +67,7 @@ from .completed_primary import (
 from .completed_halo_sampling import (
     CachedVectorSamplingStats,
     CompletedHaloSamplingSession,
+    UnrepresentableRefinedSampleError,
     clear_completed_halo_sampling_session,
     make_completed_halo_sampling_session,
     sample_refined_trilinear_vectors_cached,
@@ -164,6 +165,26 @@ from .local_field import (
     SelectedCurlExecutionStats,
     execute_selected_refined_curl_from_blocks,
 )
+from .field_line_rhs import (
+    RHS_NONFINITE_FIELD,
+    RHS_OK,
+    RHS_UNREPRESENTABLE_NORM,
+    RHS_ZERO_FIELD,
+    field_line_rhs_into,
+)
+from .rk4 import (
+    field_line_rk4_finish_into,
+    field_line_rk4_stage_into,
+)
+from .field_line_termination import (
+    FieldLineStage,
+    FieldLineTermination,
+    classify_field_line_candidate,
+    classify_field_line_seed,
+    classify_field_line_stage_state,
+    field_line_termination_from_rhs_status,
+)
+from .field_lines import FieldLineExecutionStats, execute_refined_field_lines
 from .pipeline import execute_level1_m0, execute_level1_m0_from_blocks
 
 __all__ = [
@@ -179,13 +200,21 @@ __all__ = [
     "CompletedHaloSamplingSession",
     "CompletedPrimaryConsumer",
     "CompletedPrimaryExecutionStats",
+    "FieldLineExecutionStats",
+    "FieldLineStage",
+    "FieldLineTermination",
     "HintedLocationStats",
     "INDEX_DTYPE",
     "PAYLOAD_DTYPE",
     "PHYSICAL_BOUNDARY_ID",
     "RefinedForest",
     "RefinedRegionSelection",
+    "RHS_NONFINITE_FIELD",
+    "RHS_OK",
+    "RHS_UNREPRESENTABLE_NORM",
+    "RHS_ZERO_FIELD",
     "SelectedCurlExecutionStats",
+    "UnrepresentableRefinedSampleError",
     "copy_region_into",
     "array_block_reader",
     "array_block_writer",
@@ -194,12 +223,16 @@ __all__ = [
     "apply_coarser_workspace_plan",
     "bind_amrvac_v5_forest",
     "cartesian_curl_into",
+    "classify_field_line_candidate",
+    "classify_field_line_seed",
+    "classify_field_line_stage_state",
     "clear_completed_halo_sampling_session",
     "count_refined_region_windows",
     "execute_selected_refined_curl_from_blocks",
     "execute_selected_refined_halos_from_blocks",
     "execute_selected_refined_halos_with_consumer",
     "execute_refined_trilinear_points_from_blocks",
+    "execute_refined_field_lines",
     "execute_refined_zero_order_points_from_blocks",
     "execute_level1_m0",
     "execute_level1_m0_from_blocks",
@@ -225,6 +258,10 @@ __all__ = [
     "fill_refined_contact_targets",
     "fill_physical_halos",
     "fill_same_level_halos",
+    "field_line_rhs_into",
+    "field_line_rk4_finish_into",
+    "field_line_rk4_stage_into",
+    "field_line_termination_from_rhs_status",
     "finalize_field_sum",
     "gather_blocks_into",
     "interior_region",
