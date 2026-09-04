@@ -62,6 +62,19 @@ from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
 )
+from .point_location import (
+    fill_refined_point_leaf_ids,
+    refined_point_leaf_ids,
+)
+from .refined_sampling import (
+    sample_refined_trilinear_point_groups,
+    sample_refined_zero_order_point_groups,
+)
+from .repeated_sampling import (
+    RepeatedPointExecutionStats,
+    execute_refined_trilinear_points_from_blocks,
+    execute_refined_zero_order_points_from_blocks,
+)
 from .storage import gather_blocks_into, scatter_blocks_from
 from .blockio import (
     BlockReader,
@@ -136,6 +149,8 @@ __all__ = [
     "apply_cartesian_physical_widening",
     "apply_coarser_workspace_plan",
     "execute_selected_refined_halos_from_blocks",
+    "execute_refined_trilinear_points_from_blocks",
+    "execute_refined_zero_order_points_from_blocks",
     "execute_level1_m0",
     "execute_level1_m0_from_blocks",
     "fill_balanced_refined_relations",
@@ -154,6 +169,7 @@ __all__ = [
     "fill_level1_halo_relation_plan",
     "fill_refined_forest",
     "fill_refined_leaf_geometry",
+    "fill_refined_point_leaf_ids",
     "fill_refined_contact_targets",
     "fill_physical_halos",
     "fill_same_level_halos",
@@ -165,6 +181,7 @@ __all__ = [
     "level1_face_neighbors",
     "refined_forest",
     "refined_leaf_geometry",
+    "refined_point_leaf_ids",
     "refined_contact_targets",
     "balanced_refined_relations",
     "level1_block_geometry",
@@ -193,6 +210,8 @@ __all__ = [
     "resolve_refined_relation_source_slots",
     "sample_level1_zero_order",
     "sample_level1_trilinear",
+    "sample_refined_zero_order_point_groups",
+    "sample_refined_trilinear_point_groups",
     "scaled_difference_into",
     "scatter_blocks_from",
     "supports_output_region",
@@ -208,6 +227,7 @@ __all__ = [
     "RELATION_SAME",
     "RELATION_FINER",
     "RefinedHaloExecutionStats",
+    "RepeatedPointExecutionStats",
     "workspace_nbytes",
     "workspace_slot_capacity",
     "write_blocks_from",

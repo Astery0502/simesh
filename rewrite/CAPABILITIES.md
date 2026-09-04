@@ -72,6 +72,10 @@ complete.
 | PWA-001 | Cartesian physical widening application | FND-001, PBC-001, TGT-001 | complete |
 | CWA-001 | Explicit COARSER workspace application | CSP-001, PWA-001, CWP-001, RST-001 | complete |
 | RHE-001 | Bounded selected refined halo execution | FND-001, BAL-001, REL-001, RSL-001, RPH-001, TGT-001, CSP-001, PWA-001, CWA-001, STO-003, WSP-001, SPR-001, SLB-001, FRP-001, CWP-001, RST-001, PRL-001 | complete |
+| LOC-001 | Exact Cartesian 3D refined point ownership | FST-002, GEO-002 | complete |
+| SAM-004 | Refined zero-order point-group sampling | LOC-001, GEO-002, STO-001 | complete |
+| SAM-005 | Refined trilinear point-group sampling | LOC-001, GEO-002, SAM-003, RHE-001 | complete |
+| RPS-001 | Bounded repeated refined point-sampling execution | LOC-001, SAM-004, SAM-005, STO-003, RHE-001, WSP-001 | complete |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -121,6 +125,22 @@ every RPH-valid COARSER phase/direction after its first consumer exposed an old
 restriction-send policy leak.  A proven `B=2`/wide-reach
 counterexample is deferred to secondary closure or a separately contracted
 cross-valid PRL strategy rather than hidden in the executor.
+
+The completed bounded repeated-point sampling group separates exact leaf
+ownership, zero-order cell selection, trilinear stencil arithmetic, and
+reader/workspace scheduling. LOC-001 descends the existing flat forest under
+canonical GEO face comparisons. SAM-004 and SAM-005 consume explicit
+slot-to-point groups and do not select a reader, cache, or traversal policy.
+RPS-001 locates once, groups repeated owners, and executes bounded batches;
+zero-order batches read only owner interiors, while trilinear batches consume
+RHE-001-completed one-cell halos. The existing SAM-002/SAM-003 block-centric
+uniform wrappers remain fused compatibility/performance strategies. Exact
+half-open point ownership, scalar point kernels, bounded array/non-array reader
+execution, all refined relation/PBC kinds, public-RHE preservation, and
+capacity/backend invariance are recorded in the group evidence. Measured
+all-26 amplification and checked-halo planning remain explicit streamline and
+native-reader optimization triggers rather than cache policy hidden in the
+sampler.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

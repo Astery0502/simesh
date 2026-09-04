@@ -2,10 +2,17 @@
 
 import cython
 
-from libc.math cimport floor, isfinite
+from libc.math cimport isfinite
 from libc.stddef cimport size_t
 from libc.stdint cimport int64_t
 from libc.string cimport memcpy
+
+from ._sampling_core cimport (
+    canonical_face,
+    fixed_lerp,
+    source_cell_index,
+    trilinear_axis_stencil_from_point,
+)
 
 
 @cython.boundscheck(False)
@@ -81,22 +88,6 @@ cpdef void place_level1_blocks_unchecked(
                         )
 
 
-cdef inline double _canonical_face(
-    double domain_lower,
-    double domain_upper,
-    double native_spacing,
-    int64_t face_index,
-    int64_t domain_cells,
-) noexcept nogil:
-    cdef volatile double offset
-    if face_index == 0:
-        return domain_lower
-    if face_index == domain_cells:
-        return domain_upper
-    offset = <double>face_index * native_spacing
-    return domain_lower + offset
-
-
 cdef inline double _sample_center(
     double sample_lower,
     double output_spacing,
@@ -105,73 +96,6 @@ cdef inline double _sample_center(
     cdef volatile double factor = <double>output_index + 0.5
     cdef volatile double offset = factor * output_spacing
     return sample_lower + offset
-
-
-cdef inline int64_t _source_cell_index_binary(
-    double center,
-    double domain_lower,
-    double domain_upper,
-    double native_spacing,
-    int64_t domain_cells,
-) noexcept nogil:
-    cdef int64_t lower = 0
-    cdef int64_t upper = domain_cells - 1
-    cdef int64_t middle
-    while lower < upper:
-        middle = lower + (upper - lower + 1) // 2
-        if _canonical_face(
-            domain_lower,
-            domain_upper,
-            native_spacing,
-            middle,
-            domain_cells,
-        ) <= center:
-            lower = middle
-        else:
-            upper = middle - 1
-    return lower
-
-
-cdef inline int64_t _source_cell_index(
-    double center,
-    double domain_lower,
-    double domain_upper,
-    double native_spacing,
-    int64_t domain_cells,
-) noexcept nogil:
-    cdef volatile double delta = center - domain_lower
-    cdef volatile double ratio = delta / native_spacing
-    cdef int64_t candidate
-    if ratio <= 0.0:
-        candidate = 0
-    elif ratio >= <double>(domain_cells - 1):
-        candidate = domain_cells - 1
-    else:
-        candidate = <int64_t>ratio
-    if _canonical_face(
-        domain_lower,
-        domain_upper,
-        native_spacing,
-        candidate,
-        domain_cells,
-    ) > center or (
-        candidate + 1 < domain_cells
-        and _canonical_face(
-            domain_lower,
-            domain_upper,
-            native_spacing,
-            candidate + 1,
-            domain_cells,
-        ) <= center
-    ):
-        return _source_cell_index_binary(
-            center,
-            domain_lower,
-            domain_upper,
-            native_spacing,
-            domain_cells,
-        )
-    return candidate
 
 
 cdef inline int64_t _output_owner_block(
@@ -184,7 +108,7 @@ cdef inline int64_t _output_owner_block(
     int64_t domain_cells,
     int64_t block_cells,
 ) noexcept nogil:
-    return _source_cell_index(
+    return source_cell_index(
         _sample_center(sample_lower, output_spacing, output_index),
         domain_lower,
         domain_upper,
@@ -322,7 +246,7 @@ cpdef void sample_level1_zero_order_unchecked(
             )
 
             for i in range(output_lower[0], output_upper[0]):
-                global_i = _source_cell_index(
+                global_i = source_cell_index(
                     _sample_center(sample_lower[0], output_spacing[0], i),
                     domain_lower[0],
                     domain_upper[0],
@@ -331,7 +255,7 @@ cpdef void sample_level1_zero_order_unchecked(
                 )
                 local_i = global_i - coordinate[0] * block_cell_counts[0]
                 for j in range(output_lower[1], output_upper[1]):
-                    global_j = _source_cell_index(
+                    global_j = source_cell_index(
                         _sample_center(sample_lower[1], output_spacing[1], j),
                         domain_lower[1],
                         domain_upper[1],
@@ -340,7 +264,7 @@ cpdef void sample_level1_zero_order_unchecked(
                     )
                     local_j = global_j - coordinate[1] * block_cell_counts[1]
                     for k in range(output_lower[2], output_upper[2]):
-                        global_k = _source_cell_index(
+                        global_k = source_cell_index(
                             _sample_center(sample_lower[2], output_spacing[2], k),
                             domain_lower[2],
                             domain_upper[2],
@@ -378,18 +302,20 @@ cdef inline void _trilinear_axis_stencil(
         output_spacing,
         output_index,
     )
-    cdef double block_lower = _canonical_face(
+    cdef double block_lower = canonical_face(
         domain_lower,
         domain_upper,
         native_spacing,
         block_coordinate * block_cells,
         domain_cells,
     )
-    cdef volatile double delta = center - block_lower
-    cdef volatile double ratio = delta / native_spacing
-    cdef volatile double normalized = ratio - 0.5
-    left_index[0] = <int64_t>floor(normalized)
-    weight[0] = normalized - <double>left_index[0]
+    trilinear_axis_stencil_from_point(
+        center,
+        block_lower,
+        native_spacing,
+        left_index,
+        weight,
+    )
 
 
 cdef inline bint _trilinear_axis_stencil_is_valid(
@@ -501,18 +427,6 @@ cpdef int64_t validate_trilinear_stencils_unchecked(
     return -1
 
 
-cdef inline double _lerp(
-    double left,
-    double right,
-    double weight,
-) noexcept nogil:
-    cdef volatile double one_minus = 1.0 - weight
-    cdef volatile double left_term = left * one_minus
-    cdef volatile double right_term = right * weight
-    cdef volatile double result = left_term + right_term
-    return result
-
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef void sample_level1_trilinear_unchecked(
@@ -615,26 +529,26 @@ cpdef void sample_level1_trilinear_unchecked(
                         k0 = interior_lower[2] + left_k
                         k1 = k0 + 1
                         for field in range(payload.shape[1]):
-                            c00 = _lerp(
+                            c00 = fixed_lerp(
                                 payload[slot, field, i0, j0, k0],
                                 payload[slot, field, i0, j0, k1],
                                 wz,
                             )
-                            c01 = _lerp(
+                            c01 = fixed_lerp(
                                 payload[slot, field, i0, j1, k0],
                                 payload[slot, field, i0, j1, k1],
                                 wz,
                             )
-                            c10 = _lerp(
+                            c10 = fixed_lerp(
                                 payload[slot, field, i1, j0, k0],
                                 payload[slot, field, i1, j0, k1],
                                 wz,
                             )
-                            c11 = _lerp(
+                            c11 = fixed_lerp(
                                 payload[slot, field, i1, j1, k0],
                                 payload[slot, field, i1, j1, k1],
                                 wz,
                             )
-                            c0 = _lerp(c00, c01, wy)
-                            c1 = _lerp(c10, c11, wy)
-                            uniform_grid[field, i, j, k] = _lerp(c0, c1, wx)
+                            c0 = fixed_lerp(c00, c01, wy)
+                            c1 = fixed_lerp(c10, c11, wy)
+                            uniform_grid[field, i, j, k] = fixed_lerp(c0, c1, wx)

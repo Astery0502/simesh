@@ -166,3 +166,16 @@ preserved.  STO-002 remains Yellow until HCL-001 extracts full-halo closure, the
 final unresolved decision.  HCL-001 is now complete with the M0 pass-two
 consumer migrated.  STO-002 is reclassified as a retained compatibility
 composition over WSP/PRI/FCL/HCL; its Yellow finding is resolved before STO-004.
+
+## Refined-Sampling Trigger Resolution
+
+The SAM-002/SAM-003 Fused trigger is resolved by the completed LOC-001,
+SAM-004, SAM-005, and RPS-001 group. Canonical face/highest-cell ownership and
+the fixed trilinear stencil/blend tree now live in shared allocation-free Cython
+primitives. The existing block-centric uniform entrypoints retain their owned
+center/range loops and measured performance; controlled before/after standards
+show no 10% material regression. LOC owns only refined leaf ties, SAM-004/005
+own the two independent numerical meanings, and RPS owns grouping/reader/
+workspace scheduling. Cache, last-leaf/neighbor lookup, and streamline stepping
+remain separate consumer-triggered policies. See
+`BOUNDED-REFINED-REPEATED-POINT-SAMPLING.md`.

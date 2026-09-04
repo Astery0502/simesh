@@ -162,6 +162,16 @@ def main() -> None:
             include_dirs=[np.get_include()],
         ),
         Extension(
+            "simesh_rewrite._point_location",
+            [str(ROOT / "src/simesh_rewrite/_point_location.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
+            "simesh_rewrite._refined_sampling",
+            [str(ROOT / "src/simesh_rewrite/_refined_sampling.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
             "simesh_rewrite._operators",
             [str(ROOT / "src/simesh_rewrite/_operators.pyx")],
             include_dirs=[np.get_include()],

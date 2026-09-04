@@ -129,6 +129,39 @@ Prefer optimizations in this order unless evidence shows another bottleneck:
 Do not optimize for a hypothetical simulation loop, global cache, or complete
 uniform grid when the representative analysis workflow does not consume it.
 
+### Completed Record: Bounded Refined Repeated Point Sampling
+
+- Primary analysis workflow and query shape: selected magnetic/vector fields at
+  ordered points, initially explicit clustered and scattered batches and later
+  data-dependent streamline points; point count may greatly exceed unique leaf
+  count.
+- Expected access density and locality: sparse relative to the whole snapshot,
+  with both long same-leaf runs and cross-leaf paths; benchmark `P >> U` and
+  `P ~= U` instead of assuming either.
+- Reusable state and its lifetime: immutable FST/GEO metadata for one snapshot
+  lifecycle; the implementation retains no payload or cache across calls and uses
+  only call-scoped owner/group plans and bounded canonical workspaces.
+- Dominant expected cost: selective reader bytes and repeated refined support/
+  halo completion for trilinear sampling, followed by point location and group
+  planning; arithmetic is expected to dominate only after those costs are
+  amortized.
+- Current and structurally different candidate strategies: choose canonical
+  root selection plus flat hierarchy descent, stable owner grouping, direct
+  owner reads for zero order, and bounded RHE-001 completion for trilinear.
+  Defer a retained leaf BVH/hash, maximum-level ownership grid, locality-aware
+  neighbor walk, persistent payload LRU, and complete uniform-grid materialization.
+- Workload-specific metrics and representative consumer: single/batch point
+  latency, point and field-value throughput, depth/locality scaling, unique
+  owners, owner reuse, time to first result, requested/read/support/output
+  bytes, reader calls, support amplification, capacity scaling, managed bytes,
+  peak RSS, and exact/numerical equivalence for repeated zero/trilinear sampling.
+- Deferred alternatives and concrete reopen triggers: reconsider a last-leaf/
+  neighbor locator when hierarchy fallbacks materially dominate coherent paths;
+  a persistent cache when the native-reader warm streamline slice repeats
+  material reads; direction-projected halo support when all-26 amplification is
+  material; and another spatial index only when descent is a stable bottleneck
+  after I/O and support costs are controlled.
+
 ## Required Performance Profiles
 
 ### Selected Local Field

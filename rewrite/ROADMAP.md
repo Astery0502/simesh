@@ -69,10 +69,11 @@ FINER placement and COARSER workspace geometry so the composed planning result
 does not inherit STO-004's dense-primary traversal.  That selected transfer-
 planning group is complete; PBC-aware support completion and value application
 are also complete through CSP-001/PWA-001/CWA-001 and the bounded selected
-RHE-001 consumer.  Refined point ownership and repeated point sampling are next;
-the complete halo boundary was deliberately finished before extracting them.
-Six-face TOP-003 caching remains optional and requires repeated-consumer
-performance justification.
+RHE-001 consumer. Exact refined point ownership, reusable zero/trilinear point
+kernels, and bounded repeated point sampling are complete while the fused
+SAM-002/SAM-003 uniform strategies remain available. The native selective
+`.dat` adapter and real analysis slices are next. Six-face TOP-003 caching
+remains optional and requires repeated-consumer performance justification.
 
 Before refined halo work, complete the functional-composition checkpoint:
 

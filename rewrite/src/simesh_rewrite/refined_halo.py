@@ -196,6 +196,26 @@ def _validate_external_nonoverlap(
                 raise ValueError("writer memory arrays must be pairwise nonoverlapping")
 
 
+def _validate_consumer_output_nonoverlap(
+    reader: BlockReader,
+    output_arrays: tuple[np.ndarray, ...],
+    metadata: tuple[np.ndarray, ...],
+) -> None:
+    inputs = (*reader.memory_arrays, *metadata)
+    for index, output in enumerate(output_arrays):
+        if not isinstance(output, np.ndarray):
+            raise TypeError("consumer output arrays must be NumPy arrays")
+        if any(np.shares_memory(output, value) for value in inputs):
+            raise ValueError("consumer output must not overlap reader or metadata")
+        for other in output_arrays[index + 1 :]:
+            if not isinstance(other, np.ndarray):
+                raise TypeError("consumer output arrays must be NumPy arrays")
+            if np.shares_memory(output, other):
+                raise ValueError(
+                    "consumer output arrays must be pairwise nonoverlapping"
+                )
+
+
 def _fresh_csp_plan() -> tuple[np.ndarray, ...]:
     return (
         np.empty(PLAN_CAPACITY, dtype=np.int64),
@@ -895,9 +915,85 @@ def _apply_chunk_actions_unchecked(
         )
 
 
-def execute_selected_refined_halos_from_blocks(
+def _prepare_refined_halo_chunk(
+    workspace: _RHEWorkspace,
+    candidates: np.ndarray,
+    root_shape: np.ndarray,
+    coord_to_rank: np.ndarray,
+    root_node_ids: np.ndarray,
+    node_levels: np.ndarray,
+    node_coords: np.ndarray,
+    child_node_ids: np.ndarray,
+    node_leaf_ids: np.ndarray,
+    leaf_node_ids: np.ndarray,
+    lower_halo: np.ndarray,
+    interior_upper: np.ndarray,
+    boundary_modes: np.ndarray,
+    normal_field_slots: np.ndarray,
+    *,
+    validate_actions: bool,
+) -> tuple[int, int]:
+    candidate_count = int(candidates.shape[0])
+    fill_balanced_refined_relations_unchecked(
+        root_shape,
+        coord_to_rank,
+        root_node_ids,
+        node_levels,
+        node_coords,
+        child_node_ids,
+        node_leaf_ids,
+        leaf_node_ids,
+        candidates,
+        CANONICAL_DIRECTIONS,
+        workspace.relation_kinds[:candidate_count],
+        workspace.physical_masks[:candidate_count],
+        workspace.source_counts[:candidate_count],
+        workspace.source_leaf_ids[:candidate_count],
+    )
+    primary_count, selected_count = plan_selected_refined_support_prefix_unchecked(
+        candidates,
+        workspace.source_counts[:candidate_count],
+        workspace.source_leaf_ids[:candidate_count],
+        workspace.selected_leaf_ids,
+    )
+    primary_count = int(primary_count)
+    selected_count = int(selected_count)
+    resolve_refined_relation_source_slots_unchecked(
+        workspace.selected_leaf_ids[:selected_count],
+        workspace.source_counts[:primary_count],
+        workspace.source_leaf_ids[:primary_count],
+        workspace.source_slots[:primary_count],
+    )
+    _guard_relation_source_slots_before_phase(
+        workspace,
+        primary_count,
+        selected_count,
+    )
+    fill_refined_relation_phase_codes_unchecked(
+        workspace.selected_leaf_ids[:selected_count],
+        node_coords,
+        leaf_node_ids,
+        workspace.relation_kinds[:primary_count],
+        workspace.source_counts[:primary_count],
+        workspace.source_slots[:primary_count],
+        workspace.phase_codes[:primary_count],
+    )
+    if validate_actions:
+        _preflight_chunk_actions(
+            workspace,
+            primary_count,
+            selected_count,
+            lower_halo,
+            interior_upper,
+            boundary_modes,
+            normal_field_slots,
+        )
+    return primary_count, selected_count
+
+
+def _execute_selected_refined_halos(
     reader: BlockReader,
-    writer: BlockWriter,
+    writer: BlockWriter | None,
     primary_leaf_ids: np.ndarray,
     field_ids: np.ndarray,
     root_shape: np.ndarray,
@@ -913,10 +1009,27 @@ def execute_selected_refined_halos_from_blocks(
     boundary_modes: np.ndarray,
     normal_field_slots: np.ndarray,
     slot_capacity: int,
+    *,
+    completed_primary_consumer=None,
+    consumer_output_arrays: tuple[np.ndarray, ...] = (),
+    preflight_all_chunks: bool = False,
+    additional_managed_array_bytes: int = 0,
 ) -> RefinedHaloExecutionStats:
-    """Execute one bounded selected refined-halo traversal."""
     reader = _require_block_reader(reader)
-    writer = _require_block_writer(writer)
+    if completed_primary_consumer is None:
+        writer = _require_block_writer(writer)
+    else:
+        if writer is not None:
+            raise RuntimeError("private RHE execution has two terminal actions")
+        if not callable(completed_primary_consumer):
+            raise TypeError("completed primary consumer must be callable")
+        if not isinstance(consumer_output_arrays, tuple):
+            raise TypeError("consumer_output_arrays must be a tuple")
+        if (
+            type(additional_managed_array_bytes) is not int
+            or additional_managed_array_bytes < 0
+        ):
+            raise TypeError("additional managed bytes must be a nonnegative int")
     primary_leaf_ids = _require_primary_selection(primary_leaf_ids)
     field_ids = _require_index_vector("field_ids", field_ids)
     lower_halo = _require_index_triplet("lower_halo", lower_halo)
@@ -956,7 +1069,11 @@ def execute_selected_refined_halos_from_blocks(
     for position, field_id in enumerate(field_ids):
         if int(field_id) < 0 or int(field_id) >= reader.shape[1]:
             raise ValueError(f"field_ids entry {position} is out of range")
-    if writer.shape != (leaf_count, field_count, *padded_shape):
+    if writer is not None and writer.shape != (
+        leaf_count,
+        field_count,
+        *padded_shape,
+    ):
         raise ValueError(
             "writer shape must be (leaf_count, selected fields, padded block)"
         )
@@ -990,7 +1107,14 @@ def execute_selected_refined_halos_from_blocks(
         )
         if isinstance(value, np.ndarray)
     )
-    _validate_external_nonoverlap(reader, writer, metadata)
+    if writer is not None:
+        _validate_external_nonoverlap(reader, writer, metadata)
+    else:
+        _validate_consumer_output_nonoverlap(
+            reader,
+            consumer_output_arrays,
+            metadata,
+        )
 
     padded_volume = _checked_product("padded shape", padded_shape)
     payload_bytes_per_slot = 8 * field_count * padded_volume
@@ -1065,6 +1189,49 @@ def execute_selected_refined_halos_from_blocks(
         workspace.phase_codes[:0],
     )
 
+    if preflight_all_chunks:
+        preflight_first = 0
+        while preflight_first < primary_total:
+            candidate_count = min(
+                slot_capacity,
+                primary_total - preflight_first,
+            )
+            candidates = primary_leaf_ids[
+                preflight_first : preflight_first + candidate_count
+            ]
+            primary_count, _ = _prepare_refined_halo_chunk(
+                workspace,
+                candidates,
+                root_shape,
+                coord_to_rank,
+                root_node_ids,
+                node_levels,
+                node_coords,
+                child_node_ids,
+                node_leaf_ids,
+                leaf_node_ids,
+                lower_halo,
+                interior_upper,
+                boundary_modes,
+                normal_field_slots,
+                validate_actions=True,
+            )
+            preflight_first += primary_count
+
+        private_managed_bytes = sum(
+            value.nbytes
+            for value in (
+                *workspace_arrays,
+                zero,
+                block_shape_array,
+                padded_shape_array,
+                interior_upper,
+                local_field_ids,
+            )
+        )
+        if private_managed_bytes > _INDEX_MAX - additional_managed_array_bytes:
+            raise OverflowError("combined managed raw-array bytes do not fit in int64")
+
     empty_payload = workspace.payload[:0]
     read_blocks_into(
         reader,
@@ -1075,15 +1242,16 @@ def execute_selected_refined_halos_from_blocks(
         empty_payload,
         lower_halo,
     )
-    write_blocks_from(
-        writer,
-        empty_payload,
-        zero,
-        padded_shape_array,
-        workspace.selected_leaf_ids[:0],
-        local_field_ids,
-        zero,
-    )
+    if writer is not None:
+        write_blocks_from(
+            writer,
+            empty_payload,
+            zero,
+            padded_shape_array,
+            workspace.selected_leaf_ids[:0],
+            local_field_ids,
+            zero,
+        )
 
     capacity_arrays = (
         workspace.selected_leaf_ids,
@@ -1120,7 +1288,9 @@ def execute_selected_refined_halos_from_blocks(
     while first < primary_total:
         candidate_count = min(slot_capacity, primary_total - first)
         candidates = primary_leaf_ids[first : first + candidate_count]
-        fill_balanced_refined_relations_unchecked(
+        primary_count, selected_count = _prepare_refined_halo_chunk(
+            workspace,
+            candidates,
             root_shape,
             coord_to_rank,
             root_node_ids,
@@ -1129,49 +1299,11 @@ def execute_selected_refined_halos_from_blocks(
             child_node_ids,
             node_leaf_ids,
             leaf_node_ids,
-            candidates,
-            CANONICAL_DIRECTIONS,
-            workspace.relation_kinds[:candidate_count],
-            workspace.physical_masks[:candidate_count],
-            workspace.source_counts[:candidate_count],
-            workspace.source_leaf_ids[:candidate_count],
-        )
-        primary_count, selected_count = (
-            plan_selected_refined_support_prefix_unchecked(
-                candidates,
-                workspace.source_counts[:candidate_count],
-                workspace.source_leaf_ids[:candidate_count],
-                workspace.selected_leaf_ids,
-            )
-        )
-        resolve_refined_relation_source_slots_unchecked(
-            workspace.selected_leaf_ids[:selected_count],
-            workspace.source_counts[:primary_count],
-            workspace.source_leaf_ids[:primary_count],
-            workspace.source_slots[:primary_count],
-        )
-        _guard_relation_source_slots_before_phase(
-            workspace,
-            primary_count,
-            selected_count,
-        )
-        fill_refined_relation_phase_codes_unchecked(
-            workspace.selected_leaf_ids[:selected_count],
-            node_coords,
-            leaf_node_ids,
-            workspace.relation_kinds[:primary_count],
-            workspace.source_counts[:primary_count],
-            workspace.source_slots[:primary_count],
-            workspace.phase_codes[:primary_count],
-        )
-        _preflight_chunk_actions(
-            workspace,
-            primary_count,
-            selected_count,
             lower_halo,
             interior_upper,
             boundary_modes,
             normal_field_slots,
+            validate_actions=not preflight_all_chunks,
         )
 
         read_blocks_into(
@@ -1192,15 +1324,37 @@ def execute_selected_refined_halos_from_blocks(
             boundary_modes,
             normal_field_slots,
         )
-        write_blocks_from(
-            writer,
-            workspace.payload[:primary_count],
-            zero,
-            padded_shape_array,
-            workspace.selected_leaf_ids[:primary_count],
-            local_field_ids,
-            zero,
-        )
+        if writer is not None:
+            write_blocks_from(
+                writer,
+                workspace.payload[:primary_count],
+                zero,
+                padded_shape_array,
+                workspace.selected_leaf_ids[:primary_count],
+                local_field_ids,
+                zero,
+            )
+        else:
+            consumer_leaf_ids = workspace.selected_leaf_ids[:primary_count].view()
+            consumer_payload = workspace.payload[:primary_count].view()
+            consumer_valid_lower = zero.view()
+            consumer_valid_upper = padded_shape_array.view()
+            for value in (
+                consumer_leaf_ids,
+                consumer_payload,
+                consumer_valid_lower,
+                consumer_valid_upper,
+            ):
+                value.setflags(write=False)
+            result = completed_primary_consumer(
+                first,
+                consumer_leaf_ids,
+                consumer_payload,
+                consumer_valid_lower,
+                consumer_valid_upper,
+            )
+            if result is not None:
+                raise TypeError("completed primary consumer must return None")
 
         first += primary_count
         chunk_count += 1
@@ -1211,8 +1365,97 @@ def execute_selected_refined_halos_from_blocks(
         primary_total,
         chunk_count,
         chunk_count,
-        chunk_count,
+        chunk_count if writer is not None else 0,
         selected_load_count,
         maximum_selected_slots,
         managed_array_bytes,
+    )
+
+
+def execute_selected_refined_halos_from_blocks(
+    reader: BlockReader,
+    writer: BlockWriter,
+    primary_leaf_ids: np.ndarray,
+    field_ids: np.ndarray,
+    root_shape: np.ndarray,
+    coord_to_rank: np.ndarray,
+    root_node_ids: np.ndarray,
+    node_levels: np.ndarray,
+    node_coords: np.ndarray,
+    child_node_ids: np.ndarray,
+    node_leaf_ids: np.ndarray,
+    leaf_node_ids: np.ndarray,
+    lower_halo: np.ndarray,
+    upper_halo: np.ndarray,
+    boundary_modes: np.ndarray,
+    normal_field_slots: np.ndarray,
+    slot_capacity: int,
+) -> RefinedHaloExecutionStats:
+    """Execute one bounded selected refined-halo traversal."""
+    return _execute_selected_refined_halos(
+        reader,
+        writer,
+        primary_leaf_ids,
+        field_ids,
+        root_shape,
+        coord_to_rank,
+        root_node_ids,
+        node_levels,
+        node_coords,
+        child_node_ids,
+        node_leaf_ids,
+        leaf_node_ids,
+        lower_halo,
+        upper_halo,
+        boundary_modes,
+        normal_field_slots,
+        slot_capacity,
+    )
+
+
+def _execute_selected_refined_halos_with_consumer(
+    reader: BlockReader,
+    primary_leaf_ids: np.ndarray,
+    field_ids: np.ndarray,
+    root_shape: np.ndarray,
+    coord_to_rank: np.ndarray,
+    root_node_ids: np.ndarray,
+    node_levels: np.ndarray,
+    node_coords: np.ndarray,
+    child_node_ids: np.ndarray,
+    node_leaf_ids: np.ndarray,
+    leaf_node_ids: np.ndarray,
+    lower_halo: np.ndarray,
+    upper_halo: np.ndarray,
+    boundary_modes: np.ndarray,
+    normal_field_slots: np.ndarray,
+    slot_capacity: int,
+    completed_primary_consumer,
+    *,
+    consumer_output_arrays: tuple[np.ndarray, ...] = (),
+    additional_managed_array_bytes: int = 0,
+) -> RefinedHaloExecutionStats:
+    """Run RHE privately with a synchronous completed-primary consumer."""
+    return _execute_selected_refined_halos(
+        reader,
+        None,
+        primary_leaf_ids,
+        field_ids,
+        root_shape,
+        coord_to_rank,
+        root_node_ids,
+        node_levels,
+        node_coords,
+        child_node_ids,
+        node_leaf_ids,
+        leaf_node_ids,
+        lower_halo,
+        upper_halo,
+        boundary_modes,
+        normal_field_slots,
+        slot_capacity,
+        completed_primary_consumer=completed_primary_consumer,
+        consumer_output_arrays=consumer_output_arrays,
+        preflight_all_chunks=True,
+        additional_managed_array_bytes=additional_managed_array_bytes,
     )
