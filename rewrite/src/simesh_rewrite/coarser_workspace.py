@@ -109,17 +109,15 @@ def fill_coarser_workspace_boxes(
                 valid = (
                     stop == lower
                     and lower - extent <= start <= lower
-                    and phase_bit == 0
                 )
             else:
                 valid = (
                     start == upper
                     and upper <= stop <= upper + extent
-                    and phase_bit == 1
                 )
             if not valid:
                 raise ValueError(
-                    "COARSER target or phase is incompatible with direction"
+                    "COARSER target is incompatible with direction"
                 )
 
             if not empty and start != stop:

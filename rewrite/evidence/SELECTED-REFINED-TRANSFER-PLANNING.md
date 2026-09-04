@@ -120,3 +120,10 @@ PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rew
   support/application capability must consume its uncovered required region;
   reopen the selected support representation only if that consumer cannot add
   the needed leaves without global traversal.
+
+Consumer follow-up: the complete RHE composition found that CWP's original
+phase/sign validation described the current fine-to-coarse send gate, not the
+accepted COARSER prolongation domain already frozen by RPH-001.  Independent
+review approved accepting either phase on nonzero CWP axes.  Every previously
+accepted output is unchanged; the active halo-group evidence owns the expanded
+phase matrix, complete-target current comparison, and final regression counts.

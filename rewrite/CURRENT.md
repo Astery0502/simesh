@@ -3,28 +3,31 @@
 ## Active State
 
 - Milestone: M1 Cartesian 3D refined AMR.
-- Last completed group: **Selected Refined Transfer Planning**; SPR-001,
-  FRP-001, and CWP-001 are complete.
+- Last completed group: **Selected Refined Halo Completion**; CSP-001, PWA-001,
+  CWA-001, RHE-001, and the expanded CWP-001 accepted domain are complete.
+- Completed outcome: for `B>=4` and per-side reach `<=B/2`, a sparse ascending
+  selection flows through bounded reader/writer adapters with complete SAME,
+  FINER, COARSER, pure-physical, and mixed-physical halos.
 - One-time analysis-workload reorientation audit: complete; see
   `evidence/ANALYSIS-PRIORITY-REAUDIT.md`.
-- Completed outcome: explicit sparse ascending selected leaves are closed over
-  requested REL directions and mapped to SAME/FINER/COARSER boxes without gaps.
-- Next work: define the smallest PBC-aware refined support/application group
-  that fills CWP uncovered slope reach and produces complete selected halos.
+- Group evidence: `evidence/SELECTED-REFINED-HALO-COMPLETION.md`; 210 focused
+  and all 715 rewrite tests pass.  Final small/medium/full WENO-metadata
+  compositions are 0.061/1.020/33.474 seconds with exact calls, I/O bytes, and
+  managed-array bytes.
+- Next work: define refined point ownership/location and repeated zero/trilinear
+  point sampling over complete halos.  Preserve SAM-002/SAM-003 fused uniform
+  wrappers; do not start streamline stepping until the sampler boundary passes.
 - Readiness: dependencies outside the group must be `complete`; earlier members
   inside the group may be consumed at `integrated` after focused and immediate
   composition checks pass.
-- Group evidence: `evidence/SELECTED-REFINED-TRANSFER-PLANNING.md`; 166 focused
-  checks and all 632 rewrite tests pass. The standard composition records
-  selected/read bytes, support amplification, reader calls, and dense fallback.
 
 The implementation remains isolated under `simesh_rewrite`. M0 supplies a
 complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path.
 M1 currently supplies refined forest reconstruction/conformance, contact and
 balance semantics, geometry, relation/support planning, restriction, limiter,
-prolongation, selected-primary planning, source-slot mapping, and SAME/FINER/
-COARSER transfer geometry. Refined value application and sampling remain
-incomplete.
+prolongation, selected-primary planning, complete refined value application,
+and bounded selected halo execution. Refined sampling and real-data/native
+analysis integration remain incomplete.
 
 ## Durable Decisions
 
@@ -73,11 +76,15 @@ The dependency ledger and exact status authority are in `CAPABILITIES.md`.
   and all M0 capabilities are complete.
 - M1 complete through: FST-001/002, TOP-002, BAL-001, GEO-002, REL-001,
   WSP-001, PRI-001, FCL-001, HCL-001, STO-004, RST-001, LIM-001, PRL-001,
-  RSL-001, TGT-001, RPH-001, SLB-001, SPR-001, FRP-001, and CWP-001.
+  RSL-001, TGT-001, RPH-001, SLB-001, SPR-001, FRP-001, CWP-001, CSP-001,
+  PWA-001, CWA-001, and RHE-001.
 - TOP-003 optional face-cache materialization remains proposed and must be
   justified by a repeated real consumer.
 - The selected transfer-planning group is complete. Full-domain work retains
   STO-004; selected work uses SPR-001 and the same downstream slot layout.
+- Complete selected refined halos retain a checked preflight reference and use
+  an equivalent optimized proof over internal plans.  CWP/CSP accept every
+  RPH-valid COARSER phase/direction; the old restriction-send gate is removed.
 
 The audit accepted two focused reopen findings. First, preserve STO-004 dense
 semantics but add SPR-001 before an executor so sparse/ROI primary selection
@@ -85,7 +92,9 @@ does not process gaps. Second, preserve SAM-002/SAM-003 wrappers and numerical
 rules but extract point ownership/interpolation at refined sampling; add an
 exact locator and repeated point sampler instead of using dense uniform output
 for streamlines. INT-001 remains M0 evidence and is not extended into the
-selected analysis executor. No stable numerical contract changed.
+selected analysis executor. The audit itself changed no numerical contract;
+the later independently reviewed CWP change only expanded accepted COARSER
+phase/direction inputs while preserving every prior output.
 
 HAL-002 remains a measured fused compatibility implementation over the explicit
 HPL/PBC/HAX semantics. SAM-002 and SAM-003 remain validated fused level-1
@@ -98,9 +107,9 @@ and rejected alternatives live in `designs/`, `contracts/`, and `evidence/`.
 - The only available real refined Cartesian 3D `.dat` fixture is staggered, so
   it currently supplies forest/topology/geometry evidence but not supported
   refined payload evidence.
-- PBC-aware completion of CWP slope reach, refined value application, complete
-  selected halos, refined sampling, a native selective `.dat` adapter, and a
-  real bounded M1 vertical slice remain.
+- Refined sampling, a native selective `.dat` adapter, and real bounded
+  local-field/streamline M1 vertical slices remain.  `B=2`, reach above half a
+  block, and direction-subset support projection have explicit reopen triggers.
 - Cartesian 2D, periodic meshes, broader scientific/derived workflows, complete
   AMRVAC I/O/write/export, Dataset/public API integration, packaging,
   parallelism, fallback, and cutover remain assigned to M2--M7.
@@ -111,15 +120,14 @@ and rejected alternatives live in `designs/`, `contracts/`, and `evidence/`.
 1. Read this file, `CAPABILITIES.md`, and `ANALYSIS_WORKLOADS.md`. Read
    `CHARTER.md` only on a new agent's first rewrite cycle, at a milestone
    boundary, or for a material project-direction change.
-2. Decompose PBC-aware support completion, physical widening, value application,
-   and execution; do not combine them into a refined halo dispatcher.
-3. Record group alternatives and the analysis algorithm-selection gate, then
-   freeze one-to-four dependency-adjacent members with explicit performance
-   classes and closing checks.
-4. Preserve STO-004 for dense traversal, use SPR-001 for explicit selections,
-   and include CWP's uncovered slope reach before reading payload.
-5. After complete refined halos create the refined point-owner/sampler boundary;
-   retain SAM-002/SAM-003 fused uniform wrappers until that real consumer.
+2. Apply DECOMPOSITION and the analysis algorithm-selection gate to refined
+   point ownership, interpolation, and repeated point sampling.  Keep locator,
+   numerical sampler, cache/reader policy, and streamline execution separate.
+3. Retain SAM-002/SAM-003 fused uniform samplers as compatibility/performance
+   strategies; prove their ownership and interpolation rules through the new
+   refined point consumer rather than rewriting them first.
+4. After refined sampling completes, add the native selective `.dat` adapter,
+   then the local-field and streamline vertical slices and M1 horizon review.
 
 ## Current Reproduction Commands
 

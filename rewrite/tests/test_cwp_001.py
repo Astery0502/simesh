@@ -21,21 +21,15 @@ def i3(*values: int) -> np.ndarray:
     return np.asarray(values, dtype=np.int64)
 
 
-def active_rows():
+def all_direction_phase_rows():
     directions: list[tuple[int, int, int]] = []
     phases: list[int] = []
     for direction in itertools.product((-1, 0, 1), repeat=3):
         if direction == (0, 0, 0):
             continue
         for phase in range(8):
-            compatible = all(
-                component == 0
-                or ((phase >> axis) & 1) == (0 if component < 0 else 1)
-                for axis, component in enumerate(direction)
-            )
-            if compatible:
-                directions.append(direction)
-                phases.append(phase)
+            directions.append(direction)
+            phases.append(phase)
     return np.asarray(directions, dtype=np.int64), np.asarray(phases, dtype=np.uint8)
 
 
@@ -64,8 +58,10 @@ def production(*inputs):
     return outputs
 
 
-def test_all_active_rows_match_reference_and_containment() -> None:
-    directions, phases = active_rows()
+def test_all_208_direction_phase_rows_match_reference_and_containment() -> None:
+    directions, phases = all_direction_phase_rows()
+    assert directions.shape == (208, 3)
+    assert phases.shape == (208,)
     lower, upper, target_lower, target_upper = targets(directions)
     actual = production(
         lower, upper, directions, phases, target_lower, target_upper
@@ -113,13 +109,23 @@ def test_source_copy_uses_only_intersection_and_preserves_uncovered_reach() -> N
     assert np.isnan(workspace).any()
 
 
-def test_emitted_origin_drives_prl_mapping() -> None:
+@pytest.mark.parametrize(
+    ("direction", "phase", "target_lower", "target_upper"),
+    [
+        ((-1, 0, 0), 4, (0, 2, 2), (2, 10, 10)),
+        ((-1, 0, 0), 1, (0, 2, 2), (2, 10, 10)),
+        ((1, 0, 0), 0, (10, 2, 2), (12, 10, 10)),
+    ],
+)
+def test_emitted_origin_drives_prl_mapping_for_matching_and_mismatched_phases(
+    direction, phase, target_lower, target_upper
+) -> None:
     lower = i3(2, 2, 2)
     upper = i3(10, 10, 10)
-    directions = np.asarray([(-1, 0, 0)], dtype=np.int64)
-    phases = np.asarray([4], dtype=np.uint8)
-    target_lower = np.asarray([[0, 2, 2]], dtype=np.int64)
-    target_upper = np.asarray([[2, 10, 10]], dtype=np.int64)
+    directions = np.asarray([direction], dtype=np.int64)
+    phases = np.asarray([phase], dtype=np.uint8)
+    target_lower = np.asarray([target_lower], dtype=np.int64)
+    target_upper = np.asarray([target_upper], dtype=np.int64)
     _, _, _, _, required_lower, required_upper, origin = production(
         lower, upper, directions, phases, target_lower, target_upper
     )
@@ -172,8 +178,6 @@ def test_empty_target_row_is_exact_zero_after_full_validation() -> None:
         ((10, 10, 10), (-1, 0, 0), 8, (0, 2, 2), (2, 10, 10), "outside"),
         ((9, 10, 10), (-1, 0, 0), 0, (0, 2, 2), (2, 10, 10), "positive and even"),
         ((10, 10, 10), (0, 0, 0), 0, (2, 2, 2), (10, 10, 10), "noncenter"),
-        ((10, 10, 10), (-1, 0, 0), 1, (0, 2, 2), (2, 10, 10), "incompatible"),
-        ((10, 10, 10), (1, 0, 0), 0, (10, 2, 2), (12, 10, 10), "incompatible"),
         ((10, 10, 10), (-1, 0, 0), 0, (-1, 2, 2), (2, 10, 10), "ordered and nonnegative"),
     ],
 )

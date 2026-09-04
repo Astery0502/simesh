@@ -68,6 +68,10 @@ complete.
 | SLB-001 | Cartesian same-level source-box translation | FND-001, TGT-001 | complete |
 | FRP-001 | Cartesian FINER restriction placement | RST-001, TGT-001, RPH-001 | complete |
 | CWP-001 | Cartesian COARSER explicit-workspace placement and reach | PRL-001, TGT-001, RPH-001 | complete |
+| CSP-001 | Cartesian COARSER slope-support planning | BAL-001, REL-001, SPR-001, RSL-001, RPH-001, CWP-001 | complete |
+| PWA-001 | Cartesian physical widening application | FND-001, PBC-001, TGT-001 | complete |
+| CWA-001 | Explicit COARSER workspace application | CSP-001, PWA-001, CWP-001, RST-001 | complete |
+| RHE-001 | Bounded selected refined halo execution | FND-001, BAL-001, REL-001, RSL-001, RPH-001, TGT-001, CSP-001, PWA-001, CWA-001, STO-003, WSP-001, SPR-001, SLB-001, FRP-001, CWP-001, RST-001, PRL-001 | complete |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -105,6 +109,18 @@ primary selections without admitting gaps.  FRP-001 maps active finer phases to 
 RST source/target boxes, and CWP-001 exposes normalized PRL workspace placement
 plus uncovered slope reach.  Their group evidence retains STO-004 for dense
 full-domain traversal and records selected plan-to-gather bytes.
+The selected refined halo completion group scopes its first complete consumer
+to block extents at least four and per-side reach at most half a block.
+CSP-001 plans the full CWP slope rectangle from the existing all-26 selected
+support, PWA-001 owns physical widening, CWA-001 assembles one PRL workspace,
+and RHE-001 owns bounded reader/writer scheduling.  The complete bounded path is
+bitwise equal to its independent resident composition and safe dyadic current
+comparison; its optimized preflight preserves calls/bytes/memory while materially
+improving small, medium, and full WENO-metadata compositions.  CWP now accepts
+every RPH-valid COARSER phase/direction after its first consumer exposed an old
+restriction-send policy leak.  A proven `B=2`/wide-reach
+counterexample is deferred to secondary closure or a separately contracted
+cross-valid PRL strategy rather than hidden in the executor.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

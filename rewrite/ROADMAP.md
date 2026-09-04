@@ -61,14 +61,16 @@ cell-average restriction, the independent current three-point limiter, and
 ratio-two limited prolongation and refined source-slot resolution are also
 complete.  REL already supplies action classification; refined target-region
 and child-phase planning are also complete.  Source/workspace geometry and
-value application are next; combined source/workspace geometry split first into
+value application were decomposed; combined source/workspace geometry split into
 now-complete same-level translation, FINER placement, and COARSER workspace
 geometry.  The analysis re-audit places an explicit selected-primary refined
 support planner before the next executor consumer.  It groups that planner with
 FINER placement and COARSER workspace geometry so the composed planning result
 does not inherit STO-004's dense-primary traversal.  That selected transfer-
 planning group is complete; PBC-aware support completion and value application
-are next.
+are also complete through CSP-001/PWA-001/CWA-001 and the bounded selected
+RHE-001 consumer.  Refined point ownership and repeated point sampling are next;
+the complete halo boundary was deliberately finished before extracting them.
 Six-face TOP-003 caching remains optional and requires repeated-consumer
 performance justification.
 

@@ -52,6 +52,12 @@ from .relation_phases import fill_refined_relation_phase_codes
 from .same_level_boxes import fill_same_level_source_boxes
 from .finer_boxes import fill_finer_restriction_boxes
 from .coarser_workspace import fill_coarser_workspace_boxes
+from .coarser_support import fill_coarser_slope_support_plan
+from .coarser_workspace_application import apply_coarser_workspace_plan
+from .refined_halo import (
+    RefinedHaloExecutionStats,
+    execute_selected_refined_halos_from_blocks,
+)
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
@@ -93,6 +99,7 @@ from .boundary_rules import (
     physical_halo_source_index,
     transform_physical_halo_value,
 )
+from .physical_widening import apply_cartesian_physical_widening
 from .halo_plans import (
     fill_level1_halo_relation_plan,
     level1_halo_relation_plan,
@@ -126,6 +133,9 @@ __all__ = [
     "array_block_reader",
     "array_block_writer",
     "apply_level1_same_level_halo_plan",
+    "apply_cartesian_physical_widening",
+    "apply_coarser_workspace_plan",
+    "execute_selected_refined_halos_from_blocks",
     "execute_level1_m0",
     "execute_level1_m0_from_blocks",
     "fill_balanced_refined_relations",
@@ -134,6 +144,7 @@ __all__ = [
     "fill_same_level_source_boxes",
     "fill_finer_restriction_boxes",
     "fill_coarser_workspace_boxes",
+    "fill_coarser_slope_support_plan",
     "fill_ascending_primary_prefix",
     "common_physical_valid_region",
     "central_difference_into",
@@ -196,6 +207,7 @@ __all__ = [
     "RELATION_COARSER",
     "RELATION_SAME",
     "RELATION_FINER",
+    "RefinedHaloExecutionStats",
     "workspace_nbytes",
     "workspace_slot_capacity",
     "write_blocks_from",

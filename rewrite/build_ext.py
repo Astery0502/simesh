@@ -112,6 +112,11 @@ def main() -> None:
             include_dirs=[np.get_include()],
         ),
         Extension(
+            "simesh_rewrite._coarser_support",
+            [str(ROOT / "src/simesh_rewrite/_coarser_support.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
             "simesh_rewrite._geometry",
             [str(ROOT / "src/simesh_rewrite/_geometry.pyx")],
             include_dirs=[np.get_include()],
@@ -139,6 +144,11 @@ def main() -> None:
         Extension(
             "simesh_rewrite._boundary_rules",
             [str(ROOT / "src/simesh_rewrite/_boundary_rules.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
+            "simesh_rewrite._physical_widening",
+            [str(ROOT / "src/simesh_rewrite/_physical_widening.pyx")],
             include_dirs=[np.get_include()],
         ),
         Extension(
