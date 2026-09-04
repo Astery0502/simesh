@@ -45,6 +45,8 @@ complete.
 
 ## M1: Cartesian 3D Refined AMR
 
+Status: complete. See `evidence/M1-ARCHITECTURE-HORIZON.md`.
+
 | ID | Capability | Depends on | Status |
 | --- | --- | --- | --- |
 | FST-001 | Validated Cartesian 3D refined forest reconstruction | MOR-001 | complete |
@@ -72,16 +74,16 @@ complete.
 | PWA-001 | Cartesian physical widening application | FND-001, PBC-001, TGT-001 | complete |
 | CWA-001 | Explicit COARSER workspace application | CSP-001, PWA-001, CWP-001, RST-001 | complete |
 | RHE-001 | Bounded selected refined halo execution | FND-001, BAL-001, REL-001, RSL-001, RPH-001, TGT-001, CSP-001, PWA-001, CWA-001, STO-003, WSP-001, SPR-001, SLB-001, FRP-001, CWP-001, RST-001, PRL-001 | complete |
+| RHC-001 | Synchronous completed refined-primary consumption | RHE-001, STO-003 | complete |
 | LOC-001 | Exact Cartesian 3D refined point ownership | FST-002, GEO-002 | complete |
 | SAM-004 | Refined zero-order point-group sampling | LOC-001, GEO-002, STO-001 | complete |
 | SAM-005 | Refined trilinear point-group sampling | LOC-001, GEO-002, SAM-003, RHE-001 | complete |
-| RPS-001 | Bounded repeated refined point-sampling execution | LOC-001, SAM-004, SAM-005, STO-003, RHE-001, WSP-001 | complete |
+| RPS-001 | Bounded repeated refined point-sampling execution | LOC-001, SAM-004, SAM-005, STO-003, RHC-001, WSP-001 | complete |
 | DAT-001 | Safe AMRVAC v5 3D snapshot metadata index | FND-001 | complete |
 | DAT-002 | Canonical AMRVAC leaf-order forest binding | DAT-001, MOR-001, FST-001, FST-002 | complete |
 | DAT-003 | Native selective non-staggered AMRVAC block reader | DAT-001, DAT-002, STO-003 | complete |
 | ROI-001 | Refined cell-center physical-region windows | FST-002, GEO-002 | complete |
 | OPR-003 | Cartesian 3D refined curl | FND-002, OPR-001, OPR-002, GEO-002 | complete |
-| RHC-001 | Synchronous completed refined-primary consumption | RHE-001, STO-003 | complete |
 | LFE-001 | Bounded selected refined curl and regional sum execution | ROI-001, OPR-003, RHC-001, RED-001, GEO-002, DAT-003 | complete |
 | HLO-001 | Exact last-owner hinted refined point ownership | LOC-001, GEO-002 | complete |
 | CHS-001 | Completed refined owner-halo sampling session | HLO-001, RHC-001, SAM-005, DAT-003, WSP-001 | complete |
@@ -194,6 +196,19 @@ HCL-001 with compatibility wrappers preserved.  SAM-002 and SAM-003 are
 retained Fused implementations whose missing
 semantic boundaries are extracted at refined sampling.  See
 `evidence/DECOMPOSITION-AUDIT.md`.
+
+## M2: Cartesian 2D
+
+| ID | Capability | Depends on | Status |
+| --- | --- | --- | --- |
+| DIM-001 | Explicit active-dimension and singleton-z artifact provenance | FND-001 | proposed |
+
+The first active group is **Active-Dimension Foundation**, initially singleton
+DIM-001. It must keep `active_ndim` distinct from `ndir`, retain the canonical
+five-dimensional singleton-z payload layout, and prevent valid 3D singleton-
+axis grids from being inferred as 2D. Quadtree, variable-width DAT, geometry,
+halo, bilinear sampling, and operator capabilities follow only after this
+provenance integrates.
 
 ## Later Milestones
 

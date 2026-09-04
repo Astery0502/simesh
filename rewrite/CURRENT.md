@@ -2,35 +2,36 @@
 
 ## Active State
 
-- Milestone: M1 Cartesian 3D refined AMR.
+- Milestone: M2 Cartesian 2D, at the active-dimension foundation boundary.
 - Last completed group: **Native Refined Field Lines**; FLN-001, RKS-001,
   TRM-001, and SLE-001 are complete.
 - Completed outcome: CHS vector samples feed scale-safe unit-arclength magnetic
   RHS plus oriented integral, fixed classical RK4, explicit nonperiodic
   termination, and serial stage-major accepted-prefix trajectories.
-- Current work: paused by user immediately after this group checkpoint. The M1
-  architecture horizon review has not started; do not enter M2 before it.
+- M1 architecture horizon review: complete with a qualified real-fixture pass;
+  see `evidence/M1-ARCHITECTURE-HORIZON.md`.
+- Active group: **Active-Dimension Foundation**, initially singleton DIM-001.
+- Current capability: DIM-001 is proposed; recover 2D/singleton-z behavior,
+  apply decomposition, and freeze its contract before implementation.
 - One-time analysis-workload reorientation audit: complete; see
   `evidence/ANALYSIS-PRIORITY-REAUDIT.md`.
-- Group evidence: `evidence/NATIVE-REFINED-FIELD-LINES.md`; the clean build, 301
-  focused/dependency checks, and all 1,210 rewrite tests pass. Analytic rotation
-  observes order 3.896; real tdm capacity-three cold/warm medians are
-  8.814/2.957 ms with exact capacity/backend trajectories.
-- Next ready work when resumed: perform the M1 architecture horizon review over
-  completed local-field/field-line evidence; do not begin M2 first.
+- Last group evidence: `evidence/NATIVE-REFINED-FIELD-LINES.md`; the clean build,
+  301 focused/dependency checks, and all 1,210 rewrite tests pass.
+- Next ready work: define DIM-001 explicit `active_ndim`/`ndir`/singleton-z
+  provenance without inferring dimension from a z extent of one.
 - Readiness: dependencies outside the group must be `complete`; earlier members
   inside the group may be consumed at `integrated` after focused and immediate
   composition checks pass.
 
-The implementation remains isolated under `simesh_rewrite`. M0 supplies a
-complete non-periodic Cartesian 3D level-1 numerical and bounded-memory path.
-M1 currently supplies refined forest reconstruction/conformance, contact and
+The implementation remains isolated under `simesh_rewrite`. M0 and M1 are
+complete. M1 supplies refined forest reconstruction/conformance, contact and
 balance semantics, geometry, relation/support planning, restriction, limiter,
 prolongation, selected-primary planning, complete refined value application,
 bounded selected halo execution, exact refined point ownership, bounded
 repeated zero/trilinear sampling, native selective v5 input, bounded selected
 local-field curl/reduction, exact hinted ownership, completed-halo sampling
-sessions, and cached native fixed-step field lines. The M1 horizon review remains.
+sessions, and cached native fixed-step field lines. M2 must generalize shared
+concepts without replacing the exact 3D wrappers.
 
 ## Durable Decisions
 
@@ -83,6 +84,7 @@ The dependency ledger and exact status authority are in `CAPABILITIES.md`.
   PWA-001, CWA-001, RHE-001, LOC-001, SAM-004/005, RPS-001, DAT-001/002/003,
   ROI-001, OPR-003, RHC-001, LFE-001, HLO-001, CHS-001, FLN-001, RKS-001,
   TRM-001, and SLE-001.
+- M2 Active-Dimension Foundation: DIM-001 proposed.
 - TOP-003 optional face-cache materialization remains proposed and must be
   justified by a repeated real consumer.
 - The selected transfer-planning group is complete. Full-domain work retains
@@ -102,9 +104,11 @@ decisions and rejected alternatives live in `designs/` and `evidence/`.
 - The only available real refined Cartesian 3D `.dat` fixture is staggered, so
   it currently supplies forest/topology/geometry evidence but not supported
   refined payload evidence.
-- The M1 horizon review remains. `B=2`, wider reach, exact neighbor transition,
-  direction-subset support, a raw source cache, adaptive RK, and seed parallelism
-  are measured reopen items rather than work started at this checkpoint.
+- DIM-001 must precede every 2D forest/DAT/geometry/halo/sampling consumer.
+  Direction-subset support is an explicit M2 halo-design input; raw caching,
+  neighbor transitions, adaptive RK, and seed parallelism retain measured gates.
+- No real Cartesian 2D `.dat` fixture is present; generate and provenance-record
+  one before the M2 real-data vertical slice closes.
 - Cartesian 2D, periodic meshes, broader scientific/derived workflows, complete
   AMRVAC I/O/write/export, Dataset/public API integration, packaging,
   parallelism, fallback, and cutover remain assigned to M2--M7.
@@ -115,9 +119,9 @@ decisions and rejected alternatives live in `designs/` and `evidence/`.
 1. Read this file, `CAPABILITIES.md`, and `ANALYSIS_WORKLOADS.md`. Read
    `CHARTER.md` only on a new agent's first rewrite cycle, at a milestone
    boundary, or for a material project-direction change.
-2. Read `CHARTER.md`, then perform the M1 architecture horizon review using the
-   completed local-field, cache, and native field-line evidence.
-3. Update the milestone disposition before selecting any M2 capability.
+2. Read current 2D public behavior, `docs/2d-guide.md`, and the DIM-001 design/
+   contract once created; do not infer `active_ndim` from singleton z.
+3. Complete the Active-Dimension Foundation group before quadtree or DAT work.
 
 ## Current Reproduction Commands
 

@@ -277,6 +277,19 @@ uniform grid when the representative analysis workflow does not consume it.
   only if post-hint LOC remains material; adaptive/parallel execution only after
   fixed-step error and independent-seed scaling establish a useful target.
 
+### M1 Horizon Disposition
+
+- Both priority workflows are complete and M1 may close; see
+  `evidence/M1-ARCHITECTURE-HORIZON.md`.
+- Retain completed-halo working-set caching, sparse DAT headers, exact hinted
+  location, bounded selected execution, and all-26 3D reference semantics.
+- Carry requested-direction support into the dimension-aware M2 halo design;
+  require separate target versus COARSER-slope/physical-base support and a
+  measured 20% composed or 2x byte/support improvement before promotion.
+- Defer raw-interior caching, eager headers/mmap, neighbor materialization,
+  reusable all-26 plans, adaptive RK, and seed parallelism under the recorded
+  triggers; none blocks M2 foundation work.
+
 ## Required Performance Profiles
 
 ### Selected Local Field

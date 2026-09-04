@@ -51,53 +51,20 @@ out-of-core execution.
 
 ## M1: Cartesian 3D Refined AMR
 
-Status: in progress.  Refined forest reconstruction/conformance, raw contact
-lookup, all-touch balance, leaf geometry, and balanced directional relation
-records are complete.  The triggered STO-002 workspace/traversal/closure
-decomposition precedes refined support planning: workspace accounting, shared
-primary-prefix planning, direct-face closure, complete one-block halo closure,
-and refined support union/bounded planning are complete.  Ratio-two
-cell-average restriction, the independent current three-point limiter, and
-ratio-two limited prolongation and refined source-slot resolution are also
-complete.  REL already supplies action classification; refined target-region
-and child-phase planning are also complete.  Source/workspace geometry and
-value application were decomposed; combined source/workspace geometry split into
-now-complete same-level translation, FINER placement, and COARSER workspace
-geometry.  The analysis re-audit places an explicit selected-primary refined
-support planner before the next executor consumer.  It groups that planner with
-FINER placement and COARSER workspace geometry so the composed planning result
-does not inherit STO-004's dense-primary traversal.  That selected transfer-
-planning group is complete; PBC-aware support completion and value application
-are also complete through CSP-001/PWA-001/CWA-001 and the bounded selected
-RHE-001 consumer. Exact refined point ownership, reusable zero/trilinear point
-kernels, and bounded repeated point sampling are complete while the fused
-SAM-002/SAM-003 uniform strategies remain available. The native selective
-`.dat` adapter and selected local-field slice are complete; streamline is next.
-Six-face TOP-003 caching remains optional and requires repeated-consumer
-performance justification.
+Status: complete with the qualified real-fixture limitation recorded in
+`evidence/M1-ARCHITECTURE-HORIZON.md`.
 
-The native-read group now completes safe v5 byte decoding, canonical forest
-binding, and non-staggered selected transfer through RHE/RPS. The local-field
-slice is complete and the streamline analysis slice is next; v3/v4 format
-breadth and owned dataset/file lifecycle remain assigned to M5/M6.
+The milestone includes validated refined forest/topology/balance/geometry;
+sparse selected support and complete SAME/FINER/COARSER/physical halo
+application; restriction/prolongation; exact refined zero/trilinear sampling;
+native selective v5 input; bounded selected curl/reduction; completed-owner
+sampling cache; and fixed-step native field lines. The analysis-priority local-
+field and streamline gates both have synthetic refined native and real tdm
+workflow evidence. All-26 execution remains the exact 3D reference; direction-
+projected support is carried into dimension-aware M2 design rather than added as
+a 3D-only patch.
 
-The completed local-field slice adds exact refined cell-center ROI windows, fixed
-Cartesian curl, and a stable completed-primary consumer before composing native
-selected output and reduction. The separate streamline location/cache/stepping
-policy is the next M1 vertical slice.
-
-The completed streamline preparation group isolates exact last-owner hints
-and a byte-bounded completed-owner halo sampling session. It retains full RHE
-miss semantics; raw source caching and direction-projected support remain
-separate measured reopen choices before field-line stepping is frozen.
-
-The completed field-line group freezes normalized unit-arclength magnetic
-tracing, classical fixed-step RK4, explicit nonperiodic termination, and a
-serial stage-major CHS executor. Its native trajectory trace closes the M1
-analysis-priority gate. The M1 horizon review decides remaining cache/support
-reopen work before M2; it has not started at this checkpoint.
-
-Before refined halo work, complete the functional-composition checkpoint:
+The completed functional-composition checkpoint established:
 
 - expose block readers and writers as explicit coarse-grained function
   adapters over canonical buffers;
@@ -107,7 +74,7 @@ Before refined halo work, complete the functional-composition checkpoint:
 - separate halo requirements, support closure, relation planning, and value
   transfer before adding coarse/fine behavior.
 
-Add:
+M1 then added:
 
 - validated parent/child reconstruction;
 - coarse, sibling, and fine neighbor relations;
@@ -123,6 +90,8 @@ contracts. Native AMRVAC, mapped, resident, cached, or other adapters may alter
 I/O and scheduling but not refined numerical semantics.
 
 ## Analysis Priority Gate Before M2
+
+Status: complete. See `evidence/M1-ARCHITECTURE-HORIZON.md`.
 
 Before broad dimensional and periodic generalization, validate that the
 completed Cartesian 3D refined core supports the primary analysis direction in
@@ -143,6 +112,11 @@ bytes, support amplification, peak memory, query latency, cache behavior, and
 the appropriate numerical comparisons.
 
 ## M2: Cartesian 2D
+
+Status: active at the foundation boundary. The first group is **Active-
+Dimension Foundation**, initially singleton DIM-001. It makes `active_ndim`
+explicit, keeps `ndir` separate, and preserves the canonical singleton-z array
+layout before quadtree, DAT, geometry, halo, or sampling behavior is generalized.
 
 Generalize established concepts to active x/y dimensions:
 

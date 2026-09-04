@@ -219,6 +219,11 @@ without a point-array-scale memory bottleneck.
 
 ## Completion Gate And Reopen Triggers
 
+Post-completion promotion note: LFE-001 supplied the second completed-primary
+consumer, so RHC-001 now owns the stable synchronous descriptor/executor and
+RPS consumes it directly. The private-hook language below records the original
+design sequence rather than the current architecture.
+
 The group closes only after independent locator/reference agreement at all
 root, child, coarse/fine, edge, corner, and physical-domain boundaries;
 bitwise zero-order comparison; trilinear finite-error and IEEE-category tests;
