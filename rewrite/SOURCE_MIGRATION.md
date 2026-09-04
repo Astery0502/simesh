@@ -37,17 +37,17 @@ No canonical feature may remain merely `inventoried` at final cutover.
 
 | Feature family | Current authority | Rewrite state | Planned closure |
 | --- | --- | --- | --- |
-| Array/index/layout conventions | `amrvac/layouts.py`, canonical array APIs | Core 3D conventions, workspace accounting, dense primary traversal, level-1 closures, and refined source-union planning complete; singleton-z pending | M1 transfer integration, then M2/M6 |
+| Array/index/layout conventions | `amrvac/layouts.py`, canonical array APIs | Core 3D conventions, workspace accounting, dense and sparse selected-primary traversal, level-1 closures, and refined source-union planning complete; singleton-z pending | M1 transfer integration, then M2/M6 |
 | Morton, forest, leaf traversal, connectivity | `utils/lib/amr/morton.pyx`, `forest.pyx` | Level-1/refined 3D reconstruction, conformance, contacts, all-touch balance, selected direction/source records, and bounded support planning complete; optional face cache deferred | M1 transfer integration, then M2 quadtree and M3 periodic |
 | Mesh geometry and coordinate bookkeeping | `utils/lib/amr/mesh.pyx` | Level-1 and refined Cartesian 3D bounds/spacing complete; refined centers remain sampling-owned | M1 sampling integration, then M2/M3 |
-| Physical, sibling, coarse/fine and periodic halos | `amrvac/boundary.py`, `mesh.pyx` | Physical/level-1 sibling boundaries plus refined restriction, limiter, prolongation, bounded source slots, targets, phases, and same-level source translation complete; fine/coarse placement and refined execution pending | M1 refined, then M2 and M3 |
+| Physical, sibling, coarse/fine and periodic halos | `amrvac/boundary.py`, `mesh.pyx` | Physical/level-1 sibling boundaries plus refined restriction, limiter, prolongation, selected-primary support, bounded source slots, targets, phases, same-level translation, FINER placement, and COARSER workspace reach complete; PBC-aware reach completion/value application and refined execution pending | M1 refined, then M2 and M3 |
 | Exact/uniform sampling and uniform-to-SFC placement | `mesh.pyx`, `amrvac_uniform.py` | Level-1 3D placement/zero/trilinear complete | M1/M2/M3/M5 |
-| Pointwise, stencil, reduction and diagnostics | `derived_fields.py`, `mesh.pyx`, legacy diagnostic evidence | Representative contracts complete | M4 |
+| Pointwise, stencil, reduction and diagnostics | `derived_fields.py`, `mesh.pyx`, legacy diagnostic evidence | Representative contracts complete | Post-M1 analysis priority gate for one local workflow; M4 for breadth |
 | Derived-field registration/materialization and field selectors | `amrvac_dataset.py`, `derived_fields.py` | Not migrated | M4 and M6 |
 | AMRVAC header/forest/tree/block reading | `amrvac/datio.py` | Array/memmap adapter only | M1 native refined read slice; full M5 |
 | AMRVAC writing and roundtrip | `amrvac/datio.py`, `amrvac_uniform.py` | Not migrated | M5 |
 | Uniform construction, singleton-z conversion and VTK export | `amrvac_uniform.py`, `layouts.py` | Core placement only | M2 and M5 |
-| Dataset lifecycle and public `simesh.amrvac` API | `amrvac_dataset.py`, `api.py`, `dataset_base.py` | Not integrated | M6 |
+| Dataset lifecycle and public `simesh.amrvac` API | `amrvac_dataset.py`, `api.py`, `dataset_base.py` | Not integrated | Thin internal analysis composition after M1; complete public lifecycle in M6 |
 | Independent potential-field and configuration helpers | `tools/potential_field.py`, `utils/configurations.py` | Inventoried; some already function oriented | M4 retain/rewrite audit |
 | Runtime/OpenMP/build/package exports | `utils/runtime.py`, build files, package `__init__` modules | Rewrite-local build only | M7 |
 | `src/simesh/legacy/` duplicate/reference behavior | legacy tree | Evidence source, not default target | Classify then retire/archive in M7 |

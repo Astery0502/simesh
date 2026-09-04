@@ -2,18 +2,40 @@
 
 ## Capability Group Cycle
 
-Before implementation, select two to five dependency-adjacent capabilities
+Before implementation, select one to four dependency-adjacent capabilities
 that deliver one concrete composed outcome and record the active group in
 `CURRENT.md`. The group declaration names its member IDs, dependency order,
 outcome, focused checks, full regression command, relevant current-path
-comparisons, and standard benchmark set. Exact later member IDs may be refined
-by the five-question gate before the first member is implemented, but the group
-must not expand beyond five members or absorb unrelated work.
+comparisons, performance classes, and any required standard benchmark set.
+Exact later member IDs may be refined by the five-question gate before the first
+member is implemented, but the group must not expand beyond four members or
+absorb unrelated work.
 
-Implement one ready member at a time. A member completes the capability cycle
-below through focused validation and immediate integration, then remains
-`integrated` until the group gate passes. Do not rerun the accumulated suite or
-standard benchmark matrix after each member.
+Before freezing the group, add a short exploration-coverage record:
+
+```text
+Current approach:
+Structurally different credible alternative:
+Most decision-changing uncertainty:
+Reopen evidence or consumer:
+```
+
+This is a coverage check, not a requirement to implement every alternative. If
+the uncertainty can materially change a boundary, complexity class, data
+layout, transfer count, or memory model, use the disposable-exploration rule.
+Otherwise record the deferral and proceed.
+
+When the group selects or optimizes an algorithm, data structure, cache, local
+operator, sampler, or streamline path, also complete the algorithm-selection
+record in `ANALYSIS_WORKLOADS.md`. The representative consumer and metrics must
+match the primary analysis workload unless the group explicitly owns a
+migration-only or simulation-style compatibility requirement.
+
+Implement one ready member at a time. Dependencies outside the active group
+must be `complete`; an earlier member of the same group may be consumed at
+`integrated` after its focused and immediate-composition checks pass. A member
+remains `integrated` until the group gate passes. Do not rerun the accumulated
+suite or standard benchmark matrix after each member.
 
 Close the group by:
 
@@ -21,15 +43,18 @@ Close the group by:
 2. running all member-focused tests and the accumulated rewrite regression and
    integration suite once;
 3. running the relevant comparisons with the current implementation once;
-4. running one standard benchmark pass for the group's new hot paths and
-   immediate composed outcome, without rerunning unaffected benchmarks;
+4. when required by a member's performance class, running one standard
+   benchmark pass for the group's new hot paths and immediate composed outcome,
+   without rerunning unaffected benchmarks;
 5. resolving any failure at its owning capability and rerunning the failed gate;
-6. marking the members `complete`, updating the ledgers and evidence, inspecting
+6. recording any credible deferred alternative with its reason and concrete
+   reopen trigger;
+7. marking the members `complete`, updating the ledgers and evidence, inspecting
    the working and staged diffs, and creating one cohesive group checkpoint.
 
-A group may contain one capability only when `CURRENT.md` records why a
-milestone gate, isolated high-risk hot path, or external dependency boundary
-makes batching inappropriate.
+Use a singleton group when no other capability naturally shares the same
+composed outcome and closing checks. Do not invent a companion capability or
+prematurely specify downstream behavior to avoid a singleton.
 
 ## Capability Cycle
 
@@ -44,7 +69,7 @@ For one ready capability:
 7. Implement the simplest Cython form with explicit inputs, outputs, and workspace.
 8. Compare intermediate artifacts, not only the final user-visible result.
 9. Integrate with the immediate lower-level producer and next higher-level consumer.
-10. Measure the performance and memory dimensions relevant to this capability and its new composed path.
+10. Assign the capability a performance class and gather only the evidence required by that class.
 11. Explore optimized or fused variants only after the simple implementation and composition are correct.
 12. Run the capability's focused tests and immediate reference/composition comparisons; use smoke benchmarks only when useful during iteration.
 13. Update the capability ledger to `integrated` and update the active-group checkpoint.
@@ -53,6 +78,16 @@ For one ready capability:
 
 Keep this cycle proportional. A simple index transform does not need a report;
 a refined ghost algorithm or out-of-core executor does.
+
+## Disposable Exploration
+
+Before freezing a non-trivial contract, a short prototype is allowed when a
+concrete feasibility, layout, cache, or complexity question requires executable
+evidence. Record the question and a time or variant bound. Experimental code
+must remain outside package imports, stable tests, and downstream dependencies.
+It may use lightweight measurements but does not need production validation.
+Carry only the result into the design/contract, then remove the prototype or
+leave it under an ignored experiment path.
 
 ## Design And Specification
 
@@ -75,9 +110,12 @@ optimization, integration, defect, or cutover boundaries. Preserve validated
 behavior and compatibility wrappers while extracting functions; do not reopen
 completed work for stylistic purity alone.
 
-Do not require separate design and contract files for trivial capabilities. Do
-not turn design notes into long reports. Their purpose is to preserve the
-reasoning that a later agent would otherwise have to rediscover.
+Do not require separate design and contract files for trivial capabilities. A
+simple capability may append its concise final evidence to its contract. Prefer
+one evidence summary for a capability group instead of one file per member when
+the checks and benchmark are shared. Do not turn design notes into long reports.
+Their purpose is to preserve reasoning that a later agent would otherwise have
+to rediscover.
 
 ## Contract Contents
 
@@ -123,6 +161,19 @@ unless a supported behavior still uniquely depends on them.
 An optimization begins with a concrete hypothesis. Keep the simple validated
 implementation available while testing variants such as loop fusion, layout
 changes, workspace reuse, tiling, mapping, caching, streaming, or OpenMP.
+
+Classify the work before benchmarking:
+
+- `cold/control`: validate complexity, allocation, and correctness; do not
+  create an isolated timing merely because the implementation is in Cython;
+- `composition-only`: measure at the first real immediate consumer rather than
+  constructing a repeated synthetic consumer;
+- `hot-kernel`: measure the kernel and its immediate composed consumer;
+- `milestone-workflow`: measure a representative real-data or public workflow,
+  including runtime, memory, I/O, and scaling dimensions that matter.
+
+A capability moves to a more expensive class only when a cost model, profiler,
+scaling risk, or real consumer justifies it.
 
 For a hot path, record the `PERFORMANCE.md` workload/profile, comparator,
 hypothesis, metrics, and material-regression rule before the final experiment.
@@ -181,7 +232,9 @@ completion, not an unbounded search for a theoretical maximum.
 
 ## Independent Contract Review
 
-When evidence shows that a stable contract may be wrong or incomplete:
+Use an independent sub-agent review when evidence suggests a material stable
+contract change affecting numerical meaning, ownership/mutation/atomicity, a
+representation consumed elsewhere, or supported public failure behavior:
 
 1. The primary agent writes a short proposed change with the conflicting evidence and affected capabilities.
 2. The primary agent starts an independent sub-agent reviewer and asks it to inspect the contract, raw evidence, reference behavior, and invariants before relying on the primary conclusion.
@@ -190,7 +243,39 @@ When evidence shows that a stable contract may be wrong or incomplete:
 5. If they disagree, run the smallest experiment likely to resolve the disagreement and review again. Keep the existing contract until agreement is reached; continue other ready work when possible.
 
 The review is a technical second perspective, not an approval ceremony. Keep
-the proposal and conclusion concise.
+the proposal and conclusion concise. Editorial clarification, private naming,
+benchmark tuning, and stronger tests for unchanged behavior use ordinary review
+and do not require a sub-agent.
+
+For parallel implementation or investigation, delegate only bounded workstreams
+with enough independence to save wall-clock time or add a genuinely different
+technical perspective. Give each sub-agent explicit file or evidence ownership;
+the primary agent integrates the result. Do not delegate tiny sequential steps,
+duplicate the same review, or infer delegation from the selected model or
+reasoning-effort level.
+
+## Milestone Architecture Horizon Review
+
+At each milestone close, inspect the composed implementation before selecting
+the next milestone's detailed capabilities. Keep the review focused on:
+
+- data structures or layouts leaking across multiple semantic layers;
+- validation, traversal, transfer, or materialization repeated across consumers;
+- measured runtime, memory, I/O, and allocation hotspots;
+- storage/backend boundaries that force avoidable full-payload movement;
+- assumptions about dimension, geometry, refinement, ownership, or scheduling
+  that the next milestone may invalidate;
+- completed capabilities that still lack a real consumer.
+
+Apply the workload order and local-field/streamline metrics in
+`ANALYSIS_WORKLOADS.md`; explicitly identify any optimization retained mainly
+for migration parity or a simulation-style workload.
+
+Record only decisions, deferred questions, and reopen triggers in the milestone
+evidence. Do not repeat every completed capability result. Use one independent
+sub-agent when a material cross-layer choice has at least two credible
+architectures or the primary analysis has an unresolved technical uncertainty.
+A routine milestone with no such decision uses one concise primary-agent review.
 
 ## Checkpoint Discipline
 
@@ -205,6 +290,10 @@ should say:
 - next ready capability;
 - exact commands for focused checks and the closing group gate;
 - source-migration rows and benchmark baselines changed by the checkpoint.
+
+Keep `CURRENT.md` as a short resume surface, normally no more than 150 lines.
+Move completed milestone narratives and historical measurements to capability
+or milestone evidence instead of duplicating them in the checkpoint.
 
 The Git commit created after a completed capability group is the durable
 recovery point. Keep group commits cohesive and executable. Intermediate

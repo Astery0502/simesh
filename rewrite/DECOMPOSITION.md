@@ -39,13 +39,15 @@ implementation can replace another without changing the consumer's semantic
 contract. If replacement requires consumers to understand the internal
 algorithm, the boundary is wrong or incomplete.
 
-### 4. Can Its Cost Be Measured Independently?
+### 4. Is Its Cost Evaluated At The Right Boundary?
 
-For a hot path, identify a kernel metric and the immediate composed metric. For
-a tiny orchestration helper whose isolated timing is meaningless, state that
-explicitly and identify the first composed boundary where its cost is visible.
-Inability to locate any meaningful measurement boundary is evidence that the
-responsibility may be mixed or too small.
+Assign the least expensive `PERFORMANCE.md` class that can guide a decision. For
+a hot path, identify a kernel metric and the immediate composed metric. For a
+composition-only helper, identify the first real consumer where its cost is
+visible. For cold/control work, state the relevant complexity and allocation
+bound instead of creating an isolated timing. Inability to locate any useful
+cost boundary or bound is evidence that the responsibility may be mixed or too
+small.
 
 ### 5. Are Semantic Meaning And Policy/Execution Separate?
 
@@ -103,7 +105,7 @@ Mutation and ownership:
 Access pattern / halo reach:
 Independent reference or invariant:
 Immediate producer and consumer:
-Kernel and composed measurement boundary:
+Performance class and measurement boundary or cost bound:
 Five-question result and any justified exception:
 ```
 

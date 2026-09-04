@@ -39,6 +39,10 @@ from .refined_support import (
     maximum_balanced_refined_support_slots,
     plan_balanced_refined_support_prefix,
 )
+from .selected_refined_support import (
+    maximum_selected_refined_support_slots,
+    plan_selected_refined_support_prefix,
+)
 from .restriction import restrict_cartesian_2to1_into
 from .limiter import three_point_limited_slope
 from .prolongation import prolong_cartesian_2to1_into
@@ -46,6 +50,8 @@ from .relation_slots import resolve_refined_relation_source_slots
 from .target_boxes import fill_directed_halo_target_boxes
 from .relation_phases import fill_refined_relation_phase_codes
 from .same_level_boxes import fill_same_level_source_boxes
+from .finer_boxes import fill_finer_restriction_boxes
+from .coarser_workspace import fill_coarser_workspace_boxes
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
@@ -126,6 +132,8 @@ __all__ = [
     "fill_directed_halo_target_boxes",
     "fill_refined_relation_phase_codes",
     "fill_same_level_source_boxes",
+    "fill_finer_restriction_boxes",
+    "fill_coarser_workspace_boxes",
     "fill_ascending_primary_prefix",
     "common_physical_valid_region",
     "central_difference_into",
@@ -154,6 +162,7 @@ __all__ = [
     "minimum_halo_closed_slots",
     "minimum_level1_halo_closed_slots",
     "maximum_balanced_refined_support_slots",
+    "maximum_selected_refined_support_slots",
     "make_block_reader",
     "make_block_writer",
     "merge_field_sums",
@@ -162,6 +171,7 @@ __all__ = [
     "plan_level1_halo_chunk",
     "plan_level1_halo_closed_prefix",
     "plan_balanced_refined_support_prefix",
+    "plan_selected_refined_support_prefix",
     "place_level1_blocks",
     "physical_halo_source_index",
     "prolong_cartesian_2to1_into",

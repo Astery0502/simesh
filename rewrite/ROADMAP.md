@@ -63,7 +63,12 @@ complete.  REL already supplies action classification; refined target-region
 and child-phase planning are also complete.  Source/workspace geometry and
 value application are next; combined source/workspace geometry split first into
 now-complete same-level translation, FINER placement, and COARSER workspace
-geometry.  FINER placement is next.
+geometry.  The analysis re-audit places an explicit selected-primary refined
+support planner before the next executor consumer.  It groups that planner with
+FINER placement and COARSER workspace geometry so the composed planning result
+does not inherit STO-004's dense-primary traversal.  That selected transfer-
+planning group is complete; PBC-aware support completion and value application
+are next.
 Six-face TOP-003 caching remains optional and requires repeated-consumer
 performance justification.
 
@@ -81,6 +86,7 @@ Add:
 
 - validated parent/child reconstruction;
 - coarse, sibling, and fine neighbor relations;
+- explicit selected-primary support planning for sparse/ROI leaf streams;
 - restriction and prolongation;
 - refined ghost provision;
 - refined zero-order and trilinear sampling;
@@ -90,6 +96,26 @@ Add:
 M1 storage and halo implementations must compose through the same canonical
 contracts. Native AMRVAC, mapped, resident, cached, or other adapters may alter
 I/O and scheduling but not refined numerical semantics.
+
+## Analysis Priority Gate Before M2
+
+Before broad dimensional and periodic generalization, validate that the
+completed Cartesian 3D refined core supports the primary analysis direction in
+`ANALYSIS_WORKLOADS.md`. Activate the minimum selected M4-style capabilities
+needed for two vertical slices:
+
+- a native selective read feeding a bounded physical-region local diagnostic,
+  with shared input/halo work and a regional output or reduction;
+- an exact spatial locator and field sampler feeding one representative
+  streamline composition with explicit stepping, termination, and cache
+  behavior.
+
+This gate does not require the complete derived-field public lifecycle or every
+scientific operator. Its purpose is to let real analysis consumers test the
+storage, layout, ownership, caching, and execution boundaries before M2/M3 make
+them dimension- and periodic-aware. Record time to first result, useful/read
+bytes, support amplification, peak memory, query latency, cache behavior, and
+the appropriate numerical comparisons.
 
 ## M2: Cartesian 2D
 
@@ -116,8 +142,10 @@ reported as migrated parity.
 
 ## M4: Scientific Operators And Derived Fields
 
-Once refined, dimensional, and periodic access contracts are established, add
-the supported scientific and field-lifecycle families:
+Complete and generalize the scientific and field-lifecycle families. Selected
+Cartesian 3D local-analysis and streamline primitives may already exist from
+the analysis priority gate; preserve their contracts and extend them rather
+than implementing unrelated replacements:
 
 - pointwise field transforms;
 - derivative batching and local stencils;

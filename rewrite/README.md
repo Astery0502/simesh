@@ -30,11 +30,13 @@ case, not an afterthought.
 6. `WORKFLOW.md` -- how one capability is designed, specified, implemented, composed, and optimized.
 7. `DECOMPOSITION.md` -- the five-question capability gate, decision ownership,
    and progressive refinement of earlier implementations.
-8. `FUNCTIONAL_COMPOSITION.md` -- stable boundaries for storage, execution,
+8. `ANALYSIS_WORKLOADS.md` -- analysis-first workload, algorithm, data-structure,
+   benchmark priorities, and the one-time completed-work reorientation audit.
+9. `FUNCTIONAL_COMPOSITION.md` -- stable boundaries for storage, execution,
    halo planning, compute kernels, and alternative framework implementations.
-9. `SOURCE_MIGRATION.md` -- feature-parity inventory from current source to
+10. `SOURCE_MIGRATION.md` -- feature-parity inventory from current source to
    final canonical replacement.
-10. `PERFORMANCE.md` -- benchmark levels, baselines, metrics, recording, and
+11. `PERFORMANCE.md` -- benchmark levels, baselines, metrics, recording, and
    regression policy.
 
 Non-trivial design notes are added under `designs/` while alternatives are
@@ -50,22 +52,33 @@ a concrete use.
 Continue the functional AMR rewrite under rewrite/.
 
 Follow rewrite/AGENTS.md and the current checkpoint in rewrite/CURRENT.md.
+Use rewrite/ANALYSIS_WORKLOADS.md when selecting algorithms, data structures,
+execution strategies, and benchmark metrics. Complete its one-time
+reorientation audit before resuming new M1 implementation.
 Apply the five-question and decision-ownership gate in rewrite/DECOMPOSITION.md
 before implementing or extending each non-trivial capability. Audit in-progress
 work created under earlier rules before continuing it; preserve valid work and
 refine it incrementally rather than resetting it.
+Before freezing each capability group, record the current approach, one
+structurally different credible alternative, the uncertainty most likely to
+change the choice, and the evidence or consumer that would reopen it. Explore
+only uncertainties that can materially change a boundary, complexity, layout,
+transfer count, or memory model.
 Work through dependency-ready capabilities across M1--M7 toward the complete
 supported-feature migration and final cutover gates in SOURCE_MIGRATION.md.
 Preserve numerical behavior, keep the new implementation isolated until its
 integration stage, and follow PERFORMANCE.md for every hot path and milestone
 workflow. Record enough correctness, performance, memory, I/O, and real-data
-evidence to justify each completed capability. Stable contracts may change
-only through the independent sub-agent review described in rewrite/WORKFLOW.md.
+evidence appropriate to each capability's performance class. Material stable
+contract changes use the independent sub-agent review described in
+rewrite/WORKFLOW.md; routine clarifications do not.
 Do not stop merely because one milestone is complete; update the feature
 ledger, select the next dependency-ready capability, and continue until final
-cutover is complete or no capability can make meaningful progress. Make a
-cohesive Git commit after each completed capability so the branch remains an
-executable sequence of validated checkpoints. Before each commit, run the
-accumulated rewrite regression suite and stage only files belonging to the
-active rewrite capability and its checkpoint.
+cutover is complete or no capability can make meaningful progress. Make one
+cohesive Git commit after each completed capability group so the branch remains
+an executable sequence of validated checkpoints. Before each commit, run the
+group closing gate and stage only files belonging to the active group and its
+checkpoint. At each milestone close, perform the concise architecture-horizon
+review in WORKFLOW.md and use an independent sub-agent only for a material
+cross-layer choice with credible alternatives or unresolved uncertainty.
 ```

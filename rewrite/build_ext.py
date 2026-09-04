@@ -102,6 +102,16 @@ def main() -> None:
             include_dirs=[np.get_include()],
         ),
         Extension(
+            "simesh_rewrite._finer_boxes",
+            [str(ROOT / "src/simesh_rewrite/_finer_boxes.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
+            "simesh_rewrite._coarser_workspace",
+            [str(ROOT / "src/simesh_rewrite/_coarser_workspace.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
             "simesh_rewrite._geometry",
             [str(ROOT / "src/simesh_rewrite/_geometry.pyx")],
             include_dirs=[np.get_include()],

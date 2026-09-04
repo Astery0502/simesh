@@ -1,0 +1,190 @@
+# Analysis Workload Priorities
+
+## Purpose
+
+The rewrite serves local scientific analysis of mostly immutable AMR snapshots.
+Its primary workloads are selected-region field analysis and field-line or
+streamline analysis. Simulation-style full-domain state updates remain useful
+comparators but do not define the default architecture or optimization target.
+
+This policy guides algorithm selection, data structures, execution strategies,
+benchmarks, and the order in which broader support is activated. It does not
+weaken numerical semantics, reproducibility, valid-region rules, or supported
+format compatibility.
+
+## Workload Model
+
+The common analysis session:
+
+- opens one or more large read-mostly snapshots;
+- selects a small set of fields and often a physical region, slice, or seeds;
+- performs several related queries against reusable forest, topology, and
+  geometry metadata;
+- computes local derived quantities such as gradient, divergence, curl,
+  current density, vorticity, magnitude, and regional reductions;
+- samples fields along data-dependent trajectories;
+- may process data larger than memory on one local machine.
+
+This differs from a simulation loop that repeatedly updates every cell, fills
+global halos, writes new state, and optimizes aggregate cell updates or MPI
+exchange. The rewrite may support those operations where required for parity,
+but they do not outrank the analysis workloads above.
+
+## Product Priorities
+
+Use this order when trade-offs cannot satisfy every workload equally:
+
+1. **Correct spatial and numerical semantics.** Preserve deterministic leaf and
+   cell ownership, coarse/fine relations, valid regions, interpolation rules,
+   operator meaning, and reproducible results across execution strategies.
+2. **Selective I/O and computation.** Read and compute only requested fields,
+   primary blocks, regions, and required support whenever the contract permits.
+3. **Time to first useful result and bounded memory.** Prefer useful partial or
+   regional results without requiring the complete payload to be resident.
+4. **Reuse with explicit lifetime.** Reuse immutable forest/topology/geometry
+   metadata and measured query plans or payload cache entries without making
+   hidden state part of numerical semantics.
+5. **Composed throughput.** Reduce bytes moved, support amplification, repeated
+   halo work, and repeated traversal before micro-optimizing arithmetic kernels.
+6. **Parallel independent analysis.** Prefer parallelism across seeds, regions,
+   fields, and snapshots. Parallelize one dependent streamline only when
+   evidence establishes a useful strategy.
+7. **Full-domain update and write throughput.** Optimize these after supported
+   analysis workflows unless migration parity or a measured shared bottleneck
+   requires earlier work.
+
+## Local-Field Execution Family
+
+The intended composition is:
+
+```text
+physical region or selected leaves
+        -> primary selection
+        -> operator access requirements
+        -> support closure and selected block reads
+        -> shared halo provision
+        -> batched compatible operators
+        -> selected outputs and/or streaming reductions
+```
+
+Group local operators when they share input fields, access reach, boundary
+semantics, and workspace validity. A batch should amortize reads, support
+planning, and halo provision without merging independently variable numerical
+definitions. Uniform-grid materialization is an output strategy, not the
+default intermediate representation.
+
+Optimize this family primarily by useful bytes read, support amplification,
+number of halo provisions, workspace peak, time to first result, and composed
+throughput. A faster isolated stencil does not justify extra whole-domain reads
+or payload-sized temporaries.
+
+## Streamline Execution Family
+
+Streamline work composes a spatial locator, field sampler, stepper, termination
+policy, and reducer. It does not share the local-stencil executor merely because
+both consume fields.
+
+Prefer this lookup order when evidence supports it:
+
+1. test whether the next point remains in the last leaf;
+2. use an exact adjacent relation when the path crosses a known face;
+3. fall back to root selection and hierarchy descent;
+4. obtain required fields from a bounded block cache or reader;
+5. interpolate, advance, terminate, and reduce through explicit contracts.
+
+Forest and geometry metadata may remain resident when small enough. Field
+payload caching is budgeted separately and keyed by explicit leaf and field
+identity. Cache policy, prefetch, step size, interpolation, and termination are
+replaceable decisions. The result must remain within its numerical contract
+across cache sizes and traversal strategies.
+
+Optimize this family by point/step latency, samples per second, last-leaf and
+neighbor-transition hit rates, hierarchy fallbacks, block loads, cache hit
+rate, bytes per sample, peak cache bytes, and trajectory equivalence. Global
+cells per second alone is not a useful streamline metric.
+
+## Algorithm Selection Gate
+
+Before selecting or optimizing an algorithm or retained data structure, record:
+
+```text
+Primary analysis workflow and query shape:
+Expected access density and locality:
+Reusable state and its lifetime:
+Dominant expected cost (I/O, transfer, planning, arithmetic, allocation):
+Current and structurally different candidate strategies:
+Workload-specific metrics and representative consumer:
+Deferred alternatives and concrete reopen triggers:
+```
+
+Prefer optimizations in this order unless evidence shows another bottleneck:
+
+1. avoid unnecessary file reads and payload materialization;
+2. reduce selected-support and transfer amplification;
+3. reuse metadata, plans, halos, and cache entries with explicit ownership;
+4. batch or fuse compatible operators at an already validated boundary;
+5. improve hot-loop locality, vectorization, and arithmetic reuse;
+6. parallelize independent queries and then measured inner kernels.
+
+Do not optimize for a hypothetical simulation loop, global cache, or complete
+uniform grid when the representative analysis workflow does not consume it.
+
+## Required Performance Profiles
+
+### Selected Local Field
+
+Use a representative refined snapshot, a small field set such as magnetic
+components, and physical regions covering small, medium, and full-domain cases.
+Compute at least one multi-term diagnostic such as curl/current density and one
+regional reduction. Record:
+
+- metadata/open and time to first result;
+- requested, read, support, and output bytes;
+- primary/support amplification and halo count;
+- cold and warm runtime;
+- managed workspace and peak RSS;
+- cells or output values per second;
+- exact or numerical comparison with the reference/current behavior.
+
+### Streamline
+
+Use single and multiple seeds, short and long paths, and both spatially coherent
+and divergent seed sets. Record:
+
+- point and integration-step throughput plus latency distribution;
+- last-leaf, neighbor-transition, hierarchy-fallback, and cache hit counts;
+- reader calls and bytes per accepted point;
+- cache capacity and peak memory;
+- cold and warm behavior;
+- termination classification and trajectory comparison;
+- scaling across independent seeds.
+
+### Snapshot Series
+
+When repeated topology occurs across files, measure metadata/plan reuse and
+per-snapshot payload work separately. Do not assume topology reuse until the
+format adapter proves identity and lifetime safely.
+
+## One-Time Reorientation Audit
+
+Before resuming new M1 implementation under this policy, audit completed M0/M1
+capabilities once. This is not a rewrite or a new benchmark campaign. Classify
+each relevant boundary as:
+
+- retain unchanged;
+- retain semantics and defer optimization until an analysis consumer;
+- reopen before the next consumer because it forces avoidable global work,
+  payload movement, retained state, or an incompatible query boundary;
+- deprioritize because it serves migration parity rather than the primary
+  analysis path.
+
+Reopen code only when the finding can materially affect the selected local-field
+or streamline path, asymptotic behavior, transfer volume, peak memory, or a
+cross-layer representation. Use existing contracts, tests, and evidence first.
+Add a focused experiment only for a remaining decision-changing uncertainty;
+do not rebuild, rebenchmark, or refactor every completed capability.
+
+Record one concise audit summary with findings, owners, and reopen triggers.
+After that summary is accepted, resume the next capability group. Later
+milestone horizon reviews apply the same workload priorities without repeating
+this whole historical audit.

@@ -58,6 +58,7 @@ complete.
 | FCL-001 | Deterministic direct-face support closure | PRI-001, TOP-001 | complete |
 | HCL-001 | Deterministic complete one-block halo support closure | PRI-001, TOP-001 | complete |
 | STO-004 | Balanced refined support union and bounded primary planning | WSP-001, PRI-001, REL-001 | complete |
+| SPR-001 | Explicit selected-primary refined support planning | STO-004 | complete |
 | RST-001 | Cartesian 3D ratio-two cell-average restriction | FND-001, STO-001, STO-004 | complete |
 | LIM-001 | Cartesian three-point limited-slope primitive | FND-001, RST-001 | complete |
 | PRL-001 | Cartesian 3D ratio-two limited prolongation | FND-001, RST-001, LIM-001 | complete |
@@ -65,7 +66,8 @@ complete.
 | TGT-001 | Directed halo target boxes | FND-001 | complete |
 | RPH-001 | Refined relation child-phase codes | FST-002, REL-001, RSL-001 | complete |
 | SLB-001 | Cartesian same-level source-box translation | FND-001, TGT-001 | complete |
-| FRP-001 | Cartesian FINER restriction placement | RST-001, TGT-001, RPH-001 | proposed |
+| FRP-001 | Cartesian FINER restriction placement | RST-001, TGT-001, RPH-001 | complete |
+| CWP-001 | Cartesian COARSER explicit-workspace placement and reach | PRL-001, TGT-001, RPH-001 | complete |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -77,10 +79,13 @@ policy; its consumer evidence keeps optional TOP-003 deferred.  The STO-002
 Yellow trigger activated the now-complete extraction sequence: WSP-001
 accounting, PRI-001 primary traversal, FCL-001 direct-face closure, and HCL-001
 full-halo closure.  STO-002 is now a retained compatibility composition.
-STO-004 now supplies exact bounded refined source union, primary progress, and
-one-row capacity bounds without owning transfer semantics.  RST-001's numerical
-kernel depends only on FND layout, while STO-001/STO-004 provide its immediate
-bounded gather composition.
+STO-004 now supplies exact bounded refined source union, dense-primary progress,
+and one-row capacity bounds without owning transfer semantics.  The analysis
+priority re-audit retains that operation for dense traversal but requires
+SPR-001 before its next executor consumer so an explicit sparse/ROI selection
+does not scan or read intervening primary leaves.  RST-001's numerical kernel
+depends only on FND layout, while STO-001/STO-004 provide its completed dense
+bounded gather evidence.
 RST-001 now freezes the current eight-value ratio-two average independently of
 relation/slot/halo policy and composes it with explicit FINER-source gathering.
 LIM-001 now extracts the independently variable three-point slope rule as a
@@ -92,9 +97,14 @@ because REL kind/mask already determines it.  Combined RTP-001 failed the
 five-question gate and split into now-complete TGT-001 directed boxes and
 now-complete RPH-001 ratio-two phases.  Proposed RSG-001 failed decomposition
 and split into now-complete SLB-001 same-level translation, FRP-001 FINER
-restriction placement, and later COARSER workspace geometry; physical widening
-remains PBC-owned.  SLB-001 is a topology-free affine translation from explicit
-target boxes and reduced directions to equal-level source boxes.
+restriction placement, and CWP-001 COARSER workspace geometry; physical
+widening remains PBC-owned.  SLB-001 is a topology-free affine translation from
+explicit target boxes and reduced directions to equal-level source boxes.
+SPR-001 now preserves STO-004 support semantics for explicit sparse ascending
+primary selections without admitting gaps.  FRP-001 maps active finer phases to exact
+RST source/target boxes, and CWP-001 exposes normalized PRL workspace placement
+plus uncovered slope reach.  Their group evidence retains STO-004 for dense
+full-domain traversal and records selected plan-to-gather bytes.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;
@@ -135,7 +145,8 @@ becomes active. Every milestone also closes the corresponding rows in
 `PERFORMANCE.md`.
 
 When selecting work, choose a capability whose dependencies are sufficiently
-complete and whose result unlocks a real consumer. By default, every dependency
-must be `complete`. If a capability needs only an earlier dependency status,
-state that exception explicitly in its ledger entry. Do not create isolated
-utilities without a place in the dependency chain.
+complete and whose result unlocks a real consumer. Dependencies outside the
+active group must be `complete`; an earlier member inside the active group may
+be consumed at `integrated` after focused and immediate-composition checks pass.
+State any different readiness rule explicitly in the ledger. Do not create
+isolated utilities without a place in the dependency chain.

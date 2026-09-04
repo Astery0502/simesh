@@ -19,6 +19,13 @@ The rewrite is also an investigation. Differences from the current
 implementation should be used to clarify the real semantics of the project,
 not merely copied or suppressed.
 
+The primary product is a local analysis toolkit over mostly immutable AMR
+snapshots, especially selected-region field diagnostics and field-line or
+streamline analysis. Simulation-style full-domain updates and global halo
+throughput are secondary unless they are required for supported parity or
+shared measured bottlenecks. `ANALYSIS_WORKLOADS.md` defines the resulting
+algorithm, data-structure, execution, and benchmark priorities.
+
 ## Required Outcome
 
 The rewrite must preserve supported numerical behavior. It does not need to
@@ -96,6 +103,11 @@ backend implements the same kernel contracts directly.
 14. Track migration by supported feature and public workflow; do not use file counts or line-for-line translation as evidence of parity.
 15. Define high performance through reproducible kernel, composition, workflow, memory, I/O, and parallel measurements against explicit baselines.
 16. Decompose by semantic decision ownership: independently variable decisions outside a function's stated meaning become explicit semantic, planning, policy, adapter, or execution boundaries.
+17. Optimize analysis work by avoiding reads and transfers first, reusing
+    explicit metadata/plans second, batching compatible operators third, and
+    tuning arithmetic or parallel kernels after composed profiling.
+18. Treat local-field traversal and streamline traversal as separate execution
+    families over shared topology, geometry, storage, and sampling semantics.
 
 ## Performance Outcome
 
@@ -133,7 +145,9 @@ common interface.
 ## Autonomy
 
 Agents may explore implementations and revise development contracts
-autonomously. Contract changes require independent sub-agent review and
-supporting technical evidence, but do not require user approval. The same rule
-may be used to revise this charter when the rewrite itself reveals a better
-model.
+autonomously. Material contract changes affecting numerical meaning,
+ownership, consumed representations, or supported public behavior require one
+independent sub-agent review and supporting technical evidence, but do not
+require user approval. Routine clarifications use ordinary focused review. The
+same materiality rule may be used to revise this charter when the rewrite itself
+reveals a better model.
