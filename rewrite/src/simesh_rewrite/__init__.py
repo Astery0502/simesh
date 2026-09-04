@@ -58,9 +58,21 @@ from .refined_halo import (
     RefinedHaloExecutionStats,
     execute_selected_refined_halos_from_blocks,
 )
+from .completed_primary import (
+    CompletedPrimaryConsumer,
+    CompletedPrimaryExecutionStats,
+    execute_selected_refined_halos_with_consumer,
+    make_completed_primary_consumer,
+)
 from .refined_geometry import (
     fill_refined_leaf_geometry,
     refined_leaf_geometry,
+)
+from .region_selection import (
+    RefinedRegionSelection,
+    count_refined_region_windows,
+    fill_refined_region_windows,
+    refined_region_windows,
 )
 from .point_location import (
     fill_refined_point_leaf_ids,
@@ -131,10 +143,15 @@ from .sampling import (
     sample_level1_zero_order,
 )
 from .operators import central_difference_into, scaled_difference_into
+from .curl import cartesian_curl_into
 from .reductions import (
     accumulate_field_sum,
     finalize_field_sum,
     merge_field_sums,
+)
+from .local_field import (
+    SelectedCurlExecutionStats,
+    execute_selected_refined_curl_from_blocks,
 )
 from .pipeline import execute_level1_m0, execute_level1_m0_from_blocks
 
@@ -147,10 +164,14 @@ __all__ = [
     "BoundaryMode",
     "BlockReader",
     "BlockWriter",
+    "CompletedPrimaryConsumer",
+    "CompletedPrimaryExecutionStats",
     "INDEX_DTYPE",
     "PAYLOAD_DTYPE",
     "PHYSICAL_BOUNDARY_ID",
     "RefinedForest",
+    "RefinedRegionSelection",
+    "SelectedCurlExecutionStats",
     "copy_region_into",
     "array_block_reader",
     "array_block_writer",
@@ -158,7 +179,11 @@ __all__ = [
     "apply_cartesian_physical_widening",
     "apply_coarser_workspace_plan",
     "bind_amrvac_v5_forest",
+    "cartesian_curl_into",
+    "count_refined_region_windows",
+    "execute_selected_refined_curl_from_blocks",
     "execute_selected_refined_halos_from_blocks",
+    "execute_selected_refined_halos_with_consumer",
     "execute_refined_trilinear_points_from_blocks",
     "execute_refined_zero_order_points_from_blocks",
     "execute_level1_m0",
@@ -180,6 +205,7 @@ __all__ = [
     "fill_refined_forest",
     "fill_refined_leaf_geometry",
     "fill_refined_point_leaf_ids",
+    "fill_refined_region_windows",
     "fill_refined_contact_targets",
     "fill_physical_halos",
     "fill_same_level_halos",
@@ -193,6 +219,7 @@ __all__ = [
     "refined_leaf_geometry",
     "refined_point_leaf_ids",
     "refined_contact_targets",
+    "refined_region_windows",
     "balanced_refined_relations",
     "level1_block_geometry",
     "minimum_face_closed_slots",
@@ -203,6 +230,7 @@ __all__ = [
     "maximum_selected_refined_support_slots",
     "make_block_reader",
     "make_block_writer",
+    "make_completed_primary_consumer",
     "make_amrvac_v5_block_reader",
     "merge_field_sums",
     "plan_level1_chunk",

@@ -191,6 +191,38 @@ uniform grid when the representative analysis workflow does not consume it.
   material; a payload cache only after the streamline slice supplies snapshot,
   field, reach, and PBC cache-key/lifetime evidence.
 
+### Completed Record: Native Selected Refined Curl
+
+- Primary analysis workflow and query shape: one contained physical ROI over a
+  v5 snapshot, three magnetic input fields, exact cell-centered Cartesian curl
+  outputs, and one unweighted regional component sum; small, medium, and full
+  regions include mixed refinement and non-block-aligned boundaries.
+- Expected access density and locality: ROI cell count and leaf support range
+  from sparse to full; only cells whose canonical centers lie in the half-open
+  ROI are output/reduced, while complete selected block interiors and one-layer
+  support are current transfer units.
+- Reusable state and its lifetime: immutable DAT/FST/GEO metadata and borrowed
+  fd for one snapshot; ROI windows, spacing, RHE workspace, compact curl output,
+  and reduction state are call-scoped. No payload/cache persists.
+- Dominant expected cost: selected/support file bytes and refined halo planning,
+  then curl memory traffic; ROI scan and serial sum are measured rather than
+  assumed negligible.
+- Current and structurally different candidate strategies: choose a two-pass
+  full-leaf center-window scan, fixed fused curl, stable synchronous RHE
+  consumer, equal-window run grouping, and persistent serial reduction. Defer
+  hierarchy/BVH ROI lookup, block-cover/post-crop, six derivative temporaries,
+  generic expressions, direction-projected support, and payload caching.
+- Workload-specific metrics and representative consumer: selected cells/leaves,
+  block-cover amplification, requested/read/support/output bytes, header/payload
+  calls, chunks/halo/operator/reduction calls, first result, cold/warm runtime,
+  managed/output bytes, RSS, exact reduction capacity invariance, and numerical
+  native/array/current curl comparison.
+- Deferred alternatives and concrete reopen triggers: hierarchy pruning remains
+  closed because ROI selection is below 0.5% of small first-result time; the
+  measured 27x small-tdm support load activates direction projection for the
+  streamline design; batched generic recipes still require a second operator,
+  and cache/header indexing awaits the streamline reuse trace.
+
 ## Required Performance Profiles
 
 ### Selected Local Field

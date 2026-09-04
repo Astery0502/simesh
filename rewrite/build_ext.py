@@ -172,6 +172,16 @@ def main() -> None:
             include_dirs=[np.get_include()],
         ),
         Extension(
+            "simesh_rewrite._region_selection",
+            [str(ROOT / "src/simesh_rewrite/_region_selection.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
+            "simesh_rewrite._curl",
+            [str(ROOT / "src/simesh_rewrite/_curl.pyx")],
+            include_dirs=[np.get_include()],
+        ),
+        Extension(
             "simesh_rewrite._operators",
             [str(ROOT / "src/simesh_rewrite/_operators.pyx")],
             include_dirs=[np.get_include()],

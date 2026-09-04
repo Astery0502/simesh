@@ -79,6 +79,10 @@ complete.
 | DAT-001 | Safe AMRVAC v5 3D snapshot metadata index | FND-001 | complete |
 | DAT-002 | Canonical AMRVAC leaf-order forest binding | DAT-001, MOR-001, FST-001, FST-002 | complete |
 | DAT-003 | Native selective non-staggered AMRVAC block reader | DAT-001, DAT-002, STO-003 | complete |
+| ROI-001 | Refined cell-center physical-region windows | FST-002, GEO-002 | complete |
+| OPR-003 | Cartesian 3D refined curl | FND-002, OPR-001, OPR-002, GEO-002 | complete |
+| RHC-001 | Synchronous completed refined-primary consumption | RHE-001, STO-003 | complete |
+| LFE-001 | Bounded selected refined curl and regional sum execution | ROI-001, OPR-003, RHC-001, RED-001, GEO-002, DAT-003 | complete |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -154,6 +158,13 @@ caller-owned file descriptor; it selects block/field bytes without importing
 the current eager reader or adding dataset/cache lifecycle. Real tdm fields and
 a streamed WENO regular-field bridge are bitwise equal through native/array
 RHE/RPS compositions with exact selected bytes and bounded managed memory.
+
+The completed native selected refined curl group defines exact cell-center ROI
+windows, a fixed per-slot-spacing Cartesian curl, and the now-triggered stable
+completed-primary consumer boundary before composing one bounded curl output
+and streaming component sum. It consumes DAT-003 directly and does not add
+dataset lifecycle, cache policy, streamline stepping, or a generic expression
+engine.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

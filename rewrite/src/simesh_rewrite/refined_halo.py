@@ -1339,11 +1339,15 @@ def _execute_selected_refined_halos(
             consumer_payload = workspace.payload[:primary_count].view()
             consumer_valid_lower = zero.view()
             consumer_valid_upper = padded_shape_array.view()
+            consumer_interior_lower = lower_halo.view()
+            consumer_interior_upper = interior_upper.view()
             for value in (
                 consumer_leaf_ids,
                 consumer_payload,
                 consumer_valid_lower,
                 consumer_valid_upper,
+                consumer_interior_lower,
+                consumer_interior_upper,
             ):
                 value.setflags(write=False)
             result = completed_primary_consumer(
@@ -1352,6 +1356,8 @@ def _execute_selected_refined_halos(
                 consumer_payload,
                 consumer_valid_lower,
                 consumer_valid_upper,
+                consumer_interior_lower,
+                consumer_interior_upper,
             )
             if result is not None:
                 raise TypeError("completed primary consumer must return None")

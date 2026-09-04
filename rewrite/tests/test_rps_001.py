@@ -861,14 +861,26 @@ def test_private_rhe_consumer_receives_read_only_completed_primary_views() -> No
     backing = axis_coded_backing(1, 1, block_shape)
     seen: list[tuple[int, np.ndarray, np.ndarray]] = []
 
-    def consume(offset, leaf_ids, payload, valid_lower, valid_upper) -> None:
+    def consume(
+        offset,
+        leaf_ids,
+        payload,
+        valid_lower,
+        valid_upper,
+        interior_lower,
+        interior_upper,
+    ) -> None:
         assert not leaf_ids.flags.writeable
         assert not payload.flags.writeable
         assert not valid_lower.flags.writeable
         assert not valid_upper.flags.writeable
+        assert not interior_lower.flags.writeable
+        assert not interior_upper.flags.writeable
         seen.append((offset, leaf_ids.copy(), payload.copy()))
         assert valid_lower.tolist() == [0, 0, 0]
         assert valid_upper.tolist() == [6, 6, 6]
+        assert interior_lower.tolist() == [1, 1, 1]
+        assert interior_upper.tolist() == [5, 5, 5]
 
     arguments = (
         array_block_reader(backing),

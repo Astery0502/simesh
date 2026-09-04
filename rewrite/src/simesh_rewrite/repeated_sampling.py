@@ -12,12 +12,15 @@ from ._refined_sampling import (
     sample_refined_zero_order_point_groups_unchecked,
 )
 from .blockio import BlockReader, _require_block_reader, read_blocks_into
+from .completed_primary import (
+    execute_selected_refined_halos_with_consumer,
+    make_completed_primary_consumer,
+)
 from .foundation import PAYLOAD_DTYPE
 from .point_location import (
     _require_points,
     fill_refined_point_leaf_ids,
 )
-from .refined_halo import _execute_selected_refined_halos_with_consumer
 from .refined_sampling import _preflight_refined_point_groups
 from .storage import _require_index_vector
 from .workspace import _require_nonnegative_integer
@@ -44,6 +47,51 @@ class _RepeatedPointPlan:
     grouped_point_indices: np.ndarray
     owner_leaf_ids: np.ndarray
     owner_offsets: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class _TrilinearPointConsumerState:
+    domain_lower: np.ndarray
+    domain_upper: np.ndarray
+    domain_cell_counts: np.ndarray
+    block_cell_counts: np.ndarray
+    node_levels: np.ndarray
+    node_coords: np.ndarray
+    leaf_node_ids: np.ndarray
+    base_spacing: np.ndarray
+    points: np.ndarray
+    plan: _RepeatedPointPlan
+    point_values: np.ndarray
+
+
+def _consume_trilinear_point_groups(
+    state: _TrilinearPointConsumerState,
+    primary_offset: int,
+    primary_leaf_ids: np.ndarray,
+    payload: np.ndarray,
+    _valid_lower: np.ndarray,
+    _valid_upper: np.ndarray,
+    interior_lower: np.ndarray,
+    _interior_upper: np.ndarray,
+) -> None:
+    stop = primary_offset + int(primary_leaf_ids.shape[0])
+    sample_refined_trilinear_point_groups_unchecked(
+        payload,
+        interior_lower,
+        primary_leaf_ids,
+        state.domain_lower,
+        state.domain_upper,
+        state.domain_cell_counts,
+        state.block_cell_counts,
+        state.node_levels,
+        state.node_coords,
+        state.leaf_node_ids,
+        state.base_spacing,
+        state.points,
+        state.plan.grouped_point_indices,
+        state.plan.owner_offsets[primary_offset : stop + 1],
+        state.point_values,
+    )
 
 
 def _require_point_values(
@@ -483,34 +531,27 @@ def execute_refined_trilinear_points_from_blocks(
     if point_managed_array_bytes > _INDEX_MAX:
         raise OverflowError("point managed raw-array bytes do not fit in int64")
 
-    def consume_completed_primaries(
-        primary_offset: int,
-        primary_leaf_ids: np.ndarray,
-        payload: np.ndarray,
-        _valid_lower: np.ndarray,
-        _valid_upper: np.ndarray,
-    ) -> None:
-        stop = primary_offset + int(primary_leaf_ids.shape[0])
-        sample_refined_trilinear_point_groups_unchecked(
-            payload,
-            one,
-            primary_leaf_ids,
-            domain_lower,
-            domain_upper,
-            domain_cell_counts,
-            block_cell_counts,
-            node_levels,
-            node_coords,
-            leaf_node_ids,
-            base_spacing,
-            points,
-            plan.grouped_point_indices,
-            plan.owner_offsets[primary_offset : stop + 1],
-            point_values,
-        )
-
-    rhe_stats = _execute_selected_refined_halos_with_consumer(
+    consumer_state = _TrilinearPointConsumerState(
+        domain_lower,
+        domain_upper,
+        domain_cell_counts,
+        block_cell_counts,
+        node_levels,
+        node_coords,
+        leaf_node_ids,
+        base_spacing,
+        points,
+        plan,
+        point_values,
+    )
+    consumer = make_completed_primary_consumer(
+        consumer_state,
+        _consume_trilinear_point_groups,
+        output_arrays=(point_values,),
+    )
+    rhe_stats = execute_selected_refined_halos_with_consumer(
         reader,
+        consumer,
         plan.owner_leaf_ids,
         field_ids,
         root_shape,
@@ -526,9 +567,7 @@ def execute_refined_trilinear_points_from_blocks(
         boundary_modes,
         normal_field_slots,
         slot_capacity,
-        consume_completed_primaries,
-        consumer_output_arrays=(point_values,),
-        additional_managed_array_bytes=point_managed_array_bytes,
+        _additional_managed_array_bytes=point_managed_array_bytes,
     )
 
     managed_array_bytes = point_managed_array_bytes + rhe_stats.managed_array_bytes
@@ -539,8 +578,8 @@ def execute_refined_trilinear_points_from_blocks(
         int(plan.grouped_point_indices.shape[0]),
         int(plan.owner_leaf_ids.shape[0]),
         rhe_stats.chunk_count,
-        rhe_stats.reader_calls,
-        rhe_stats.chunk_count,
+        rhe_stats.reader_call_count,
+        rhe_stats.consumer_call_count,
         rhe_stats.selected_load_count,
         rhe_stats.maximum_selected_slots,
         managed_array_bytes,

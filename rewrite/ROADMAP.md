@@ -72,13 +72,19 @@ are also complete through CSP-001/PWA-001/CWA-001 and the bounded selected
 RHE-001 consumer. Exact refined point ownership, reusable zero/trilinear point
 kernels, and bounded repeated point sampling are complete while the fused
 SAM-002/SAM-003 uniform strategies remain available. The native selective
-`.dat` adapter and real analysis slices are next. Six-face TOP-003 caching
-remains optional and requires repeated-consumer performance justification.
+`.dat` adapter and selected local-field slice are complete; streamline is next.
+Six-face TOP-003 caching remains optional and requires repeated-consumer
+performance justification.
 
 The native-read group now completes safe v5 byte decoding, canonical forest
 binding, and non-staggered selected transfer through RHE/RPS. The local-field
-and streamline analysis slices are next; v3/v4 format breadth and owned
-dataset/file lifecycle remain assigned to M5/M6.
+slice is complete and the streamline analysis slice is next; v3/v4 format
+breadth and owned dataset/file lifecycle remain assigned to M5/M6.
+
+The completed local-field slice adds exact refined cell-center ROI windows, fixed
+Cartesian curl, and a stable completed-primary consumer before composing native
+selected output and reduction. The separate streamline location/cache/stepping
+policy is the next M1 vertical slice.
 
 Before refined halo work, complete the functional-composition checkpoint:
 

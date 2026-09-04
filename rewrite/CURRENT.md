@@ -3,22 +3,24 @@
 ## Active State
 
 - Milestone: M1 Cartesian 3D refined AMR.
-- Last completed group: **Native Selective AMRVAC Read**; DAT-001, DAT-002, and
-  DAT-003 are complete.
-- Completed outcome: little/big-endian spatially 3D v5 metadata is decoded
-  safely, disk rows are bound to canonical FST leaf IDs with source provenance,
-  and selected non-staggered regions feed RHE/RPS through a borrowed-fd STO-003
-  reader with lazy record validation and no retained payload.
+- Last completed group: **Native Selected Refined Curl**; ROI-001, OPR-003,
+  RHC-001, and LFE-001 are complete.
+- Completed outcome: exact half-open physical ROI windows feed a bounded native
+  selected magnetic read and complete refined halos; a fixed per-slot Cartesian
+  curl writes only selected cells and RED-001 adds one component in exact
+  leaf/x/y/z order. RPS now consumes the same stable synchronous RHC boundary.
+- Current capability: none. Define the separate streamline vertical slice next;
+  cache, direction-projected support, stepping, and result policy require that
+  workload's decomposition and evidence.
 - One-time analysis-workload reorientation audit: complete; see
   `evidence/ANALYSIS-PRIORITY-REAUDIT.md`.
-- Group evidence: `evidence/NATIVE-SELECTIVE-AMRVAC-READ.md`; 125 focused and
-  all 837 rewrite tests pass. On the WENO regular-field bridge, native zero/
-  trilinear reads 49,152/663,552 payload bytes instead of materializing
-  277,880,832 bytes, with bitwise array-reader equality.
-- Next work: define the minimum selected physical-region local-field executor,
-  including one concrete multi-term curl/current diagnostic plus streaming
-  regional reduction over the native reader. Streamline execution follows only
-  after that separate vertical slice passes.
+- Group evidence: `evidence/NATIVE-SELECTED-REFINED-CURL.md`; the build, 168
+  focused/dependency checks, and all 905 rewrite tests pass. Synthetic refined
+  native/array and capacity variants are bitwise equal; real tdm safe cells are
+  bitwise equal to current derived current.
+- Next ready work: apply progressive disclosure and the analysis selection gate
+  to the minimum native refined streamline consumer. Preserve SAM-002/SAM-003
+  as fused compatibility/performance strategies.
 - Readiness: dependencies outside the group must be `complete`; earlier members
   inside the group may be consumed at `integrated` after focused and immediate
   composition checks pass.
@@ -29,8 +31,9 @@ M1 currently supplies refined forest reconstruction/conformance, contact and
 balance semantics, geometry, relation/support planning, restriction, limiter,
 prolongation, selected-primary planning, complete refined value application,
 bounded selected halo execution, exact refined point ownership, bounded
-repeated zero/trilinear sampling, and native selective v5 input. Local-field/
-streamline analysis integration remains incomplete.
+repeated zero/trilinear sampling, native selective v5 input, and bounded
+selected local-field curl/reduction. Streamline analysis integration remains
+incomplete.
 
 ## Durable Decisions
 
@@ -80,7 +83,8 @@ The dependency ledger and exact status authority are in `CAPABILITIES.md`.
 - M1 complete through: FST-001/002, TOP-002, BAL-001, GEO-002, REL-001,
   WSP-001, PRI-001, FCL-001, HCL-001, STO-004, RST-001, LIM-001, PRL-001,
   RSL-001, TGT-001, RPH-001, SLB-001, SPR-001, FRP-001, CWP-001, CSP-001,
-  PWA-001, CWA-001, RHE-001, LOC-001, SAM-004/005, RPS-001, and DAT-001/002/003.
+  PWA-001, CWA-001, RHE-001, LOC-001, SAM-004/005, RPS-001, DAT-001/002/003,
+  ROI-001, OPR-003, RHC-001, and LFE-001.
 - TOP-003 optional face-cache materialization remains proposed and must be
   justified by a repeated real consumer.
 - The selected transfer-planning group is complete. Full-domain work retains
@@ -100,7 +104,7 @@ decisions and rejected alternatives live in `designs/` and `evidence/`.
 - The only available real refined Cartesian 3D `.dat` fixture is staggered, so
   it currently supplies forest/topology/geometry evidence but not supported
   refined payload evidence.
-- Real bounded local-field/streamline M1 vertical slices remain. `B=2`, reach
+- The real bounded streamline M1 vertical slice remains. `B=2`, reach
   above half a block, direction-subset support, last-leaf/neighbor lookup, and
   persistent caching have explicit consumer-driven reopen triggers.
 - Cartesian 2D, periodic meshes, broader scientific/derived workflows, complete
@@ -114,18 +118,17 @@ decisions and rejected alternatives live in `designs/` and `evidence/`.
    `CHARTER.md` only on a new agent's first rewrite cycle, at a milestone
    boundary, or for a material project-direction change.
 2. Apply DECOMPOSITION and the analysis algorithm-selection gate to the minimum
-   selected-region local-field executor. Keep operator definitions, shared
-   halo/read scheduling, output/reduction policy, and dataset lifecycle separate.
-3. Complete the local-field slice, then the separate streamline composition and
-   M1 horizon review.
+   native refined streamline consumer. Decide locator/sampler reuse, point order,
+   stepping/termination, cache keys/lifetime, and output policy separately.
+3. Complete the streamline composition, then perform the M1 horizon review.
 
 ## Current Reproduction Commands
 
 ```text
 .venv/bin/python rewrite/build_ext.py
-PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_dat_001.py rewrite/tests/test_dat_002.py rewrite/tests/test_dat_003.py rewrite/tests/test_dat_003_integration.py rewrite/tests/test_sto_003.py rewrite/tests/test_rhe_001.py rewrite/tests/test_rps_001.py
+PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests/test_roi_001.py rewrite/tests/test_opr_003.py rewrite/tests/test_rhc_001.py rewrite/tests/test_lfe_001.py rewrite/tests/test_opr_001.py rewrite/tests/test_opr_002.py rewrite/tests/test_red_001.py rewrite/tests/test_rhe_001.py rewrite/tests/test_rps_001.py rewrite/tests/test_dat_003.py rewrite/tests/test_dat_003_integration.py
 PYTHONPATH=rewrite/src:src .venv/bin/python -m pytest -q -p no:cacheprovider rewrite/tests
-PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/dat_003.py --profile standard --output rewrite/benchmark-results/dat-003-standard.json
+PYTHONPATH=rewrite/src:src .venv/bin/python rewrite/benchmarks/lfe_001.py --profile standard --dat data/tdm.dat --output rewrite/benchmark-results/lfe-001-standard.json
 ```
 
 Historical commands and measurements remain with their capability/group
