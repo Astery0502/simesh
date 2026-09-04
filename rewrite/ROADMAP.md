@@ -75,6 +75,11 @@ SAM-002/SAM-003 uniform strategies remain available. The native selective
 `.dat` adapter and real analysis slices are next. Six-face TOP-003 caching
 remains optional and requires repeated-consumer performance justification.
 
+The native-read group now completes safe v5 byte decoding, canonical forest
+binding, and non-staggered selected transfer through RHE/RPS. The local-field
+and streamline analysis slices are next; v3/v4 format breadth and owned
+dataset/file lifecycle remain assigned to M5/M6.
+
 Before refined halo work, complete the functional-composition checkpoint:
 
 - expose block readers and writers as explicit coarse-grained function

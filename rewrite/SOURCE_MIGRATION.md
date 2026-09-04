@@ -44,7 +44,7 @@ No canonical feature may remain merely `inventoried` at final cutover.
 | Exact/uniform sampling and uniform-to-SFC placement | `mesh.pyx`, `amrvac_uniform.py` | Level-1 3D placement/zero/trilinear and bounded refined repeated zero/trilinear point sampling complete | M1 native/streamline integration, then M2/M3/M5 |
 | Pointwise, stencil, reduction and diagnostics | `derived_fields.py`, `mesh.pyx`, legacy diagnostic evidence | Representative contracts complete | M1 analysis-priority vertical slice; M4 for breadth |
 | Derived-field registration/materialization and field selectors | `amrvac_dataset.py`, `derived_fields.py` | Not migrated | M4 and M6 |
-| AMRVAC header/forest/tree/block reading | `amrvac/datio.py` | Array/memmap adapter only | M1 native refined read slice; full M5 |
+| AMRVAC header/forest/tree/block reading | `amrvac/datio.py` | Native v5 metadata/FST binding and selective non-staggered reader complete; full parse breadth/public lifecycle remain | M1 analysis slices; full M5 |
 | AMRVAC writing and roundtrip | `amrvac/datio.py`, `amrvac_uniform.py` | Not migrated | M5 |
 | Uniform construction, singleton-z conversion and VTK export | `amrvac_uniform.py`, `layouts.py` | Core placement only | M2 and M5 |
 | Dataset lifecycle and public `simesh.amrvac` API | `amrvac_dataset.py`, `api.py`, `dataset_base.py` | Not integrated | Thin internal analysis composition after M1; complete public lifecycle in M6 |

@@ -76,6 +76,9 @@ complete.
 | SAM-004 | Refined zero-order point-group sampling | LOC-001, GEO-002, STO-001 | complete |
 | SAM-005 | Refined trilinear point-group sampling | LOC-001, GEO-002, SAM-003, RHE-001 | complete |
 | RPS-001 | Bounded repeated refined point-sampling execution | LOC-001, SAM-004, SAM-005, STO-003, RHE-001, WSP-001 | complete |
+| DAT-001 | Safe AMRVAC v5 3D snapshot metadata index | FND-001 | complete |
+| DAT-002 | Canonical AMRVAC leaf-order forest binding | DAT-001, MOR-001, FST-001, FST-002 | complete |
+| DAT-003 | Native selective non-staggered AMRVAC block reader | DAT-001, DAT-002, STO-003 | complete |
 
 FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
 validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
@@ -141,6 +144,16 @@ capacity/backend invariance are recorded in the group evidence. Measured
 all-26 amplification and checked-halo planning remain explicit streamline and
 native-reader optimization triggers rather than cache policy hidden in the
 sampler.
+
+The completed native selective AMRVAC read group separates byte-format decoding,
+canonical forest binding, and payload transfer strategy. DAT-001 accepts exact
+v5 metadata in either byte order and keeps staggered files available for
+metadata evidence. DAT-002 proves file leaf rows are the FST canonical leaf
+order. DAT-003 exposes selected non-staggered interiors through STO-003 over a
+caller-owned file descriptor; it selects block/field bytes without importing
+the current eager reader or adding dataset/cache lifecycle. Real tdm fields and
+a streamed WENO regular-field bridge are bitwise equal through native/array
+RHE/RPS compositions with exact selected bytes and bounded managed memory.
 
 Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
 HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;

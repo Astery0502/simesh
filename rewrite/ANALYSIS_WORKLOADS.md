@@ -162,6 +162,35 @@ uniform grid when the representative analysis workflow does not consume it.
   material; and another spatial index only when descent is a stable bottleneck
   after I/O and support costs are controlled.
 
+### Completed Record: Native Selective AMRVAC Read
+
+- Primary analysis workflow and query shape: open one v5 snapshot, then issue
+  repeated sparse block/field reads for selected-region operators and point
+  paths; blocks are read as complete interiors by current RHE/RPS consumers,
+  while STO substitution still requires arbitrary interior boxes.
+- Expected access density and locality: small/medium selections are sparse and
+  may repeat support leaves; full traversal remains a comparator, not the
+  default architecture.
+- Reusable state and its lifetime: decoded header/tree arrays and a canonical
+  FST binding live for one immutable file-descriptor lifecycle. Record headers,
+  transfer groups, and byte buffers are call-scoped; no payload is retained.
+- Dominant expected cost: cold file/page I/O and bytes read, then syscall and
+  x-fast-to-canonical transfer cost; parsing and arithmetic are secondary.
+- Current and structurally different candidate strategies: choose borrowed-fd
+  position-independent reads, selected record-header preflight, exact unique
+  field runs for full interiors, and one contiguous per-field envelope for
+  other boxes. Defer eager all-record scans, mmap, path-open callbacks, and a
+  persistent payload cache.
+- Workload-specific metrics and representative consumer: metadata/open and
+  time to first result; requested/useful/read bytes; pread/header/payload calls;
+  duplicate suppression; support amplification; cold/warm RHE/RPS runtime;
+  scratch/managed bytes, faults, RSS, and bitwise array/current equality.
+- Deferred alternatives and concrete reopen triggers: reconsider eager record
+  indexing only if warm repeated header reads dominate and cold sparse TTFW is
+  protected; mmap or an owned persistent source if pread/syscall overhead is
+  material; a payload cache only after the streamline slice supplies snapshot,
+  field, reach, and PBC cache-key/lifetime evidence.
+
 ## Required Performance Profiles
 
 ### Selected Local Field

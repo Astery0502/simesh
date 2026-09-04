@@ -86,6 +86,13 @@ from .blockio import (
     read_blocks_into,
     write_blocks_from,
 )
+from .amrvac_dat import (
+    AMRVACV5ForestBinding,
+    AMRVACV5Index,
+    bind_amrvac_v5_forest,
+    read_amrvac_v5_index,
+)
+from .amrvac_dat_reader import make_amrvac_v5_block_reader
 from .chunking import (
     minimum_face_closed_slots,
     minimum_halo_closed_slots,
@@ -134,6 +141,8 @@ from .pipeline import execute_level1_m0, execute_level1_m0_from_blocks
 __all__ = [
     "AccessPattern",
     "accumulate_field_sum",
+    "AMRVACV5ForestBinding",
+    "AMRVACV5Index",
     "AXIS_NAMES",
     "BoundaryMode",
     "BlockReader",
@@ -148,6 +157,7 @@ __all__ = [
     "apply_level1_same_level_halo_plan",
     "apply_cartesian_physical_widening",
     "apply_coarser_workspace_plan",
+    "bind_amrvac_v5_forest",
     "execute_selected_refined_halos_from_blocks",
     "execute_refined_trilinear_points_from_blocks",
     "execute_refined_zero_order_points_from_blocks",
@@ -193,6 +203,7 @@ __all__ = [
     "maximum_selected_refined_support_slots",
     "make_block_reader",
     "make_block_writer",
+    "make_amrvac_v5_block_reader",
     "merge_field_sums",
     "plan_level1_chunk",
     "plan_direct_face_closed_prefix",
@@ -206,6 +217,7 @@ __all__ = [
     "ravel_cell",
     "required_input_region",
     "read_blocks_into",
+    "read_amrvac_v5_index",
     "restrict_cartesian_2to1_into",
     "resolve_refined_relation_source_slots",
     "sample_level1_zero_order",
