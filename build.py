@@ -8,6 +8,7 @@ from setuptools import Extension, setup
 
 ROOT_DIR = Path(__file__).parent
 CYTHON_ROOT = ROOT_DIR / "src/simesh/utils/lib"
+PROVIDER_ROOT = ROOT_DIR / "rewrite/src/simesh_rewrite"
 
 
 def _env_flag(name: str) -> bool:
@@ -83,6 +84,15 @@ def get_extensions(group: str | None = None, *, openmp: bool = False) -> list[Ex
                 library_dirs=library_dirs,
             )
         )
+    if group in (None, "all"):
+        # Reuse the provider's original extension names, sources and compiler
+        # defaults. Its numerical directives are handled separately below.
+        for source in sorted(PROVIDER_ROOT.glob("*.pyx")):
+            extensions.append(Extension(
+                "simesh_rewrite."+source.stem,
+                [source.relative_to(ROOT_DIR).as_posix()],
+                include_dirs=[np.get_include()],
+            ))
     return extensions
 
 
@@ -94,8 +104,11 @@ def cythonize_extensions(
     linetrace: bool = False,
 ):
     extensions = get_extensions(group, openmp=openmp)
-    return cythonize(
-        extensions,
+    canonical = [extension for extension in extensions if not extension.name.startswith("simesh_rewrite.")]
+    providers = [extension for extension in extensions if extension.name.startswith("simesh_rewrite.")]
+    compiled = cythonize(
+        canonical,
+        include_path=[str(ROOT_DIR / "src")],
         compiler_directives={
             "language_level": "3",
             "boundscheck": False,
@@ -107,6 +120,12 @@ def cythonize_extensions(
         },
         nthreads=4,
     )
+    if providers:
+        # Do not inherit cdivision/bounds directives from the canonical tree:
+        # the retained provider's helper specifies only language_level=3.
+        compiled += cythonize(providers,compiler_directives={"language_level":"3"},
+                              include_path=[str(ROOT_DIR/"rewrite/src")],nthreads=4)
+    return compiled
 
 
 def get_setup_kwargs(
@@ -120,7 +139,7 @@ def get_setup_kwargs(
     if openmp is None:
         openmp = _env_flag("SIMESH_OPENMP")
     return {
-        "package_dir": {"": "src"},
+        "package_dir": {"": "src", "simesh_rewrite": "rewrite/src/simesh_rewrite"},
         "ext_modules": cythonize_extensions(
             group,
             openmp=openmp,

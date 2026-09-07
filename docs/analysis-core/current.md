@@ -61,12 +61,20 @@ P0/P1/F/D or LOS geometry work.
 
 ## Next Action
 
-Implement a distinct ordinary-field reader for supported 3D staggered-tail v5
-records, preserving the original DAT-003 rejection and failure contract. Expose
-file-source/resident convenience entrypoints with explicit units and ownership.
-Make the reused provider an explicit installed component, preserving its build
-semantics, then run affected package/public/2D/helper/I/O checks and a feasible
-million-seed summary case. No canonical cutover or removal is required.
+The original-record ordinary reader, installed source/resident entrypoints and
+interior-only products are implemented. Reader conformance passes (21 cases),
+and file lifetime/selection, 2D/periodic-metadata/VTK and uniform-stream checks pass.
+Direct WENO short tracing is 0.129 s versus 5.118 s for the eager-source comparator,
+with equal results. Zero-ghost facts reduce CPU cost; one-record private dense I/O
+reduces B read wall time 7.495 -> 5.012 s without weakening callback preflight.
+
+A clean-source wheel (~9.35 MB) built and passed isolated non-editable import and
+file-to-result checks. The first harness copy included stale egg-info; excluding
+that generated metadata fixed it. Build cleanup now preserves .venv/references/
+results and make clean is clean-only. Next run the supported Make test/build,
+affected provider/public/helper checks, OpenMP compatibility, and declared actual
+million-seed/1000^3 stream cases. Refresh P4 evidence and final scope dispositions.
+
 
 P3-L response/EOS/units delegation is still pending; WENO contains rho/m/B but
 no energy/temperature. Only WENO (~1 GB) and tdm (~1.5 MB) exist in data/; actual

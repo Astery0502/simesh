@@ -149,6 +149,35 @@ For now, it is safest to think of the public API in three layers:
 3. lower-level Cython acceleration modules under `simesh.utils.lib` that should
    usually stay behind the Python interface
 
+## Experimental Native Analysis
+
+The additive `simesh.analysis` namespace provides `open_source`, `open_prepared`,
+`prepare`, `PreparedPool`, `sample`, `derivative`/`curl`, `trace`/`iter_traces`,
+`with_curl`/`CurlPool`, `retrace`, `global_curl`, `Plane`/`sample_plane`,
+`integrate_los`/`orthographic_plane`, and `iter_uniform`. These do not redirect
+canonical Dataset or file-level APIs. See [usage](analysis-core/usage.md) and
+[current acceptance](analysis-core/current.md) before choosing them.
+
+File convenience functions are implemented in `amrvac/analysis_io.py` and lazily
+load the explicitly bundled `simesh_rewrite` provider. They support nonperiodic
+Cartesian 3D v5 ordinary fields, including validated three-component staggered
+tails; CT values are not exposed. Selected file fields become source columns
+0..K-1, with original file indices recorded in `FieldSource.original_field_ids`.
+`open_prepared` returns a detached canonical bulk-prepared native product;
+`open_source` owns a file context for bounded reads/preparation.
+
+Native analysis values use `(slot,x,y,z,component)`, with explicit leaf-to-slot
+mapping and per-group remaining halo. Primary preparation supports interiors
+only (`halo=0`) or two valid layers. Derived groups are independently allocated.
+PreparedPool views are scoped borrows; point/line/image/stream outputs have their
+declared owned/sink lifetimes. The old STO provider and raw reader retain their
+field-major `(slot,field,x,y,z)` layout at the adapter boundary.
+
+Tracing reports accepted prefixes and optional twist/trajectories; exact boundary
+footpoints and Q are not delivered. LOS integrates an explicitly supplied scalar
+reconstruction; physical response/EOS remains an input decision. New native
+consumers do not silently reinterpret 2D, periodic or non-Cartesian snapshots.
+
 ## Array Layouts
 
 The canonical AMRVAC path uses three explicit layout conventions:

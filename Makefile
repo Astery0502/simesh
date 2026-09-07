@@ -26,4 +26,4 @@ benchmark-openmp-threads: build-amr-openmp
 	PYTHONPATH=src $(PYTHON) -m benchmarks.amr_openmp_threads --profile smoke --threads 1,2,4 --repetitions 1 --warmups 0 --output benchmark-results/openmp-threads-smoke
 
 clean:
-	$(PYTHON) scripts/build_ext.py --clean
+	$(PYTHON) scripts/build_ext.py --clean-only

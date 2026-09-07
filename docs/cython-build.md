@@ -35,6 +35,13 @@ The package build compiles every `.pyx` file under:
 Files such as `.pxd` are not compiled directly; they act as Cython interface
 or header files.
 
+Full package builds also explicitly include the retained provider extensions in
+`rewrite/src/simesh_rewrite/`. The distribution bundles that package as an analysis
+implementation dependency; installed file workflows require no manual PYTHONPATH.
+Provider Cython directives remain separate (language level 3 only), preserving
+its existing division/bounds semantics. Group-scoped canonical development builds
+remain scoped, including `--group analysis` for native consumer kernels.
+
 For development, `--group <name>` means:
 
 - compile only the subdirectory `src/simesh/utils/lib/<name>/`
@@ -87,6 +94,11 @@ After editing `.pyx` files, rebuild in place with:
 To reset generated extension and packaging artifacts:
 
 - `make clean`
+
+The clean target uses `--clean-only`: it removes generated siblings of known
+package `.pyx` files and known build metadata, without rebuilding. It does not
+recursively remove `.so`/`.c` files or egg-info from the virtualenv, references or
+results. The helper's `--clean` option still means clean before a requested build.
 
 Current tests mirror the package structure:
 

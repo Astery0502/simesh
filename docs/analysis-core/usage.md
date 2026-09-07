@@ -5,16 +5,39 @@ Canonical `simesh.amrvac` APIs remain available. The new numerical kernels build
 with the standard setuptools discovery under `src/simesh/utils/lib/analysis`:
 
 ```sh
+.venv/bin/python -m pip install -e .
+# Subsequent native consumer kernel iteration:
 .venv/bin/python build.py --inplace --group analysis
 ```
 
-The core has no implicit file/cache provider. Current development assembly uses
-`scripts/analysis_core/rewrite_provider.py` with `PYTHONPATH=src:rewrite/src:scripts`.
-It takes existing validated rewrite forest and block-reader descriptors; it does
-not make `simesh_rewrite` an undeclared installed dependency. The bounded reader
-supports the original non-staggered v5 scope; the WENO driver explicitly uses a
-resident ordinary-field bootstrap from its staggered records. Source arrays/file
-descriptors are borrowed and remain immutable/alive during preparation.
+The core has no implicit file/cache provider. Full builds explicitly bundle the
+retained `simesh_rewrite` provider; installed workflows need no manual PYTHONPATH.
+The old development adapter now forwards to `simesh.analysis.providers`.
+The new file-source profile reads ordinary fields from supported 3D v5 records,
+including validated staggered tails. The original DAT-003 factory still rejects
+staggered files. Source arrays/file descriptors remain immutable/alive during
+preparation; CT/staggered computation is not enabled.
+
+```python
+from simesh.analysis import open_source, open_prepared, PreparedPool, trace
+
+with open_source("snapshot.dat", field_names=["b1", "b2", "b3"]) as source:
+    pool = PreparedPool(source, [0, 1, 2], capacity=256)
+    try:
+        lines = trace(pool, seeds, step=0.001, max_steps=1000, workers=4)
+    finally:
+        pool.close()
+
+resident = open_prepared("snapshot.dat", field_names=["b1", "b2", "b3"])
+```
+
+The source context closes its owned file; detached products remain usable.
+`field_indices` alternatively selects original file positions. Selected fields
+become source columns 0..K-1; inspect `original_field_ids` for the file mapping.
+`field_units` can declare a unit string or a name-to-unit mapping; it does not
+convert values or infer EOS. The default label is code units. File analysis
+currently requires nonperiodic Cartesian 3D v5 and even blocks of at least four.
+Canonical APIs remain the route for their supported 2D and other file workflows.
 
 ## Prepared Fields And Repeated Sampling
 
@@ -36,6 +59,7 @@ geometry, two valid halo layers and an explicit `slot_of_leaf` directory.
 Outside/missing/nonfinite coordinates return invalid/NaN samples. Sampling
 never performs implicit preparation. Source closure does not revoke a detached
 product. A field group does not concatenate/rebuild another group's backing.
+Pass `halo=0` for an interior-only native product; this performs no ghost work.
 
 ```python
 pool = PreparedPool(source, [0, 1, 2], capacity=256)
@@ -166,3 +190,18 @@ not area averages. The returned units are scalar units times coordinate length.
 This interface does not infer epsilon(rho,T), EOS, temperature or instrument
 response. The recorded WENO rho-column image is a scalar diagnostic; the thermal
 response gate remains open in the current checkpoint.
+
+## Bounded Uniform Output
+
+```python
+from simesh.analysis import iter_uniform
+
+for z_index, slab in iter_uniform(resident, (1000, 1000, 1000)):
+    write_slab(z_index, slab.values)  # (nx, ny, component); caller-supplied sink.
+```
+
+Uniform cell centers are sampled one z slab at a time. The iterator also accepts
+a PreparedPool for bounded source access. It never constructs a full coordinate
+cube or concatenates the full output. Each returned slab is owned; arbitrary
+additional retention is the caller's explicit memory choice. The active budget
+reserves a current and one normally retained previous slab.

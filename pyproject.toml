@@ -31,10 +31,13 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = { "" = "src" }
+package-dir = { "" = "src", "simesh_rewrite" = "rewrite/src/simesh_rewrite" }
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src", "rewrite/src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.pyx", "*.pxd"]
 
 [tool.pytest.ini_options]
 markers = [

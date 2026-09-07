@@ -35,6 +35,8 @@ class FieldSource:
     strategy: str
     identity: object = field(default_factory=object)
     memory_arrays: tuple = ()
+    read_interiors: Callable | None = None
+    original_field_ids: tuple | None = None
 
 
 @dataclass(frozen=True, eq=False)
@@ -86,8 +88,8 @@ def _request(source, leaf_ids, field_ids, halo):
     fields = indices(field_ids, len(source.fields), "field_ids")
     if not fields.size:
         raise ValueError("at least one field is required")
-    if type(halo) is not int or halo != 2:
-        raise ValueError("initial primary preparation supports exactly two valid layers")
+    if type(halo) is not int or halo not in (0,2):
+        raise ValueError("primary fields support interior-only (0) or two valid halo layers")
     return ids, fields
 
 

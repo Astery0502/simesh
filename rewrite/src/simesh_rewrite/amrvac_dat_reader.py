@@ -29,6 +29,11 @@ class _AMRVACV5BlockReaderState:
     file_identity: tuple[int, int, int, int, int]
     shape: tuple[int, int, int, int, int]
     block_offsets: np.ndarray
+    staggered: bool = False
+    zero_ghost_fast: bool = True
+    zero_cells: int = 0
+    zero_ordinary_bytes: int = 0
+    zero_complete_bytes: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,8 +310,22 @@ def _read_selected_headers(
     file_size = state.file_identity[2]
     header_struct = struct.Struct(f"{state.byte_order}6i")
     records: list[_SelectedRecord] = []
+    source_is_complete = source_lower == (0,0,0) and source_upper == block_shape
     for block_id, raw_header in raw_headers:
         ghost_values = header_struct.unpack(raw_header)
+        if state.zero_ghost_fast and state.zero_cells and not any(ghost_values):
+            block_offset = int(state.block_offsets[block_id])
+            expected_end = (int(state.block_offsets[block_id+1])
+                            if block_id+1 < state.shape[0] else file_size)
+            complete_end = block_offset+state.zero_complete_bytes
+            if complete_end != expected_end:
+                raise ValueError(f"block {block_id} record end {complete_end} does not equal expected offset {expected_end}")
+            # Equality to a validated in-file next offset proves these positive
+            # prefix addresses fit int64. Request boxes were already validated.
+            records.append(_SelectedRecord(block_id,block_offset,
+                block_offset+state.zero_ordinary_bytes,block_shape,state.zero_cells,
+                source_lower,source_upper,source_is_complete))
+            continue
         lower_ghost = tuple(int(value) for value in ghost_values[:3])
         upper_ghost = tuple(int(value) for value in ghost_values[3:])
         if any(value < 0 for value in lower_ghost + upper_ghost):
@@ -382,9 +401,18 @@ def _read_selected_headers(
             if block_id + 1 < state.shape[0]
             else file_size
         )
-        if record_end != expected_end:
+        complete_record_end = record_end
+        if state.staggered:
+            tail_cells = 1
+            for stored_extent in stored_shape:
+                tail_cells = _checked_mul(tail_cells,
+                    _checked_add(stored_extent, 1, what="staggered tail shape"),
+                    what="staggered tail cells")
+            tail_bytes = _checked_mul(tail_cells, 24, what="three staggered tail bytes")
+            complete_record_end = _checked_add(record_end, tail_bytes, what="complete staggered record end")
+        if complete_record_end != expected_end:
             raise ValueError(
-                f"block {block_id} record end {record_end} does not equal "
+                f"block {block_id} record end {complete_record_end} does not equal "
                 f"expected offset {expected_end}"
             )
         records.append(
@@ -415,6 +443,7 @@ def _copy_complete_runs(
     field_runs: list[tuple[int, int]],
     destination_bits: np.ndarray,
     destination_lower: tuple[int, int, int],
+    packed_fields: dict[tuple[int,int],int] | None = None,
 ) -> None:
     dx, dy, dz = state.shape[2:]
     destination_slices = tuple(
@@ -432,6 +461,13 @@ def _copy_complete_runs(
         bits = _decode_native_bits(raw, state.byte_order)
         disk_fields = bits.reshape(field_stop - field_start, dz, dy, dx)
         canonical_fields = disk_fields.transpose(0, 3, 2, 1)
+        packed_start = None if packed_fields is None else packed_fields.get((field_start,field_stop))
+        if packed_start is not None:
+            for slot in block_positions[record.block_id]:
+                destination_bits[slot,packed_start:packed_start+field_stop-field_start,
+                    destination_slices[0],destination_slices[1],destination_slices[2]] = canonical_fields
+            del canonical_fields,disk_fields,bits,raw
+            continue
         for field_id in range(field_start, field_stop):
             values = canonical_fields[field_id - field_start]
             for slot in block_positions[record.block_id]:
@@ -571,6 +607,14 @@ def _read_amrvac_v5_blocks_into(
     sorted_block_ids = sorted(block_positions)
     sorted_field_ids = sorted(field_positions)
     field_runs = _consecutive_runs(sorted_field_ids)
+    packed_fields = {}
+    if state.zero_ghost_fast:
+        for first,last in field_runs:
+            places = [field_positions[field] for field in range(first,last)]
+            if all(len(place)==1 for place in places):
+                begin = places[0][0]
+                if all(place[0]==begin+offset for offset,place in enumerate(places)):
+                    packed_fields[first,last] = begin
     records = _read_selected_headers(
         state,
         sorted_block_ids,
@@ -599,6 +643,7 @@ def _read_amrvac_v5_blocks_into(
                 field_runs,
                 destination_bits,
                 destination_start,
+                packed_fields,
             )
         else:
             _copy_partial_fields(
@@ -625,6 +670,24 @@ def make_amrvac_v5_block_reader(
     forest_binding: AMRVACV5ForestBinding,
 ) -> BlockReader:
     """Create a cache-free STO-003 reader over ordinary AMRVAC v5 records."""
+    return _make_amrvac_v5_block_reader(file_descriptor,index,forest_binding,allow_staggered=False)
+
+
+def make_amrvac_v5_ordinary_block_reader(
+    file_descriptor: int,
+    index: AMRVACV5Index,
+    forest_binding: AMRVACV5ForestBinding,
+) -> BlockReader:
+    """Read ordinary 3D v5 fields, validating any three-component staggered tail.
+
+    This separate profile does not expose CT/staggered values. It preserves
+    DAT-003 transfer/preflight rules and requires complete record sizes including
+    tails. The original factory still rejects every staggered index.
+    """
+    return _make_amrvac_v5_block_reader(file_descriptor,index,forest_binding,allow_staggered=True)
+
+
+def _make_amrvac_v5_block_reader(file_descriptor,index,forest_binding,*,allow_staggered):
     if type(file_descriptor) is not int:
         raise TypeError("file_descriptor must be an exact Python int")
     if file_descriptor < 0:
@@ -635,8 +698,10 @@ def make_amrvac_v5_block_reader(
         raise TypeError("forest_binding must be an AMRVACV5ForestBinding")
     if forest_binding.source_file_identity != index.file_identity:
         raise ValueError("forest binding source provenance does not match index")
-    if index.staggered:
+    if index.staggered and not allow_staggered:
         raise ValueError("staggered AMRVAC block records are unsupported")
+    if allow_staggered and index.dimension_count != 3:
+        raise ValueError("ordinary staggered-tail profile requires spatially 3D records")
     if index.byte_order not in ("<", ">"):
         raise ValueError("index byte order must be '<' or '>'")
 
@@ -690,12 +755,25 @@ def make_amrvac_v5_block_reader(
         block_shape[1],
         block_shape[2],
     )
+    # Cache geometry-only byte facts. Preserve the old factory's behavior for
+    # forged/unrepresentable shapes by leaving those on checked general reads.
+    zero_cells = block_shape[0]*block_shape[1]*block_shape[2]
+    ordinary_bytes = _GHOST_HEADER_BYTES+zero_cells*field_count*8
+    complete_bytes = ordinary_bytes
+    if index.staggered:
+        complete_bytes += 24*(block_shape[0]+1)*(block_shape[1]+1)*(block_shape[2]+1)
+    if zero_cells > _INDEX_MAX or complete_bytes > _INDEX_MAX:
+        zero_cells = ordinary_bytes = complete_bytes = 0
     state = _AMRVACV5BlockReaderState(
         file_descriptor=file_descriptor,
         byte_order=index.byte_order,
         file_identity=current_identity,
         shape=shape,
         block_offsets=block_offsets,
+        staggered=bool(index.staggered),
+        zero_cells=zero_cells,
+        zero_ordinary_bytes=ordinary_bytes,
+        zero_complete_bytes=complete_bytes,
     )
     return make_block_reader(
         state,

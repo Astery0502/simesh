@@ -339,3 +339,101 @@ leaf/knot scalar references on eight spread nonempty pixels per view. Resident
 strategies have one warmup/three repetitions; bounded first/second passes are
 descriptive complete costs. Record reconstruction quadrature error and all field,
 worker/image resources. The missing temperature/response gate remains open.
+
+## P4 Source And Packaging Selection
+
+Select a distinct v5 ordinary-field reader for 3D records with staggered tails.
+Keep DAT-003's factory rejection unchanged. Reuse its selector/coalescing/endian/
+copy/failure implementation; the new profile validates an ordinary prefix plus
+three float64 tails of shape `(stored_shape + 1)`, matching the inspected 3D
+reader convention and WENO record sizes. Never expose or compute CT/staggered
+values. Record/header/address preflight remains before payload mutation, and
+borrowed-fd identity/position semantics are preserved. Short/malformed tails
+must fail instead of being ignored. New tests target this added record meaning;
+reuse existing DAT-003 checks for unchanged transfers.
+
+For installed workflows, bundle the existing `simesh_rewrite` provider package
+explicitly in the simesh distribution rather than copy its kernels into a new
+namespace or hide a checkout dependency. Its original build uses only the
+language-level directive: preserve that configuration separately from canonical
+build directives (especially cdivision), and leave its numerical APIs unchanged.
+The analysis core remains provider-independent; file convenience functions lazily
+load the bundled provider. Canonical Dataset/I/O/helpers remain the default and
+are not retired. P4 is additive integration, not the old ledger's final cutover.
+
+Move the thin provider assembly into `simesh.analysis.providers`, with a small
+compatibility import for development drivers. Add explicit file-source and
+resident-prepared entrypoints. Selected file fields are frozen as logical source
+columns with recorded original field IDs; public names/indices are unambiguous.
+Support interior-only native products without ghost work, alongside the confirmed
+zero-or-two primary halo policy. Count reader raw/endian/record scratch and all
+resident input/output/metadata before large allocation. Preserve source context
+ownership and detached result lifetime; no hidden FD close or source mutation.
+
+P4 source comparison found the intended sparse gain: direct original-file short
+tracing took 0.129 s versus 5.118 s for the same result after eager input, reading
+about 3 MB and using an 18.3 MB pool bound instead of a 294.5 MB resident-source
+pool. Full checked reading took 6.837 s before bulk preparation, so investigate
+its avoidable zero-saved-ghost overhead rather than weakening record validation.
+Bound one two-path probe: retain general records/copying as a selectable internal
+reference, and reuse immutable zero-ghost shape/byte facts plus contiguous field
+copy plans. Header/tail end, selectors, FD identity, endian and failure checks
+remain binding. Compare complete selected-field reads and source-to-result costs
+on B and rho requests; allowance 15 minutes, at most two paths, existing budget.
+
+The zero-ghost/packed-field probe preserved all bits and reduced complete-reader
+CPU time about 15--19% on B/rho, but wall time improved only about 1--2%:
+I/O wait dominates. Retain the small invariant/copy improvement without claiming
+a material wall speedup. Close that probe. A final bounded I/O-order probe compares
+128-record preflight batches with one-record batches for private dense interior
+loading. Both retain per-callback DAT preflight; the new source's documented
+partial-prefix behavior does not promise a fixed batch size. The question is
+whether sequential header/payload access removes the observed wait. Two batch
+sizes, B/rho requests, <=15 minutes, same byte/error semantics and memory budget.
+
+## P4 Feasible Scale Profile
+
+The available Cartesian real input is still ~1 GB. An additional 3.6 MB spherical
+reference was found under reference/; it cannot certify Cartesian thermal or 2D
+analysis. No 10--20 GB input fixture is available in the repository.
+
+Run actual one-million-seed (1000x1000 section) summary tracing on WENO, 32 fixed
+steps, one/four workers, batch 16,384, with complete array equivalence and actual
+termination counts. Launch at half the finest z-cell spacing above the lower
+face; step is one quarter of the finest spacing. This tests that declared scale,
+not long complete field lines. Admit both comparison results explicitly under
+2 GiB and save only the selected four-worker summary (~96 MB).
+
+Also execute a 1000^3 uniform sampling stream from the same prepared fields,
+consuming each z slab into a descriptive checksum. It delivers 24 GB of float64
+values cumulatively without allocating or saving that full cube. Record every
+requested point's validity, first slab/total costs and peak active slab storage.
+This certifies larger-than-RAM output delivery, not larger-than-RAM input I/O.
+The iterator reserves its current and one normally retained prior slab; additional
+caller retention is explicit. These are selected large acceptance runs, not
+ordinary tests or discretionary implementation shootouts.
+
+Retain one-record order for private full-domain loading: B median wall time
+fell 7.495 -> 5.012 s; rho 4.240 -> 4.042 s. CPU cost rises (about .63 -> .92 s
+for B and .36 -> .73 s for rho), an explicit I/O-locality trade-off. This does
+not change the checked reader's per-call guarantees; bounded halo reads retain
+their admitted batch behavior. Keep the raw callback's batch-size option and
+reopen on CPU/cache-dominated evidence rather than hardcode WENO field IDs.
+
+The first clean-source validation copied stale egg-info containing absolute
+paths from the checkout. Exclude generated egg-info along with generated C and
+extensions, and explicitly use each source tree's Cython include path. This is
+a build-harness/source-discovery correction, not a numerical change. Inspection
+also found the existing clean helper recursed through the entire repository,
+including .venv. It now removes only generated files corresponding to package
+.pyx sources and known build metadata; make clean cleans without rebuilding.
+A focused filesystem test protects the virtualenv and unrelated reference/results.
+
+Clean wheel validation now passes from a source copy with no generated extensions
+or egg-info. The wheel is ~9.35 MB; an isolated `python -S` process loaded both
+simesh and its provider from the extracted wheel and completed file write/read,
+bounded tracing and detached resident sampling without editable path hooks.
+Retained 2D roundtrip/bilinear and periodic-metadata/VTK value workflows pass.
+Canonical forest source explicitly initializes periodic connectivity off; neither
+this work nor header preservation establishes periodic ghost computation. New
+native sources reject that flag rather than silently using nonperiodic halos.

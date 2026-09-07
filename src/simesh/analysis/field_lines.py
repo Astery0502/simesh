@@ -154,7 +154,8 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000,
     if not len(seeds):
         return
     seed_batch = min(seed_batch, fields.capacity) if pool else seed_batch
-    private = seed_batch*(576+(24*(max_steps+1) if trajectories else 0))
+    # Reserve current paths and one previously yielded path batch during advance.
+    private = seed_batch*(576+(48*(max_steps+1) if trajectories else 0))
     transient_reserve = seeds.nbytes+3*seed_ids.nbytes+private
     temporary = None
     if twist and max_steps > 0 and max_length > 0:

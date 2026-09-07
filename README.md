@@ -14,6 +14,12 @@ AMRVAC files or AMR meshes live in `simesh.tools`.
 
 ## What it works with
 
+The experimental `simesh.analysis` layer provides native prepared field groups,
+bounded borrowing, parallel magnetic tracing and derived-field consumption.
+[Analysis-core documentation](docs/analysis-core/README.md) records its selected
+design, measured scope and remaining integration work. Canonical AMRVAC workflows
+below remain the supported default.
+
 - AMRVAC `.dat` snapshots with Cartesian 2D or Cartesian 3D AMR metadata
 - Native AMR block arrays in SFC/Morton order
 - User-facing NumPy uniform arrays with layout `(nx, ny, nz, nw)`

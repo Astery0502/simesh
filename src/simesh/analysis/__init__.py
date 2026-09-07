@@ -11,11 +11,29 @@ from .derivatives import derivative, curl
 from .field_lines import trace, iter_traces, retrace, TraceResult, Termination
 from .diagnostics import with_curl, CurlPool
 from .global_fields import global_curl
-from .slices import Plane, SliceResult, sample_plane
+from .slices import Plane, SliceResult, sample_plane, iter_uniform
 from .los import integrate_los, orthographic_plane, LOSResult, LOSStatus
 
 __all__ = ["FieldDefinition", "FieldSource", "MeshIndex", "PreparedFields",
            "PreparedPool", "prepare", "iter_prepared", "sample", "derivative", "curl",
            "trace", "iter_traces", "TraceResult", "Termination", "global_curl",
            "Plane", "SliceResult", "sample_plane", "with_curl", "CurlPool", "retrace",
-           "integrate_los", "orthographic_plane", "LOSResult", "LOSStatus"]
+           "integrate_los", "orthographic_plane", "LOSResult", "LOSStatus", "iter_uniform"]
+
+
+def open_source(path,*,field_names=None,field_indices=None,field_units=None,
+                support_capacity=128,budget_bytes=2*1024**3):
+    """Lazily open an owned immutable v5 ordinary-field source context."""
+    from simesh.amrvac.analysis_io import open_source as implementation
+    return implementation(path,field_names=field_names,field_indices=field_indices,
+                          field_units=field_units,support_capacity=support_capacity,budget_bytes=budget_bytes)
+
+
+def open_prepared(path,*,field_names=None,field_indices=None,field_units=None,budget_bytes=2*1024**3):
+    """Read selected fields into an owned full-domain canonical prepared product."""
+    from simesh.amrvac.analysis_io import open_prepared as implementation
+    return implementation(path,field_names=field_names,field_indices=field_indices,
+                          field_units=field_units,budget_bytes=budget_bytes)
+
+
+__all__ += ["open_source","open_prepared"]
