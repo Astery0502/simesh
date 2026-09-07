@@ -40,6 +40,11 @@ and the focused documents under `docs/` for detailed mechanics.
 - `src/simesh/utils/lib/`
   Canonical Cython source tree for performance-sensitive AMR internals. `.pyx`
   files here are compiled; `.pxd` files are support headers/interfaces.
+- `src/simesh/analysis/` and `src/simesh/utils/lib/analysis/`
+  Native analysis orchestration and compiled consumers. Resume through
+  `docs/analysis-core/current.md`; use `docs/analysis-core/usage.md` for the
+  experimental API. Existing rewrite kernels are explicit bundled providers,
+  not a prescription to route new consumers through old executors.
 - `tests/amrvac/` and `tests/utils/lib/`
   Behavioral reference for the canonical Python and compiled paths. Mirror the
   package structure when adding tests.

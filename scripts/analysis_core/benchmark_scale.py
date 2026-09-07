@@ -48,6 +48,8 @@ def main():
         for name in ('seed_ids','positions','length','steps','termination','samples'):
             np.testing.assert_array_equal(getattr(one,name),getattr(four,name))
         statuses,counts=np.unique(four.termination,return_counts=True)
+        if not np.isin(statuses,[1,3,4]).all() or not np.isfinite(four.positions).all():
+            raise AssertionError('unexpected numerical or coverage failure in the scale profile')
         result['million_seeds']={'seeds':len(seeds),'max_steps':32,'step':step,
             'one_seconds':one_seconds,'four_seconds':four_seconds,'arrays_equal':True,
             'accepted_steps':int(four.steps.sum()),'samples':int(four.samples.sum()),

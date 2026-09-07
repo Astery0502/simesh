@@ -1,5 +1,11 @@
 # Supported Feature Migration
 
+The 2026-09-08 analysis-core integration is additive. Its actual source-family
+dispositions and compatibility evidence are recorded in
+[P4 integration](../docs/analysis-core/evidence/p4-integration.md). Canonical
+defaults remain available; that delivery does not claim this ledger's final
+cutover or retroactively complete historical M2--M7 milestones.
+
 ## Final Goal
 
 Every supported, user-observable capability currently owned under

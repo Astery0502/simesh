@@ -2,83 +2,91 @@
 
 Updated: 2026-09-08. Resume through this file and [development](development.md).
 
-## Active Scope
+## Authorized Scope And Actual State
 
-The user activated autonomous **P0 through P4**, including P3-D, P3-L and P3-F.
-P2 is an intermediate checkpoint. Earlier documentation-only and first-run-P2
-recommendations are superseded. Continue the next ready work after checkpoints.
+The user explicitly authorized autonomous **P0 through P4**, including P3-D,
+P3-L and P3-F; P2 was an intermediate checkpoint. All currently ready work has
+advanced through implementation, comparisons, integration and feasible scale.
+**The whole scope is not marked complete:** physical P3-L and actual large-input
+acceptance still require missing inputs. Do not restart completed stages or
+reinterpret the old P2 recommendation as the endpoint.
 
-- Checkout: `/Users/astery/science/simesh`, branch `codex/analysis-core-p0-p4`,
-  branched from `7b0c1b1e17e2a16311e2c5e2cfbe22d908c98283` with existing
-  uncommitted documents preserved. Do not stage unrelated entry changes.
-- Active delivery: P4 native source, installed workflow and feasible scale gates.
-  P3-L scalar LOS is delivered; its physical response gate remains open. P0/P1, P2, P3-D and selected P3-F twist are delivered;
-  see [P1](evidence/p1-native-fields.md), [P2](evidence/p2-field-lines.md),
-  [P3-D](evidence/p3-d-global-slices.md), [P3-F](evidence/p3-f-twist.md) and
-  [scalar LOS](evidence/p3-l-scalar-los.md).
-- Selected design: [native-core-design.md](native-core-design.md).
-- Executable location: additive experimental `src/simesh/analysis/`, compiled
-  `src/simesh/utils/lib/analysis/`, development adapters `scripts/analysis_core/`.
-  Canonical/rewrite implementations remain available.
-- New executable checks: twelve core/F/D/twist/LOS composed cases pass. Full WENO
-  curl coverage (67,842,000 retained values) and axis/oblique slices compare
-  successfully. The term-major derivative preserves operation order and improves
-  the measured complete resident consumer. Keep fast resident canonical and
-  memory-bounded exact-phase preparation as explicit alternatives. Exact
-  boundary endpoints, physical LOS response and target scale remain open.
-  Twist/trajectory/retrace conformance and WENO costs are recorded in P3-F.
-  Gauss2 scalar LOS is selected after independent references and WENO columns;
-  ray-time ownership fixes an oblique boundary-rounding failure.
+| Delivery | Actual status and evidence |
+| --- | --- |
+| P0/P1 | Complete selected design, provider assembly, native interior/two-halo products, stable bounded borrowing and direct consumption; [P1](evidence/p1-native-fields.md) |
+| P2 | Complete declared accepted-prefix parallel F, terminal/length results and cache comparisons; [P2](evidence/p2-field-lines.md) |
+| P3-D | Complete whole-domain curl(B), independent retained groups and axis/oblique slices; [D](evidence/p3-d-global-slices.md) |
+| P3-F | Complete selected accepted-segment twist, optional trajectories and explicit selected-ID retracing; [F](evidence/p3-f-twist.md) |
+| P3-L | Scalar/emissivity-field integration core and WENO rho columns complete; **physical response/EOS/units gate open**; [L](evidence/p3-l-scalar-los.md) |
+| P4 | Additive installed source/workflow/build compatibility and actual million-seed/1000^3 output checks complete; **10--20 GB / larger-than-RAM input unverified**; [integration](evidence/p4-integration.md), [scale](evidence/p4-scale.md) |
 
-## Run Profile
+## Checkout And Recoverable Work
 
-The endpoint bounds the run; no user time/token limit was supplied. Host has
-8 GiB RAM and 8 logical CPUs. Entry free disk was about 7.6 GiB. Initially use
-at most 4 compute workers, 2 GiB controlled live arrays per measurement and
-2 GiB task-created scratch/output; keep at least 2 GiB disk free. Do not delete
-source fixtures or unrelated data. Count resident inputs, providers, copies,
-scratch and outputs; managed arrays do not bound RSS or OS page cache.
-One discretionary probe at a time, at most two variants/15 minutes each before
-retaining or deferring; required debugging is separate.
+- Checkout: `/Users/astery/science/simesh`, branch `codex/analysis-core-p0-p4`.
+- Source checkpoints: `ee96824` (P1), `f6dc48e` (P2), `6558286` (D),
+  `8a80a2f` (twist), `2c00792` (scalar LOS), `a5f1f88` (file/packaging integration).
+  Final acceptance/navigation has its own subsequent checkpoint.
+- Substantial pre-existing modified/untracked documentation remains preserved.
+  Stage only owned work; no blanket reset, staging or source-fixture cleanup.
+- Core: `src/simesh/analysis/`; compiled consumers: `src/simesh/utils/lib/analysis/`;
+  file adapters: `src/simesh/amrvac/analysis*.py`. Existing rewrite is an explicit
+  bundled provider with its original numerical directives and contracts.
+- Design/route decisions: [native-core-design](native-core-design.md).
+  Runnable examples and restrictions: [usage](usage.md).
 
-Real specimen: `data/weno509_sub_0000.dat`, 1,045,232,320 bytes, 22,614 leaves,
-levels 3--6, 8^3 cells. This is not a 10--20 GB or million-seed certificate.
-Larger-than-RAM fixture acceptance is resource-unverified; continue feasible
-integration/scaling without relabeling smaller evidence.
+## Latest Verification And Resource Profile
 
-## Scientific Choices And Open Items
+- Safe `make clean` and complete `make test PYTHON=.venv/bin/python` passed;
+  virtualenv NumPy remained intact. Provider suite: 1232 passed. Public/AMR/helper
+  checks: 92 passed, two opt-in heavy cases excluded. New-core composed checks:
+  17 passed. OpenMP build plus 23 AMR checks passed; default non-OpenMP restored.
+- Fresh-source wheel (~9.35 MB) built and passed isolated `python -S` imports and
+  file-to-result execution without editable checkout hooks.
+- Actual one million seeds (maximum 32 steps): one/four workers agree; trace
+  8.176 / 2.274 s; 17,273,160 accepted steps; last-accepted endpoint semantics.
+- Actual 1000^3 output stream: every billion point valid, 24 GB cumulative values,
+  81.283 s, maximum 33 MB slab. Peak run RSS 1,438,449,664 bytes.
+- Direct original-file WENO short trace: 0.129 s and ~3 MB reads versus 5.118 s
+  eager-source comparison, identical results. Dense checked B reading improved
+  to ~5.01 s through record-order I/O, retaining full callback checks.
+- Host: 8 GiB RAM / eight logical CPUs. Run limits: <=4 compute workers,
+  <=2 GiB controlled live arrays per case, <=2 GiB task-created disk scratch,
+  >=2 GiB free disk. No time/token limit was supplied. Bounds do not promise
+  process RSS or OS page-cache limits. Candidate probes are closed with outcomes.
 
-Initial preparation preserves rewrite RST/LIM/PRL exact-phase semantics through
-its RHE provider: float64 cell averages, all-26 closure, two valid layers,
-continuous physical boundaries. Canonical comparison uses its recorded numerical
-tolerance, not presumed bitwise equality. New consumer choices are recorded
-before implementation. D exposes curl(B) without inventing physical current
-normalization; F starts with length and explicit terminal status.
+## Inputs Still Required
 
-P3-L response/EOS/units are unspecified. An asynchronous question asks the user
-to specify them or delegate the first verifiable model. This does not block
-P0/P1/F/D or LOS geometry work.
+1. **P3-L physical definition and data:** an asynchronous question remains pending
+   for epsilon(rho,T), EOS/normalization/units/instrument response or explicit
+   delegation of a first model. WENO and tdm have no energy/temperature. Do not
+   relabel stored-rho columns as a thermal image. Additional temperature/physical
+   inputs must match the selected response before its independent verification.
+2. **Large Cartesian input fixture:** an asynchronous question requests a readable
+   path to an existing 10--20 GB file, including an external drive if available.
+   Repository inventory found WENO (~1 GB), tdm (~1.5 MB) and spherical bw
+   (~3.6 MB). The spherical reference is outside the selected geometry. Neither
+   million-seed output nor a sparse/fake large file substitutes for this input gate.
 
-## Next Action
+No ready authorized implementation or verification remains blocked merely by a
+milestone report. On a supplied response/model or fixture, resume that specific
+gate using the existing core and record, not an unrestricted new exploration.
 
-The original-record ordinary reader, installed source/resident entrypoints and
-interior-only products are implemented. Reader conformance passes (21 cases),
-and file lifetime/selection, 2D/periodic-metadata/VTK and uniform-stream checks pass.
-Direct WENO short tracing is 0.129 s versus 5.118 s for the eager-source comparator,
-with equal results. Zero-ghost facts reduce CPU cost; one-record private dense I/O
-reduces B read wall time 7.495 -> 5.012 s without weakening callback preflight.
+## Explicit Limits And Dispositions
 
-A clean-source wheel (~9.35 MB) built and passed isolated non-editable import and
-file-to-result checks. The first harness copy included stale egg-info; excluding
-that generated metadata fixed it. Build cleanup now preserves .venv/references/
-results and make clean is clean-only. Next run the supported Make test/build,
-affected provider/public/helper checks, OpenMP compatibility, and declared actual
-million-seed/1000^3 stream cases. Refresh P4 evidence and final scope dispositions.
+Canonical APIs remain the default/rollback path. Their generated 2D read/write,
+bilinear/coarse-fine, Dataset, VTK and helper workflows are verified. New native
+consumers are nonperiodic Cartesian 3D; periodic metadata roundtrips are not
+periodic halo computation (canonical forest currently disables periodic links).
+No new 2D extrusion, periodic tracing, CT or non-Cartesian computation is claimed.
+Exact boundary footpoints, Q and GPU remain outside the selected delivered
+profiles, with reopen conditions in the design. E1/E2/E3/E4 and new compact
+persistent fill plans are evidence-backed deferred routes, not unfinished
+mandatory prototypes. Retain fast resident and memory-bounded preparations.
 
+## Retained Outputs
 
-P3-L response/EOS/units delegation is still pending; WENO contains rho/m/B but
-no energy/temperature. Only WENO (~1 GB) and tdm (~1.5 MB) exist in data/; actual
-10--20 GB, real 2D and full physical thermal-image acceptance remain unavailable.
-New 2D/periodic analysis semantics must be explicitly scoped against retained
-canonical workflows. Preserve the ~543 MB owned global-curl result unless its
-scratch space is needed; smaller LOS arrays/figure are also in ignored results.
+Ignored `benchmark-results/analysis-core/` contains all raw JSON/logs, the ~543 MB
+global-curl native product, ~96 MB million-seed summary, LOS scalar arrays/figure,
+and clean-source build/wheel artifacts. The 24 GB uniform value stream was
+consumed, not saved as a cube. Preserve these useful results; reclaim only owned
+scratch if needed under the recorded resource limit.
