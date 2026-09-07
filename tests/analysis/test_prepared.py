@@ -12,13 +12,22 @@ from analysis_core.rewrite_provider import make_source
 from lfe_001 import make_fixture
 
 
-def source_fixture():
+def source_fixture(field=None):
     f = make_fixture()
     # Reuse the fixture's validated provider forest; parent IDs are not consumed
     # by this adapter but preserve explicit metadata ownership for accounting.
     forest = RefinedForest(f.node_levels, f.node_coords,
         np.full(len(f.node_levels), -1, dtype=np.int64), f.child_node_ids,
         f.node_leaf_ids, f.leaf_node_ids, f.root_node_ids, f.max_level)
+    if field is not None:
+        from simesh_rewrite.refined_geometry import refined_leaf_geometry
+        bounds, spacing = refined_leaf_geometry(f.domain_lower, f.domain_upper,
+            f.root_shape, f.domain_counts, f.block_counts, f.node_levels, f.node_coords,
+            f.leaf_node_ids, np.arange(len(f.leaf_node_ids), dtype=np.int64))
+        local = np.indices(tuple(f.block_counts))+.5
+        for leaf in range(len(bounds)):
+            xyz = bounds[leaf,0,:,None,None,None]+local*spacing[leaf,:,None,None,None]
+            f.backing[leaf] = field(*xyz)
     source = make_source(f.root_shape, f.coord_to_rank, forest, f.domain_lower,
         f.domain_upper, f.block_counts, array_block_reader(f.backing),
         tuple(FieldDefinition(name, "code") for name in ("b1", "b2", "b3")))

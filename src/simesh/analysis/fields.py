@@ -209,6 +209,12 @@ class PreparedPool:
         self._leaves.fill(-1)
         self._age.fill(0)
 
+    @property
+    def resident_leaf_ids(self):
+        if self._closed:
+            raise RuntimeError("pool is closed")
+        return self._leaves[self._leaves >= 0].copy()
+
     def close(self):
         if self._active:
             raise RuntimeError("cannot close a borrowed pool")

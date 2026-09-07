@@ -11,15 +11,18 @@ recommendations are superseded. Continue the next ready work after checkpoints.
 - Checkout: `/Users/astery/science/simesh`, branch `codex/analysis-core-p0-p4`,
   branched from `7b0c1b1e17e2a16311e2c5e2cfbe22d908c98283` with existing
   uncommitted documents preserved. Do not stage unrelated entry changes.
-- Active delivery: P2 independent-seed F. P0 provider assembly and the P1
-  selected native/bounded product are delivered; see [evidence](evidence/p1-native-fields.md).
+- Active delivery: P3-D whole-domain curl(B) and retained slices. P0/P1 and
+  the P2 accepted-prefix parallel tracer are delivered; see [P1](evidence/p1-native-fields.md)
+  and [P2](evidence/p2-field-lines.md).
 - Selected design: [native-core-design.md](native-core-design.md).
 - Executable location: additive experimental `src/simesh/analysis/`, compiled
   `src/simesh/utils/lib/analysis/`, development adapters `scripts/analysis_core/`.
   Canonical/rewrite implementations remain available.
-- New executable checks: five P1 composed cases pass. Selected WENO two-layer
-  comparisons pass; direct ready sampling is measured. Dense/global, parallel
-  F/D/L and scale acceptance remain open.
+- New executable checks: seven core/F composed cases pass. WENO selected
+  two-layer values and short/long F comparisons pass. A 2048-seed parallel
+  case gives 3.69x speedup; WENO long-cache probe retains 256 slots for that
+  repeated request (zero warm fills). Exact boundary endpoints, global D/L,
+  twist/trajectory delivery and target scale remain open.
 
 ## Run Profile
 
@@ -52,9 +55,11 @@ P0/P1/F/D or LOS geometry work.
 
 ## Next Action
 
-Implement P2 with explicit fixed-RK4 tangent/length/terminal semantics and
-independent worker state. Reuse the verified native groups and pool miss boundary;
-compare serial/parallel and fitting/thrashing residency in actual tracing.
-Continue to ready P3-D/L/F and P4 integration. Retained RHE preparation overhead,
-2D/periodic/direct original-record bounded adapters and actual large-fixture
-acceptance remain tracked; they do not block initial F or D development.
+Implement P3-D global curl(B) with independently owned/optionally backed derived
+fields and axis/oblique sampled slices. Compare the bounded exact-phase RHE
+provider with an explicitly named canonical bulk resident preparation adapter;
+keep transfer arithmetic distinctions visible. Preserve complete global coverage
+and include retained output in admission. Then advance P3-F and ready LOS work.
+P3-L physical response delegation is still pending. Direct original-record bounded
+input, installed provider/2D/periodic integration and actual large fixtures remain
+later gates; no automatic cutover of the canonical API is planned.

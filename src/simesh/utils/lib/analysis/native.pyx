@@ -5,7 +5,7 @@ Unchecked internal functions receive arrays validated by the provider/core.
 No file, cache, Dataset or Python callback participates in a value query.
 """
 
-from libc.math cimport floor, isfinite, NAN
+from libc.math cimport floor, isfinite, NAN, sqrt, hypot
 from libc.stdint cimport int64_t
 
 
@@ -131,3 +131,79 @@ cpdef void differentiate(
                             delta = (data[slot,i+1+x,j+1+y,k+1+z,component] -
                                      data[slot,i+1-x,j+1-y,k+1-z,component])/(2.*spacing[leaf,axis])
                             output[s,i,j,k,out] = output[s,i,j,k,out] + coefficients[t]*delta
+
+
+cpdef void advance_lines(
+    const double[::1] lo, const double[::1] hi,
+    const int64_t[:, :, ::1] roots, const int64_t[:, ::1] children,
+    const int64_t[::1] leaves, const double[:, ::1] nlo,
+    const double[:, ::1] nhi, const double[:, :, ::1] bounds,
+    const double[:, ::1] spacing, const int64_t[::1] slots,
+    const double[:, :, :, :, ::1] data, int halo,
+    double step, int64_t max_steps, double max_length, double null_threshold, int direction,
+    double[:, ::1] positions, double[::1] length, int64_t[::1] steps,
+    int64_t[::1] status, int64_t[::1] stages, double[:, :, ::1] tangents,
+    int64_t[::1] requested, int64_t[::1] samples, int64_t[::1] misses,
+):
+    cdef int64_t seed, stage, a, leaf, slot
+    cdef double p[3]
+    cdef double b[3]
+    cdef double h, norm, factor, total
+    with nogil:
+        for seed in range(positions.shape[0]):
+            requested[seed] = -1
+            while status[seed] == 0:
+                if steps[seed] >= max_steps:
+                    status[seed] = 1
+                    break
+                if length[seed] >= max_length:
+                    status[seed] = 2
+                    break
+                h = step
+                if max_length-length[seed] < h:
+                    h = max_length-length[seed]
+                stage = stages[seed]
+                for a in range(3):
+                    p[a] = positions[seed,a]
+                    if stage > 0:
+                        factor = .5 if stage < 3 else 1.
+                        p[a] = p[a] + factor*h*tangents[seed,stage-1,a]
+                leaf = owner(p,lo,hi,roots,children,leaves,nlo,nhi)
+                if leaf < 0:
+                    status[seed] = 3
+                    break
+                slot = slots[leaf]
+                if slot < 0:
+                    requested[seed] = leaf
+                    misses[seed] += 1
+                    break
+                interpolate(p,leaf,slot,bounds,spacing,data,halo,b)
+                samples[seed] += 1
+                if not (isfinite(b[0]) and isfinite(b[1]) and isfinite(b[2])):
+                    status[seed] = 5
+                    break
+                norm = hypot(hypot(b[0],b[1]),b[2])
+                if not isfinite(norm):
+                    status[seed] = 8
+                    break
+                if norm <= null_threshold:
+                    status[seed] = 4
+                    break
+                for a in range(3):
+                    tangents[seed,stage,a] = direction*(b[a]/norm)
+                if stage < 3:
+                    stages[seed] += 1
+                    continue
+                for a in range(3):
+                    total = tangents[seed,0,a] + 2.*tangents[seed,1,a]
+                    total = total + 2.*tangents[seed,2,a]
+                    total = total + tangents[seed,3,a]
+                    p[a] = positions[seed,a] + (h/6.)*total
+                if owner(p,lo,hi,roots,children,leaves,nlo,nhi) < 0:
+                    status[seed] = 3
+                    break
+                for a in range(3):
+                    positions[seed,a] = p[a]
+                length[seed] = length[seed]+h
+                steps[seed] += 1
+                stages[seed] = 0

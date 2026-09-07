@@ -8,6 +8,8 @@ from .fields import FieldDefinition, FieldSource, PreparedFields, PreparedPool, 
 from .mesh import MeshIndex
 from .sampling import sample
 from .derivatives import derivative, curl
+from .field_lines import trace, iter_traces, TraceResult, Termination
 
 __all__ = ["FieldDefinition", "FieldSource", "MeshIndex", "PreparedFields",
-           "PreparedPool", "prepare", "iter_prepared", "sample", "derivative", "curl"]
+           "PreparedPool", "prepare", "iter_prepared", "sample", "derivative", "curl",
+           "trace", "iter_traces", "TraceResult", "Termination"]

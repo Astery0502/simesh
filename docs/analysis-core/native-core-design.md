@@ -110,3 +110,68 @@ The RHC publication copy is about 1% of the mixed first-preparation composition,
 so retain component-adjacent storage and target provider planning if optimizing
 preparation. Continue P2 without claiming the RHC bootstrap is a faster dense
 fill or that a 1 GB fixture establishes target scale.
+
+## P2 Numerical And Execution Contract
+
+F1 initial strategy is `rk4-arclength-accepted-prefix-v1`: ordered classical
+fixed-step RK4 of `dx/ds = direction*B/|B|`, float64, caller step/max_steps/
+max_length/null threshold. Last step is capped to remaining length. Accumulate
+accepted arclength parameters, not chord lengths or B-dot-dx. Source coordinates
+set length units; field components must share declared units. Fixed step is an
+explicit accuracy input, independent of seed spacing; no global fourth-order
+claim is made for AMR-interpolated fields.
+
+Seeds have stable caller IDs and finite (n,3) coordinates. Half-open domain
+ownership accepts lower-boundary launches; upper faces are outside under this
+initial profile. A domain-exiting RK trial or final proposal rejects the entire
+step. Return the last accepted position, accepted length/steps, terminal reason
+and `localized_endpoint=False`; no exact footpoint or boundary-length claim.
+Null/nonfinite values have distinct termination. Ordinary F prepares no curl.
+Exact endpoint localization and upper-face inward launch need a later explicit
+profile before endpoint-map Q or full boundary footpoint delivery.
+
+Each seed keeps its RK stage, four tangents and accepted state across preparation
+misses. Missing owners pause without classifying a physical termination. The
+coordinator batches missing leaves, freezes the pool, and resumes disjoint seed
+arrays in nogil compiled kernels. A Python thread pool supplies at most four
+workers; no OpenMP runtime is required for this initial independent-seed path.
+The same kernel with one worker is the matching serial comparator. Bound active
+seed chunks independently of total output, and support summary-only chunk output.
+Retained trajectories/retracing are later P3-F output work, not implicit replay.
+
+Reference acceptance before implementation: uniform affine/constant vector traces
+with analytic paths, zero/null/nonfinite and exiting seeds; a smooth interior
+helical field with step refinement must converge to its analytic trajectory,
+with finite same-step serial/parallel and resident/bounded agreement. Use the
+same arithmetic ordered scalar RK4 reference for implementation tolerance
+rtol=atol=2e-12 on finite results; record observed analytic errors and step-refinement
+ratios rather than invent a user physical SLA. WENO starts with the recorded
+eight-seed/eight-step request and a named longer/divergent request; both report
+termination, field preparation and complete resources. Endpoint validity remains
+explicitly limited to accepted prefixes.
+
+P2 comparison profile (frozen before measurement): WENO short = eight SFC-spread
+mixed-ROI centers/eight steps; long = 32 such centers/128 steps, step one quarter
+of the minimum selected spacing. Compare one/four workers at 16 or 64 slots,
+respectively, application cleared and warm, one warmup/three repetitions. Add
+four-slot short control to reveal undersized-cache cost. Rewrite SLE supplies
+short position/accepted-count comparison only: its one-layer CHS, retained
+trajectories and B-dot-dx accumulator are different work and not an equal
+end-to-end speed comparator. New one/four-worker results must match exactly.
+A separate 2048-seed/600-step manufactured helix supplies enough ready-data work
+to measure parallel throughput. Include source/geometry setup and pool/workers/
+summary memory; no million-seed claim follows from this case.
+
+The new F tangent computes nested `hypot` and divides components by that norm;
+this is a named finite-tolerance strategy, not FLN-001's scaled expression-tree
+bits. Nonfinite input and unrepresentable norm are separate terminal statuses.
+The provider and historical SLE/FLN/RKS entrypoints retain their original rules.
+
+P2 bounded cache probe: the 32-seed/128-step WENO case needed 163 prepared-owner
+loads from a cold 64-slot pool and about 126 on warm repeats. Hypothesis: 256
+slots cover the actual visited working set and remove warm preparation without
+changing any trajectory. Compare 64 versus 256 slots, three repeats, one worker;
+allow at most 15 minutes and <32 MiB additional controlled arrays. Retain 256 for
+this repeated request only if saved reads/fills and whole-trace time justify its
+extra memory. This is a cache-sizing decision, not a universal capacity default
+or an E5 fused-plan implementation.
