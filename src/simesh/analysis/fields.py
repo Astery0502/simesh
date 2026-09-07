@@ -34,6 +34,7 @@ class FieldSource:
     resident_bytes: int
     strategy: str
     identity: object = field(default_factory=object)
+    memory_arrays: tuple = ()
 
 
 @dataclass(frozen=True, eq=False)
@@ -47,10 +48,13 @@ class PreparedFields:
     strategy: str
     source: object
     preparation_stats: object = None
+    owner: object = None
+    owner_extra_bytes: int = 0
 
     @property
     def nbytes(self):
-        return self.values.nbytes + self.leaf_ids.nbytes + self.slot_of_leaf.nbytes
+        return (self.values.nbytes + self.leaf_ids.nbytes + self.slot_of_leaf.nbytes +
+                self.owner_extra_bytes)
 
     def interior(self):
         if (len(self.values) != len(self.leaf_ids) or
@@ -203,6 +207,8 @@ class PreparedPool:
             self._active -= 1
 
     def clear(self):
+        if self._closed:
+            raise RuntimeError("pool is closed")
         if self._active:
             raise RuntimeError("cannot clear a borrowed pool")
         self._directory.fill(-1)

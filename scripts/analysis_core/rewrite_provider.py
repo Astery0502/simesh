@@ -97,4 +97,5 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
                 "scratch_admission_bytes": scratch_bytes(fields, halo)}
 
     return FieldSource(mesh, tuple(definitions), fill, scratch_bytes, resident,
-                       "rewrite-ratio2-minmod-exactphase-cont-v1")
+                       "rewrite-ratio2-minmod-exactphase-cont-v1",
+                       memory_arrays=reader.memory_arrays)

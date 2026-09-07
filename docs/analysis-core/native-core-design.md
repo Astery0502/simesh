@@ -175,3 +175,81 @@ allow at most 15 minutes and <32 MiB additional controlled arrays. Retain 256 fo
 this repeated request only if saved reads/fills and whole-trace time justify its
 extra memory. This is a cache-sizing decision, not a universal capacity default
 or an E5 fused-plan implementation.
+
+## P3-D Global Derivative And Slice Contract
+
+D1 selects full-domain curl(B), in stored B units per coordinate-length, with
+centered differences of extended input fields. Publish independently allocated
+three-component native results with one valid halo. A bounded pass computes every
+physical leaf exactly once; no slice limits the requested global computation.
+Caller-supplied float64 array/memmap output is supported with explicit full-output
+admission. On provider failure, no product is returned; an explicit sink may
+contain completed earlier batches and is not certified complete.
+
+A retained global result supplies repeated axis-aligned or oblique pixel-center
+slices by trilinear interpolation. A plane is `origin + u*t + v*s`, with t/s the
+uniform pixel-center fractions in [0,1]; u/v are independent full-width vectors,
+not unit directions. Outside or missing points are NaN with false validity.
+No area average, native intersection, current normalization or implicit EOS is
+claimed. Geometry is separate and reusable; slice calls do not recompute curl.
+
+Compare bounded RHE exact-phase preparation with a named
+`canonical-coordinatephase-cont-v1` resident preparation adapter. The canonical
+provider retains its actual C-owned padded/coarse memory and supplies the same
+component-adjacent consumer boundary; no hidden repack is needed. These transfer
+strategies have the documented small phase-rounding difference, not bitwise
+identity. Expose all retained owner storage in budgets/lifetimes. Keep the bounded
+path even if the affordable resident path wins dense throughput.
+
+Acceptance: global coverage plus independent centered differences and boundary
+extension on manufactured data, mixed AMR derivative samples, exact repeated
+retention/field-order behavior, and WENO all-cell canonical comparison at the
+predeclared finite 1e-10 tolerance. Measure global preparation+derivative+first
+slice, repeated slices, resident versus bounded resources and canonical operator
+cost; preserve accepted input/group semantics if attribution prompts redesign.
+
+P3-D WENO profile: all 22,614 leaves, B fields 4/5/6, two primary halos and
+one derived halo, continuous boundaries; retain all three curl components and
+sample a 128x128 axis plane plus a 96x80 oblique plane. Record first bounded
+pass and one repeat (descriptive, not a tight timing gate), and three resident
+operator/slice repetitions. Bounded output uses an explicit ~543 MB memmap;
+close its mapping before the resident comparison and read comparison tiles only.
+Keep output-file bytes, accessed mapped pages and resident allocations distinct.
+Compare every retained derived value and canonical derivative components in
+bounded comparison tiles at 1e-10; sum per-component canonical operator times
+only as an operator reference, not a complete retained Dataset workflow. Count
+canonical C-owned coarse storage and anchor it in every exposed NumPy view.
+
+P3-D feedback before closure: the new generic derivative loop measured 0.516780 s
+for all three components, while canonical's three separate component kernels
+summed to 0.256313 s (not identical output-retention work). Inspection identifies
+term metadata, axis selection and spacing reads inside every cell. Bound one
+E5-related execution probe to existing cell-major versus term-major loops,
+15 minutes, three same-runner repetitions at mixed-region and full-domain sizes.
+Move invariant metadata/denominator outside cell loops while preserving division,
+coefficient multiplication and each output's addition order exactly. No reciprocal
+substitution or relaxed tolerance is selected. Retain only if core conformance
+and actual derivative/consumer costs improve without a material regression.
+
+## Ready P3-F Choice
+
+Select twist for P3-F, not endpoint-map Q. The named diagnostic is
+`Tw = integral [curl(B) dot B / (4*pi*|B|^2)] ds` over the accepted traced segment,
+with positive arclength ds; reversing trace direction changes the path but does
+not multiply this integrand by the direction sign. Use the extended-input
+centered derivative already validated in D, prepared locally for pool misses
+rather than requiring a global D pass. Independently cache the one-halo curl
+group beside the two-halo B group and publish both before readonly worker use.
+Retained resident B/curl groups can likewise be reused without concatenation.
+
+Evaluate the integrand at the four RK stages and accumulate its RK4 quadrature
+only on an accepted step. This is a composed stage diagnostic, not a derivative
+estimated from saved points. Validate a helical affine B field against its known
+constant twist density and independent quadrature, plus serial/parallel/bounded
+agreement. Record derivative, trajectory and quadrature errors separately.
+Optional trajectories store accepted points only, with stable seed association
+and explicit output admission/streaming; diagnostics-only remains the default.
+Selected-seed retracing is an explicit function call with supplied integration
+parameters, never automatic replay. Q remains deferred until a chosen method
+and actual endpoint/auxiliary-dynamics acceptance are supplied; accepted-prefix
+Tw does not certify full-boundary line twist or exact footpoints.

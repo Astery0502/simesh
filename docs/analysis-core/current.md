@@ -11,18 +11,20 @@ recommendations are superseded. Continue the next ready work after checkpoints.
 - Checkout: `/Users/astery/science/simesh`, branch `codex/analysis-core-p0-p4`,
   branched from `7b0c1b1e17e2a16311e2c5e2cfbe22d908c98283` with existing
   uncommitted documents preserved. Do not stage unrelated entry changes.
-- Active delivery: P3-D whole-domain curl(B) and retained slices. P0/P1 and
-  the P2 accepted-prefix parallel tracer are delivered; see [P1](evidence/p1-native-fields.md)
-  and [P2](evidence/p2-field-lines.md).
+- Active delivery: P3-F accepted-segment twist, optional trajectories and
+  explicit selected-seed retracing. P0/P1, P2 and P3-D are delivered; see
+  [P1](evidence/p1-native-fields.md), [P2](evidence/p2-field-lines.md) and
+  [P3-D](evidence/p3-d-global-slices.md).
 - Selected design: [native-core-design.md](native-core-design.md).
 - Executable location: additive experimental `src/simesh/analysis/`, compiled
   `src/simesh/utils/lib/analysis/`, development adapters `scripts/analysis_core/`.
   Canonical/rewrite implementations remain available.
-- New executable checks: seven core/F composed cases pass. WENO selected
-  two-layer values and short/long F comparisons pass. A 2048-seed parallel
-  case gives 3.69x speedup; WENO long-cache probe retains 256 slots for that
-  repeated request (zero warm fills). Exact boundary endpoints, global D/L,
-  twist/trajectory delivery and target scale remain open.
+- New executable checks: eight core/F/D composed cases pass. Full WENO
+  curl coverage (67,842,000 retained values) and axis/oblique slices compare
+  successfully. The term-major derivative preserves operation order and improves
+  the measured complete resident consumer. Keep fast resident canonical and
+  memory-bounded exact-phase preparation as explicit alternatives. Exact
+  boundary endpoints, LOS, twist/trajectory delivery and target scale remain open.
 
 ## Run Profile
 
@@ -55,11 +57,12 @@ P0/P1/F/D or LOS geometry work.
 
 ## Next Action
 
-Implement P3-D global curl(B) with independently owned/optionally backed derived
-fields and axis/oblique sampled slices. Compare the bounded exact-phase RHE
-provider with an explicitly named canonical bulk resident preparation adapter;
-keep transfer arithmetic distinctions visible. Preserve complete global coverage
-and include retained output in admission. Then advance P3-F and ready LOS work.
-P3-L physical response delegation is still pending. Direct original-record bounded
-input, installed provider/2D/periodic integration and actual large fixtures remain
-later gates; no automatic cutover of the canonical API is planned.
+Implement selected P3-F twist with RK-stage curl sampling/quadrature and an
+independent one-halo companion group for bounded B pools; no global D dependency.
+Add optional admitted accepted trajectories and explicit selected-ID retracing.
+Use manufactured helical twist and WENO serial/parallel/resource comparisons.
+Then complete ready LOS geometry/physical work and P4 integration/scale gates.
+P3-L response/EOS/units delegation remains pending. Native 2D/periodic adapters,
+direct original-record bounded access and actual large-fixture acceptance remain
+later decisions. The global WENO output occupies ~543 MB in ignored results;
+preserve it unless reclaiming that explicitly owned scratch is necessary.

@@ -9,7 +9,10 @@ from .mesh import MeshIndex
 from .sampling import sample
 from .derivatives import derivative, curl
 from .field_lines import trace, iter_traces, TraceResult, Termination
+from .global_fields import global_curl
+from .slices import Plane, SliceResult, sample_plane
 
 __all__ = ["FieldDefinition", "FieldSource", "MeshIndex", "PreparedFields",
            "PreparedPool", "prepare", "iter_prepared", "sample", "derivative", "curl",
-           "trace", "iter_traces", "TraceResult", "Termination"]
+           "trace", "iter_traces", "TraceResult", "Termination", "global_curl",
+           "Plane", "SliceResult", "sample_plane"]

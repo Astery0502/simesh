@@ -105,7 +105,7 @@ cpdef void sample_ready(
                 interpolate(&points[i,0],leaf,slot,bounds,spacing,data,halo,&output[i,0])
 
 
-cpdef void differentiate(
+cpdef void differentiate_cellwise(
     const double[:, :, :, :, ::1] data, const int64_t[::1] slots,
     const int64_t[::1] ids, const double[:, ::1] spacing,
     const int64_t[:, ::1] terms, const double[::1] coefficients,
@@ -131,6 +131,40 @@ cpdef void differentiate(
                             delta = (data[slot,i+1+x,j+1+y,k+1+z,component] -
                                      data[slot,i+1-x,j+1-y,k+1-z,component])/(2.*spacing[leaf,axis])
                             output[s,i,j,k,out] = output[s,i,j,k,out] + coefficients[t]*delta
+
+
+cpdef void differentiate(
+    const double[:, :, :, :, ::1] data, const int64_t[::1] slots,
+    const int64_t[::1] ids, const double[:, ::1] spacing,
+    const int64_t[:, ::1] terms, const double[::1] coefficients,
+    double[:, :, :, :, ::1] output,
+):
+    """Same per-output operation tree; invariant term metadata stays outside cells."""
+    cdef int64_t s, slot, leaf, i,j,k,c,t,axis,component,out
+    cdef int x,y,z
+    cdef double delta, denominator, coefficient
+    with nogil:
+        for s in range(output.shape[0]):
+            leaf = ids[s]
+            slot = slots[leaf]
+            for i in range(output.shape[1]):
+                for j in range(output.shape[2]):
+                    for k in range(output.shape[3]):
+                        for c in range(output.shape[4]):
+                            output[s,i,j,k,c] = 0.
+            for t in range(terms.shape[0]):
+                out,component,axis = terms[t,0],terms[t,1],terms[t,2]
+                x = 1 if axis == 0 else 0
+                y = 1 if axis == 1 else 0
+                z = 1 if axis == 2 else 0
+                denominator = 2.*spacing[leaf,axis]
+                coefficient = coefficients[t]
+                for i in range(output.shape[1]):
+                    for j in range(output.shape[2]):
+                        for k in range(output.shape[3]):
+                            delta = (data[slot,i+1+x,j+1+y,k+1+z,component] -
+                                     data[slot,i+1-x,j+1-y,k+1-z,component])/denominator
+                            output[s,i,j,k,out] = output[s,i,j,k,out] + coefficient*delta
 
 
 cpdef void advance_lines(
