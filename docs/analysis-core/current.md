@@ -11,6 +11,10 @@ advanced through implementation, comparisons, integration and feasible scale.
 acceptance still require missing inputs. Do not restart completed stages or
 reinterpret the old P2 recommendation as the endpoint.
 
+Execution is **blocked on external inputs** after repeated revalidation: the
+physical response/thermodynamic inputs and a suitable large Cartesian fixture
+remain unavailable. Resume the corresponding gate when either input is supplied.
+
 | Delivery | Actual status and evidence |
 | --- | --- |
 | P0/P1 | Complete selected design, provider assembly, native interior/two-halo products, stable bounded borrowing and direct consumption; [P1](evidence/p1-native-fields.md) |
