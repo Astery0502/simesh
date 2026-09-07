@@ -1,5 +1,13 @@
 # Current Rewrite Checkpoint
 
+The active analysis-core run is governed by
+[its current checkpoint](../docs/analysis-core/current.md), which supersedes the
+historical authorization notes below. The user activated P0--P4 on 2026-09-08;
+native field/F/D/scalar-LOS and installed-provider work has now been delivered
+within its recorded scope. The provider adds a separate ordinary-prefix reader
+for 3D staggered-tail records; DAT-003's original factory and rejection remain
+unchanged. The old M0/M1/M2 history below is not the new core's execution state.
+
 ## Active State
 
 - Milestone: M2 Cartesian 2D, at the active-dimension foundation boundary.
