@@ -3,6 +3,21 @@
 This is the lightweight dependency ledger for the rewrite. Add detail only when
 a capability becomes active.
 
+[baseline.md](../docs/analysis-core/baseline.md) now owns the current requirement-to-capability/evidence
+map and recommended first-outcome readiness. The statuses below retain their
+original historical scope; `complete` does not mean preferred for new workloads,
+publicly integrated, or a mandate to follow the old milestone order. The proposed
+three-pipeline result scope supersedes the repeated-sampling phase suggestion.
+F tracing/Q/twist, independent D global derivatives/slices and L full-domain LOS
+have no newly selected implementation group or capability IDs; define only
+demonstrated missing responsibilities after the selected outcome's entry gate.
+
+The 2026-09-07 [intent catalog](../docs/analysis-core/workflows.md) expands user outcomes and
+resident/bounded acceptance. Catalog entries are not capability IDs or completed
+features. Slice, surface and volume products need future consumer-specific
+contracts; existing M0/M1 and optimization statuses retain their original scope.
+No implementation group is activated by the documentation change.
+
 ## Status Values
 
 - `proposed` -- identified but not specified;
@@ -92,110 +107,43 @@ Status: complete. See `evidence/M1-ARCHITECTURE-HORIZON.md`.
 | TRM-001 | Nonperiodic field-line termination policy | FLN-001, RKS-001, LOC-001 | complete |
 | SLE-001 | Cached native refined field-line execution | CHS-001, FLN-001, RKS-001, TRM-001 | complete |
 
-FST-001 supplies explicit flat preorder hierarchy and leaf maps, and FST-002
-validates an unchanged artifact lifecycle once.  TOP-002 owns raw contact
-semantics, and BAL-001 independently owns all-touch admissibility; both are
-complete.  GEO-002 is also complete and consumes validated FST artifacts
-without depending on balance or face caches.  REL-001 is complete and owns
-selected directional relation records without support or value-transfer
-policy; its consumer evidence keeps optional TOP-003 deferred.  The STO-002
-Yellow trigger activated the now-complete extraction sequence: WSP-001
-accounting, PRI-001 primary traversal, FCL-001 direct-face closure, and HCL-001
-full-halo closure.  STO-002 is now a retained compatibility composition.
-STO-004 now supplies exact bounded refined source union, dense-primary progress,
-and one-row capacity bounds without owning transfer semantics.  The analysis
-priority re-audit retains that operation for dense traversal but requires
-SPR-001 before its next executor consumer so an explicit sparse/ROI selection
-does not scan or read intervening primary leaves.  RST-001's numerical kernel
-depends only on FND layout, while STO-001/STO-004 provide its completed dense
-bounded gather evidence.
-RST-001 now freezes the current eight-value ratio-two average independently of
-relation/slot/halo policy and composes it with explicit FINER-source gathering.
-LIM-001 now extracts the independently variable three-point slope rule as a
-validated scalar plus allocation-free shared inline implementation.  PRL-001
-owns ratio-two indexing, exact phase eta, limited reconstruction, regions, and
-coarse reach without a slope cache.  RSL-001 provides bounded source-slot
-identity without kind policy.  The proposed RAC-001 action enum was retired
-because REL kind/mask already determines it.  Combined RTP-001 failed the
-five-question gate and split into now-complete TGT-001 directed boxes and
-now-complete RPH-001 ratio-two phases.  Proposed RSG-001 failed decomposition
-and split into now-complete SLB-001 same-level translation, FRP-001 FINER
-restriction placement, and CWP-001 COARSER workspace geometry; physical
-widening remains PBC-owned.  SLB-001 is a topology-free affine translation from
-explicit target boxes and reduced directions to equal-level source boxes.
-SPR-001 now preserves STO-004 support semantics for explicit sparse ascending
-primary selections without admitting gaps.  FRP-001 maps active finer phases to exact
-RST source/target boxes, and CWP-001 exposes normalized PRL workspace placement
-plus uncovered slope reach.  Their group evidence retains STO-004 for dense
-full-domain traversal and records selected plan-to-gather bytes.
-The selected refined halo completion group scopes its first complete consumer
-to block extents at least four and per-side reach at most half a block.
-CSP-001 plans the full CWP slope rectangle from the existing all-26 selected
-support, PWA-001 owns physical widening, CWA-001 assembles one PRL workspace,
-and RHE-001 owns bounded reader/writer scheduling.  The complete bounded path is
-bitwise equal to its independent resident composition and safe dyadic current
-comparison; its optimized preflight preserves calls/bytes/memory while materially
-improving small, medium, and full WENO-metadata compositions.  CWP now accepts
-every RPH-valid COARSER phase/direction after its first consumer exposed an old
-restriction-send policy leak.  A proven `B=2`/wide-reach
-counterexample is deferred to secondary closure or a separately contracted
-cross-valid PRL strategy rather than hidden in the executor.
+Historical composition and decomposition decisions are in
+[M1 capability history](evidence/M1-CAPABILITY-HISTORY.md),
+[M1 analysis decisions](evidence/M1-ANALYSIS-DECISIONS.md), and the
+[M1 horizon](evidence/M1-ARCHITECTURE-HORIZON.md). These preserve prior scope,
+qualified fixture evidence, rejected alternatives, and measured reopen triggers.
 
-The completed bounded repeated-point sampling group separates exact leaf
-ownership, zero-order cell selection, trilinear stencil arithmetic, and
-reader/workspace scheduling. LOC-001 descends the existing flat forest under
-canonical GEO face comparisons. SAM-004 and SAM-005 consume explicit
-slot-to-point groups and do not select a reader, cache, or traversal policy.
-RPS-001 locates once, groups repeated owners, and executes bounded batches;
-zero-order batches read only owner interiors, while trilinear batches consume
-RHE-001-completed one-cell halos. The existing SAM-002/SAM-003 block-centric
-uniform wrappers remain fused compatibility/performance strategies. Exact
-half-open point ownership, scalar point kernels, bounded array/non-array reader
-execution, all refined relation/PBC kinds, public-RHE preservation, and
-capacity/backend invariance are recorded in the group evidence. Measured
-all-26 amplification and checked-halo planning remain explicit streamline and
-native-reader optimization triggers rather than cache policy hidden in the
-sampler.
+## Post-M1 Native Derived Analysis
 
-The completed native selective AMRVAC read group separates byte-format decoding,
-canonical forest binding, and payload transfer strategy. DAT-001 accepts exact
-v5 metadata in either byte order and keeps staggered files available for
-metadata evidence. DAT-002 proves file leaf rows are the FST canonical leaf
-order. DAT-003 exposes selected non-staggered interiors through STO-003 over a
-caller-owned file descriptor; it selects block/field bytes without importing
-the current eager reader or adding dataset/cache lifecycle. Real tdm fields and
-a streamed WENO regular-field bridge are bitwise equal through native/array
-RHE/RPS compositions with exact selected bytes and bounded managed memory.
+Status: optimization round complete; broader product scope remains planned.
+Completed M0/M1 rows retain their
+original contracts and evidence. See the post-M1 stage in ROADMAP and
+[optimization scope](designs/M1-ANALYSIS-OPTIMIZATION.md).
 
-The completed native selected refined curl group defines exact cell-center ROI
-windows, a fixed per-slot-spacing Cartesian curl, and the now-triggered stable
-completed-primary consumer boundary before composing one bounded curl output
-and streaming component sum. It consumes DAT-003 directly and does not add
-dataset lifecycle, cache policy, streamline stepping, or a generic expression
-engine.
+| ID | Capability | Depends on | Status |
+| --- | --- | --- | --- |
+| HPR-001 | Invocation-local owned halo preflight | RHE-001, RHC-001, CSP-001, CWP-001 | complete |
+| CQP-001 | Invocation-local indexed cache query planning | CHS-001, HPR-001 | complete |
 
-The completed cached refined vector sampling group adds an exact last-owner hint
-before unchanged LOC descent and retains completed one-cell owner halos in one
-explicit serial byte-bounded session. It keeps all-26 RHE miss semantics while
-deferring raw-block caching and direction-projected COARSER/PBC support to
-native streamline evidence.
+The completed round reduced selected native-analysis halo preparation cost and
+large-batch cache lookup cost. The [execution plan](designs/M1-ANALYSIS-OPTIMIZATION.md#execution-order)
+owns the resolved sequence; [round evidence](evidence/M1-OPTIMIZATION-ROUND.md)
+records the baseline, gates, results and every deferred direction's trigger.
 
-The completed native refined field-line group separates scale-safe normalized
-magnetic RHS and oriented line integral, fixed classical RK4 arithmetic,
-nonperiodic termination/result policy, and serial stage-major CHS scheduling.
-No repository tracer supplies legacy semantics; these are explicit new M1
-contracts rather than a parity claim.
+DVA-001 was withdrawn at the
+user's direction before contract freeze: field-specific validity exploration
+is not a separate deliverable. Access propagation, produced validity, and
+downstream interpolation are general requirements of the actual consumers.
+Reuse existing region algebra and introduce a new capability only for a
+demonstrated missing responsibility or useful execution strategy.
 
-Decomposition audit checkpoint: HAL-002's Red finding is resolved by explicit
-HPL-001 relation planning, PBC-001 physical rules, and HAX-001 plan application;
-HAL-002 is retained as the measured Fused compatibility implementation.  The
-preserved TOP drafts have now been split into the M1 capabilities above; no Red
-combined TOP contract remains.
-The STO-002 Yellow trigger is resolved by WSP-001, PRI-001, FCL-001, and
-HCL-001 with compatibility wrappers preserved.  SAM-002 and SAM-003 are
-retained Fused implementations whose missing
-semantic boundaries are extracted at refined sampling.  See
-`evidence/DECOMPOSITION-AUDIT.md`.
+The optimization round assessed halo preparation, cache scaling,
+storage/output amplification, and conditional compute improvements. Direction
+dispositions live in the execution plan or linked evidence, not as artificial
+completed capability rows. Repeated raw/derived analysis and additional
+along-field diagnostics remain broader product outcomes; optimization closure
+does not mark them implemented. Storage/cache, requested-direction, and compute
+variants remain measured choices.
 
 ## M2: Cartesian 2D
 
@@ -203,16 +151,21 @@ semantic boundaries are extracted at refined sampling.  See
 | --- | --- | --- | --- |
 | DIM-001 | Explicit active-dimension and singleton-z artifact provenance | FND-001 | proposed |
 
-The first active group is **Active-Dimension Foundation**, initially singleton
-DIM-001. It must keep `active_ndim` distinct from `ndir`, retain the canonical
+The queued first group is **Active-Dimension Foundation**, initially singleton
+DIM-001; post-M1 analysis planning currently has priority. It must keep
+`active_ndim` distinct from `ndir`, retain the canonical
 five-dimensional singleton-z payload layout, and prevent valid 3D singleton-
 axis grids from being inferred as 2D. Quadtree, variable-width DAT, geometry,
 halo, bilinear sampling, and operator capabilities follow only after this
-provenance integrates.
+provenance integrates. Activate this prerequisite earlier if a post-M1 shared
+representation change requires it; full 2D implementation is not a prerequisite
+for composing existing valid 3D contracts.
 
 ## Later Milestones
 
-The planned dependency sequence is:
+The post-M1 analysis stage currently precedes broad M2 work; it advances only
+the concrete M4/M6 pieces needed by the user workflows. The retained dimensional
+and migration dependency sequence is:
 
 1. M1: refined forest/topology -> refined geometry -> support/relation planning
    -> restriction/prolongation -> refined halos -> refined sampling -> native

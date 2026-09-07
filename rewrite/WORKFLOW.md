@@ -1,304 +1,168 @@
 # Capability Workflow
 
-## Capability Group Cycle
+These detailed rules describe development of existing rewrite capabilities.
+New project-level analysis-core planning uses the
+[project decision workflow](../docs/analysis-core/README.md#how-a-decision-advances);
+it does not automatically inherit this tree's groups or milestone sequence.
 
-Before implementation, select one to four dependency-adjacent capabilities
-that deliver one concrete composed outcome and record the active group in
-`CURRENT.md`. The group declaration names its member IDs, dependency order,
-outcome, focused checks, full regression command, relevant current-path
-comparisons, performance classes, and any required standard benchmark set.
-Exact later member IDs may be refined by the five-question gate before the first
-member is implemented, but the group must not expand beyond four members or
-absorb unrelated work.
+This document owns the development cycle, exploration record, review, and
+checkpoint rules. CHARTER owns intent; ANALYSIS_WORKLOADS owns user acceptance;
+DECOMPOSITION owns boundary analysis; PERFORMANCE owns measurement policy.
 
-Before freezing the group, add a short exploration-coverage record:
+## Select And Resume Work
 
-```text
-Current approach:
-Structurally different credible alternative:
-Most decision-changing uncertainty:
-Reopen evidence or consumer:
-```
+For a new outcome, use [baseline.md](../docs/analysis-core/baseline.md) to select by confirmed user
+requirements and current gaps, then map the selected design to its affected R
+rows. State delivered/protected/deferred scope and the matching evidence there;
+reuse this single record rather than add a reporting layer. A historical
+`complete` capability is eligible evidence, not automatic product acceptance.
+The latest user instruction and CURRENT define active work; BASELINE supplies
+requirements and readiness rather than a separate permission gate.
 
-This is a coverage check, not a requirement to implement every alternative. If
-the uncertainty can materially change a boundary, complexity class, data
-layout, transfer count, or memory model, use the disposable-exploration rule.
-Otherwise record the deferral and proceed.
+Select a small set of related changes delivering one concrete useful outcome.
+Record the active work and next action in CURRENT. Use capability/group labels
+only where they help track a real boundary; there is no fixed member quota or
+requirement to give every helper its own contract, test or approval step.
 
-When the group selects or optimizes an algorithm, data structure, cache, local
-operator, sampler, or streamline path, also complete the algorithm-selection
-record in `ANALYSIS_WORKLOADS.md`. The representative consumer and metrics must
-match the primary analysis workload unless the group explicitly owns a
-migration-only or simulation-style compatibility requirement.
+Advance as dependencies become usable. An immediate consumer may establish a
+producer's behavior without a separate isolated test. Update CAPABILITIES when
+its actual scope or status changes; ordinary edits need no ledger ceremony.
 
-Implement one ready member at a time. Dependencies outside the active group
-must be `complete`; an earlier member of the same group may be consumed at
-`integrated` after its focused and immediate-composition checks pass. A member
-remains `integrated` until the group gate passes. Do not rerun the accumulated
-suite or standard benchmark matrix after each member.
+For a long-running goal, continue across completed groups and milestones within
+the authorized goal. Update the checkpoint, select the next ready outcome, and
+continue until that goal is satisfied or no work can make meaningful progress.
+Ordinary milestone completion is a checkpoint, not an automatic stopping point.
 
-Close the group by:
+## One Design Record
 
-1. building the rewrite extensions once from the complete group state;
-2. running all member-focused tests and the accumulated rewrite regression and
-   integration suite once;
-3. running the relevant comparisons with the current implementation once;
-4. when required by a member's performance class, running one standard
-   benchmark pass for the group's new hot paths and immediate composed outcome,
-   without rerunning unaffected benchmarks;
-5. resolving any failure at its owning capability and rerunning the failed gate;
-6. recording any credible deferred alternative with its reason and concrete
-   reopen trigger;
-7. marking the members `complete`, updating the ledgers and evidence, inspecting
-   the working and staged diffs, and creating one cohesive group checkpoint.
+For a substantive design choice, record the intended result, affected behavior,
+chosen boundary, reason and evidence in one place. Link existing numerical and
+ownership contracts. A small readable change can be explained in its diff or
+checkpoint; it does not need a separate design document.
 
-Use a singleton group when no other capability naturally shares the same
-composed outcome and closing checks. Do not invent a companion capability or
-prematurely specify downstream behavior to avoid a singleton.
+Use [DECOMPOSITION](DECOMPOSITION.md) as optional design questions when ownership
+or coupling is unclear. There is no mandatory five-question audit, split rule,
+independent-review gate or requirement to invent a competing implementation.
+Choose checks through the project
+[verification policy](../docs/analysis-core/performance.md#choose-the-smallest-useful-check).
+Direct inspection is enough when it resolves the question. Measure a real
+consumer when performance is at issue; do not create a benchmark merely to
+complete a form.
 
-## Capability Cycle
+## Exploration And Contract Freeze
 
-For one ready capability:
+Recover current behavior and domain meaning before choosing an implementation.
+Explore only uncertainties that can change semantics, a boundary, complexity,
+layout, transfer count, or memory model. A prototype has one recorded question
+and a time or variant bound. Keep it outside package imports, stable tests, and
+downstream dependencies. It needs enough evidence to answer the question, not
+a production evidence suite. Carry the conclusion into the design, then delete
+the prototype or keep it only under an ignored experiment path.
 
-1. Recover the relevant behavior from the current implementation and domain meaning.
-2. Apply the five-question and decision-ownership gate in `DECOMPOSITION.md`; split independently variable meanings before implementation.
-3. For a non-trivial capability, write a short design note under `designs/` that compares the real alternatives and their composition, memory, and performance trade-offs.
-4. Select an approach and write or refine its stable contract under `contracts/`.
-5. Define exact outputs, floating-point comparisons, and focused invariants.
-6. Build the smallest clear Python or NumPy reference when it adds independent evidence.
-7. Implement the simplest Cython form with explicit inputs, outputs, and workspace.
-8. Compare intermediate artifacts, not only the final user-visible result.
-9. Integrate with the immediate lower-level producer and next higher-level consumer.
-10. Assign the capability a performance class and gather only the evidence required by that class.
-11. Explore optimized or fused variants only after the simple implementation and composition are correct.
-12. Run the capability's focused tests and immediate reference/composition comparisons; use smoke benchmarks only when useful during iteration.
-13. Update the capability ledger to `integrated` and update the active-group checkpoint.
-14. Continue to the next ready member without rerunning the accumulated suite or standard benchmark matrix.
-15. Mark members `complete` and commit only after the capability group gate passes.
+A design records alternatives; a contract freezes selected behavior. Use
+[contracts/README.md](contracts/README.md) for contract contents. Do not freeze
+an implementation accident as universal semantics or add defensive checks
+without an owned invariant. Conversely, no new policy document silently changes
+an existing strict arithmetic, representation, ownership, or failure contract.
 
-Keep this cycle proportional. A simple index transform does not need a report;
-a refined ghost algorithm or out-of-core executor does.
+## Implement And Integrate
 
-## Disposable Exploration
+Read the relevant code, contract and existing evidence, then implement the useful
+change with explicit buffers and owned state. Check the behavior actually affected:
+core halo/AMR numerical behavior, valid data, selection/identity, live memory,
+parallel execution or complete consumer costs as appropriate.
 
-Before freezing a non-trivial contract, a short prototype is allowed when a
-concrete feasibility, layout, cache, or complexity question requires executable
-evidence. Record the question and a time or variant bound. Experimental code
-must remain outside package imports, stable tests, and downstream dependencies.
-It may use lightweight measurements but does not need production validation.
-Carry only the result into the design/contract, then remove the prototype or
-leave it under an ignored experiment path.
+Prefer an existing focused consumer check. Add a test only for a meaningful
+uncovered core case; metadata descriptions, incidental helper-call order and
+simple unchanged quantity formulas normally need direct reading only. Multiple
+helpers can be protected by one representative composition. Follow the project
+[smallest-useful-check rule](../docs/analysis-core/performance.md#choose-the-smallest-useful-check).
 
-## Design And Specification
+Update CURRENT and continue once the relevant evidence is adequate. Reuse passing
+checks; broaden only for new changes, failures, cross-consumer impact or unresolved
+concerns. Preserve the existing arithmetic/ownership/failure contracts and do not
+hide a discrepancy with wider tolerances. PERFORMANCE owns cost comparisons;
+FUNCTIONAL_COMPOSITION owns numerical-strategy and buffer meanings.
 
-A design note is exploratory. It explains the problem, the few credible
-approaches, and the trade-offs that affect later composition. It may change or
-be discarded as evidence improves.
+## Changed Requirements And Existing Work
 
-A contract is the selected specification. It defines the behavior that the
-implementation and its consumers may rely on. Implementation starts only after
-that contract is clear enough to test.
+For new user steering, identify the affected requirement and implementation,
+update the primary definition and next action, and continue within scope. Reuse
+existing decisions/evidence. Update ROADMAP/CAPABILITIES only when their actual
+priority, dependency or status changes; no routine architecture-horizon audit or
+reassessment of every completed capability is required.
 
-Capability size is semantic, not textual. Use `DECOMPOSITION.md` to record the
-owned and non-owned decisions and to distinguish coherent validation/loop cases
-from independently variable policy, planning, storage, or execution choices.
-If the five-question gate fails, split before implementation or record a
-specific exception in the design with evidence.
+Reopen a design for a concrete consumer need, incompatibility or measured cost,
+not stylistic purity. Historical tests and measurements keep their original scope.
 
-Existing work is refined progressively at dependency, substitution,
-optimization, integration, defect, or cutover boundaries. Preserve validated
-behavior and compatibility wrappers while extracting functions; do not reopen
-completed work for stylistic purity alone.
+## Independent Review And Autonomy
 
-Do not require separate design and contract files for trivial capabilities. A
-simple capability may append its concise final evidence to its contract. Prefer
-one evidence summary for a capability group instead of one file per member when
-the checks and benchmark are shared. Do not turn design notes into long reports.
-Their purpose is to preserve reasoning that a later agent would otherwise have
-to rediscover.
+Default to one agent and direct source/contract/diff inspection. Use an independent
+sub-agent review only for a specific unresolved core question where another
+technical perspective is useful, following the project
+[review rule](../docs/analysis-core/development.md#autonomous-decisions-and-user-judgments).
+Contract, layout or milestone changes do not automatically require review.
 
-## Contract Contents
+State the question and resolve real findings. Review does not substitute for
+meaningful core tests or performance measurements, and its absence is not an
+artificial blocker when direct evidence is sufficient. Earlier user authorization
+persists; seek new input only for an actual missing scope or scientific judgment.
 
-Each active contract should answer:
+## Implementation Group Gate
 
-- What concept and responsibility does this capability represent?
-- What are its inputs and outputs?
-- Who owns each buffer and where may mutation occur?
-- What layout, valid region, and halo are required?
-- What access pattern does it use?
-- What numerical behavior is exact and what uses tolerance?
-- Which old behavior, independent reference, or invariant establishes correctness?
-- Which immediate capability consumes the result?
+Close a coherent delivery when the intended behavior and relevant costs are
+established. Rebuild changed compiled sources with the supported helper; a Python
+or documentation edit does not automatically require a clean extension build.
+Use affected focused/integration checks and useful current-path comparisons.
+A full regression suite is justified by broad integration impact or an unresolved
+failure, not required at every group boundary. Likewise, run only benchmarks
+that address the changed hot path or requested consumer outcome.
 
-Use prose, small tables, and signatures. Avoid framework-like schemas unless
-the same structure is repeatedly useful.
+Resolve failures, record the useful result/evidence and update the active status.
+Passing unrelated checks are not repeated without a reason. Use ordinary Git
+checkpoints for recoverable owned work, inspecting the diff and staging only the
+selected files. No fixed group size, separate approval packet, content manifest
+or per-helper commit is required. Existing numerical and public guarantees remain
+in force; this changes verification selection, not scientific meaning.
 
-## Numerical Comparison
+## Feature-Completion Reference Assessment
 
-Use exact comparison for discrete structures and exactly specified placement.
-For floating-point work, choose metrics from the operation's meaning, such as
-maximum absolute error, relative error away from zero, norm error, conservation
-error, or convergence behavior. Record the worst discrepancy and explain why
-the chosen comparison is sufficient.
+At group selection, decide whether the changed feature affects WENO-supported
+reading, topology/geometry, halos, local fields, sampling, caching, trajectories
+or output. For an applicable feature, name an explicit completion assessment
+using [WENO-REFERENCE.md](WENO-REFERENCE.md): affected component cases and their
+immediate consumer, comparators, numerical scope, resource limits and command.
+Run it after implementation and focused validation, alongside the existing
+delivery assessment; share overlapping useful runs. A cross-layer change may
+select a broader matrix, not automatically all historical benchmarks.
 
-Do not use hashes for numerical comparison or artifact governance.
+This is a deliberate feature-completion activity, not a default pytest/Make/CI
+hook, per-edit check or per-commit trigger. Small unrelated changes and features
+the fixture cannot represent record a concise not-applicable reason and use
+their appropriate evidence. Reuse existing runs when code, workload, build and
+required metrics still match; refresh only the missing comparisons.
 
-## Source Migration Closure
+An assessment closes with functional pass/fail or a documented semantic
+difference, component costs, complete resources, feasibility, and implement/
+retain/defer recommendations. An applicable hard correctness/resource failure
+cannot be waived as a missing fixture. Missing data prevents claims about that
+case, but does not run expensive substitutes silently. Preserve prior capability
+scope; assess new evidence before selecting another optimization group.
 
-Before implementing a current-source behavior, identify its feature-family row
-in `SOURCE_MIGRATION.md`, current authority, user-observable contract, and
-intended disposition. Migrate semantics rather than classes or lines. When a
-feature is integrated, update its parity tests, benchmark/workflow evidence,
-and disposition together.
+## Documentation Checkpoint
 
-Do not retire or bypass a canonical path merely because lower kernels exist.
-Replacement requires the corresponding real public workflow, format behavior,
-failure behavior, and fallback/rollback evidence. Legacy modules are evidence
-unless a supported behavior still uniquely depends on them.
+Documentation-only work validates requirement preservation, local links,
+contract/status consistency, and the diff by direct inspection. Check affected
+links when needed; do not create a documentation test suite or routine review gate.
+Do not build extensions or run numerical/performance suites solely for prose
+changes. Do not mark proposed software complete or present historical tests as
+fresh results. A documentation commit, when made, is labeled as such and never
+represented as an executable capability-group completion.
 
-## Optimization
+## Checkpoint Surface
 
-An optimization begins with a concrete hypothesis. Keep the simple validated
-implementation available while testing variants such as loop fusion, layout
-changes, workspace reuse, tiling, mapping, caching, streaming, or OpenMP.
-
-Classify the work before benchmarking:
-
-- `cold/control`: validate complexity, allocation, and correctness; do not
-  create an isolated timing merely because the implementation is in Cython;
-- `composition-only`: measure at the first real immediate consumer rather than
-  constructing a repeated synthetic consumer;
-- `hot-kernel`: measure the kernel and its immediate composed consumer;
-- `milestone-workflow`: measure a representative real-data or public workflow,
-  including runtime, memory, I/O, and scaling dimensions that matter.
-
-A capability moves to a more expensive class only when a cost model, profiler,
-scaling risk, or real consumer justifies it.
-
-For a hot path, record the `PERFORMANCE.md` workload/profile, comparator,
-hypothesis, metrics, and material-regression rule before the final experiment.
-The active group runs the standard kernel and immediate composed benchmarks
-once at its closing gate. Milestones also require a real-data/public-workflow
-benchmark at the level reached so far.
-
-Choose among useful variants by the relevant combination of runtime,
-throughput, peak memory, allocation behavior, scaling, and conceptual cost.
-It is acceptable to retain separate in-memory and low-memory strategies.
-
-Optimization occurs at two levels:
-
-- kernel optimization improves one established transformation;
-- composition optimization reduces transfers, temporary storage, repeated
-  traversal, or call overhead across several correct transformations.
-
-Keep the separate reference kernels even when the production path uses a fused
-implementation. A fused path must preserve the contracts of the capabilities it
-combines.
-
-## Alternative Implementations And Adapters
-
-An implementation is replaceable only when the substitution boundary is
-explicit and the alternatives share one conformance suite. Use coarse-grained
-Python function adapters for storage or framework transfer at chunk boundaries;
-keep Cython cell and block loops free of Python callbacks.
-
-For a new backend or execution strategy:
-
-1. identify the existing semantic contract it must preserve;
-2. keep backend state, shape, ownership, alias information, and transfer
-   callable explicit;
-3. transfer into or out of canonical caller-owned buffers unless the backend
-   independently implements the complete compute contract;
-4. run the same exact/numerical tests through every implementation;
-5. measure adapter overhead, transfer amplification, retained state, peak
-   memory, and failure behavior separately from kernel runtime;
-6. retain a simple resident-array path as the reference composition.
-
-Do not add global backend registries, inheritance frameworks, dynamic kernel
-dispatch in hot loops, or framework-specific branches inside domain kernels.
-Add a small adapter only when a concrete implementation needs it.
-
-Halo evolution follows the same rule. Operator reach determines requirements;
-topology and geometry determine source relations; a support planner determines
-what must be resident; physical, same-level, prolongation, restriction, and
-periodic functions determine values; the executor composes them. Each layer is
-tested independently and no layer infers another from hidden state.
-
-Stop the current optimization cycle when the implementation is correct,
-integrated, and useful on the runtime-memory-complexity trade-off, and the next
-credible variant does not provide a material improvement. Record valuable
-future ideas briefly and move to the next layer. Optimization is part of
-completion, not an unbounded search for a theoretical maximum.
-
-## Independent Contract Review
-
-Use an independent sub-agent review when evidence suggests a material stable
-contract change affecting numerical meaning, ownership/mutation/atomicity, a
-representation consumed elsewhere, or supported public failure behavior:
-
-1. The primary agent writes a short proposed change with the conflicting evidence and affected capabilities.
-2. The primary agent starts an independent sub-agent reviewer and asks it to inspect the contract, raw evidence, reference behavior, and invariants before relying on the primary conclusion.
-3. The reviewer either agrees, rejects the change, or requests one concrete experiment.
-4. If both agree, the primary agent updates the contract, implementation, tests, capability ledger, and checkpoint, then continues without user approval.
-5. If they disagree, run the smallest experiment likely to resolve the disagreement and review again. Keep the existing contract until agreement is reached; continue other ready work when possible.
-
-The review is a technical second perspective, not an approval ceremony. Keep
-the proposal and conclusion concise. Editorial clarification, private naming,
-benchmark tuning, and stronger tests for unchanged behavior use ordinary review
-and do not require a sub-agent.
-
-For parallel implementation or investigation, delegate only bounded workstreams
-with enough independence to save wall-clock time or add a genuinely different
-technical perspective. Give each sub-agent explicit file or evidence ownership;
-the primary agent integrates the result. Do not delegate tiny sequential steps,
-duplicate the same review, or infer delegation from the selected model or
-reasoning-effort level.
-
-## Milestone Architecture Horizon Review
-
-At each milestone close, inspect the composed implementation before selecting
-the next milestone's detailed capabilities. Keep the review focused on:
-
-- data structures or layouts leaking across multiple semantic layers;
-- validation, traversal, transfer, or materialization repeated across consumers;
-- measured runtime, memory, I/O, and allocation hotspots;
-- storage/backend boundaries that force avoidable full-payload movement;
-- assumptions about dimension, geometry, refinement, ownership, or scheduling
-  that the next milestone may invalidate;
-- completed capabilities that still lack a real consumer.
-
-Apply the workload order and local-field/streamline metrics in
-`ANALYSIS_WORKLOADS.md`; explicitly identify any optimization retained mainly
-for migration parity or a simulation-style workload.
-
-Record only decisions, deferred questions, and reopen triggers in the milestone
-evidence. Do not repeat every completed capability result. Use one independent
-sub-agent when a material cross-layer choice has at least two credible
-architectures or the primary analysis has an unresolved technical uncertainty.
-A routine milestone with no such decision uses one concise primary-agent review.
-
-## Checkpoint Discipline
-
-During an active capability group and after each material decision, `CURRENT.md`
-should say:
-
-- active milestone;
-- active group outcome and member IDs;
-- last completed group and last integrated capability;
-- current capability and status;
-- important unresolved differences;
-- next ready capability;
-- exact commands for focused checks and the closing group gate;
-- source-migration rows and benchmark baselines changed by the checkpoint.
-
-Keep `CURRENT.md` as a short resume surface, normally no more than 150 lines.
-Move completed milestone narratives and historical measurements to capability
-or milestone evidence instead of duplicating them in the checkpoint.
-
-The Git commit created after a completed capability group is the durable
-recovery point. Keep group commits cohesive and executable. Intermediate
-experiments and integrated members do not need their own commits unless an
-external interruption requires a clearly labeled recovery checkpoint. Before
-the group commit, inspect `git status`, the working diff, and the staged diff;
-run the group gate; and ensure that unrelated repository changes remain
-unstaged.
+CURRENT contains the active stage/group, last executable checkpoint, current
+capability/status, unresolved constraints, next concrete action, and exact
+applicable check commands. Keep it short, normally under 150 lines. CAPABILITIES
+owns exact member status; ROADMAP owns stage goals. Link durable rules and
+historical evidence instead of copying their full contents into CURRENT.
