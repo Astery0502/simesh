@@ -144,3 +144,25 @@ it does not imply exact boundary endpoints or Q. Set `trajectories=True` on an
 ordinary `trace`/`iter_traces` call when points are requested from the start.
 Use `point_counts` to read valid trajectory prefixes. Full output and retained
 prior results count against admission; streaming avoids mandatory concatenation.
+
+## LOS Of A Supplied Scalar
+
+```python
+from simesh.analysis import integrate_los, orthographic_plane
+
+view = orthographic_plane(scalar.mesh.lower, scalar.mesh.upper, [0.3, 0.2, 1.0],
+                          (256, 256))
+image = integrate_los(scalar, view, [0.3, 0.2, 1.0], workers=4)
+```
+
+Supply an explicitly defined scalar/emissivity group or PreparedPool. The default
+Gauss2 method integrates its trilinear reconstruction between cell-center planes.
+`near`/`far` may be scalars or image-shaped arclength limits. `image.depth`,
+`image.valid` and `image.complete` distinguish real physical intervals and
+failed pixels; empty rays are zero. Midpoint quadrature is available explicitly
+with `quadrature="midpoint", step_fraction=...`. Plane pixels are sampled rays,
+not area averages. The returned units are scalar units times coordinate length.
+
+This interface does not infer epsilon(rho,T), EOS, temperature or instrument
+response. The recorded WENO rho-column image is a scalar diagnostic; the thermal
+response gate remains open in the current checkpoint.

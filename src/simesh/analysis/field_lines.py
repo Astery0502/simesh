@@ -22,6 +22,7 @@ class Termination(IntEnum):
     MISSING_COVERAGE = 7
     UNREPRESENTABLE_NORM = 8
     NONFINITE_DIAGNOSTIC = 9
+    UNREPRESENTABLE_SAMPLE = 10
 
 
 @dataclass(frozen=True)

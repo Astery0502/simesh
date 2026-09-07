@@ -12,8 +12,10 @@ from .field_lines import trace, iter_traces, retrace, TraceResult, Termination
 from .diagnostics import with_curl, CurlPool
 from .global_fields import global_curl
 from .slices import Plane, SliceResult, sample_plane
+from .los import integrate_los, orthographic_plane, LOSResult, LOSStatus
 
 __all__ = ["FieldDefinition", "FieldSource", "MeshIndex", "PreparedFields",
            "PreparedPool", "prepare", "iter_prepared", "sample", "derivative", "curl",
            "trace", "iter_traces", "TraceResult", "Termination", "global_curl",
-           "Plane", "SliceResult", "sample_plane", "with_curl", "CurlPool", "retrace"]
+           "Plane", "SliceResult", "sample_plane", "with_curl", "CurlPool", "retrace",
+           "integrate_los", "orthographic_plane", "LOSResult", "LOSStatus"]

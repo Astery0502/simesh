@@ -5,7 +5,7 @@ Unchecked internal functions receive arrays validated by the provider/core.
 No file, cache, Dataset or Python callback participates in a value query.
 """
 
-from libc.math cimport floor, isfinite, NAN, sqrt, hypot
+from libc.math cimport floor, isfinite, NAN, sqrt, hypot, ceil, nextafter, INFINITY
 from libc.stdint cimport int64_t
 
 
@@ -55,7 +55,7 @@ cpdef void locate(
             owners[i] = owner(&points[i,0],lo,hi,roots,children,leaves,nlo,nhi)
 
 
-cdef inline void interpolate(
+cdef inline bint interpolate(
     const double* p, int64_t leaf, int64_t slot,
     const double[:, :, ::1] bounds, const double[:, ::1] spacing,
     const double[:, :, :, :, ::1] data, int halo, double* out,
@@ -66,6 +66,8 @@ cdef inline void interpolate(
     cdef double q, v00, v01, v10, v11, v0, v1
     for a in range(3):
         q = (p[a]-bounds[leaf,0,a])/spacing[leaf,a] - .5
+        if not isfinite(q) or q < -halo or q >= data.shape[a+1]-halo-1:
+            return False
         base[a] = <int64_t>floor(q)
         t[a] = q-base[a]
         base[a] += halo
@@ -78,6 +80,7 @@ cdef inline void interpolate(
         v0 = v00*(1-t[1]) + v10*t[1]
         v1 = v01*(1-t[1]) + v11*t[1]
         out[c] = v0*(1-t[2]) + v1*t[2]
+    return True
 
 
 cpdef void sample_ready(
@@ -102,7 +105,10 @@ cpdef void sample_ready(
                 for c in range(data.shape[4]):
                     output[i,c] = NAN
             else:
-                interpolate(&points[i,0],leaf,slot,bounds,spacing,data,halo,&output[i,0])
+                if not interpolate(&points[i,0],leaf,slot,bounds,spacing,data,halo,&output[i,0]):
+                    valid[i] = 0
+                    for c in range(data.shape[4]):
+                        output[i,c] = NAN
 
 
 cpdef void differentiate_cellwise(
@@ -217,7 +223,9 @@ cpdef void advance_lines(
                     requested[seed] = leaf
                     misses[seed] += 1
                     break
-                interpolate(p,leaf,slot,bounds,spacing,data,halo,b)
+                if not interpolate(p,leaf,slot,bounds,spacing,data,halo,b):
+                    status[seed] = 10
+                    break
                 samples[seed] += 1
                 if not (isfinite(b[0]) and isfinite(b[1]) and isfinite(b[2])):
                     status[seed] = 5
@@ -235,7 +243,9 @@ cpdef void advance_lines(
                         requested[seed] = leaf
                         misses[seed] += 1
                         break
-                    interpolate(p,leaf,curl_slot,bounds,spacing,curl_data,curl_halo,cb)
+                    if not interpolate(p,leaf,curl_slot,bounds,spacing,curl_data,curl_halo,cb):
+                        status[seed] = 10
+                        break
                     # Algebraically curl(B).B / (4*pi*|B|^2), without squaring
                     # a large norm. This ordering belongs to the named strategy.
                     integrand = (cb[0]/norm)*(b[0]/norm)
@@ -272,3 +282,266 @@ cpdef void advance_lines(
                     for a in range(3):
                         paths[seed,steps[seed],a] = p[a]
                 stages[seed] = 0
+
+
+cdef inline bint interpolate_scalar(
+    const double* p, int64_t leaf, int64_t slot, int64_t component,
+    const double[:, :, ::1] bounds, const double[:, ::1] spacing,
+    const double[:, :, :, :, ::1] data, int halo, double* output,
+) noexcept nogil:
+    cdef int a
+    cdef int64_t base[3]
+    cdef int64_t x,y,z
+    cdef double t[3]
+    cdef double q,v00,v01,v10,v11,v0,v1
+    for a in range(3):
+        q = (p[a]-bounds[leaf,0,a])/spacing[leaf,a]-.5
+        if not isfinite(q) or q < -halo or q >= data.shape[a+1]-halo-1:
+            return False
+        base[a] = <int64_t>floor(q)
+        t[a] = q-base[a]
+        base[a] += halo
+    x,y,z = base[0],base[1],base[2]
+    v00 = data[slot,x,y,z,component]*(1-t[0])+data[slot,x+1,y,z,component]*t[0]
+    v01 = data[slot,x,y,z+1,component]*(1-t[0])+data[slot,x+1,y,z+1,component]*t[0]
+    v10 = data[slot,x,y+1,z,component]*(1-t[0])+data[slot,x+1,y+1,z,component]*t[0]
+    v11 = data[slot,x,y+1,z+1,component]*(1-t[0])+data[slot,x+1,y+1,z+1,component]*t[0]
+    v0 = v00*(1-t[1])+v10*t[1]
+    v1 = v01*(1-t[1])+v11*t[1]
+    output[0] = v0*(1-t[2])+v1*t[2]
+    return True
+
+
+cpdef void initialize_rays(
+    const double[::1] lo, const double[::1] hi, const double[:, ::1] origins,
+    const double[::1] direction, const double[::1] near, const double[::1] far,
+    double[::1] starts, double[::1] ends,
+    int64_t[::1] status,
+):
+    cdef int64_t ray,a
+    cdef double first,last,left,right,temp
+    cdef bint empty
+    with nogil:
+        for ray in range(origins.shape[0]):
+            first,last = near[ray],far[ray]
+            empty = False
+            for a in range(3):
+                if direction[a] == 0.:
+                    if origins[ray,a] < lo[a] or origins[ray,a] >= hi[a]:
+                        empty = True
+                    continue
+                left = (lo[a]-origins[ray,a])/direction[a]
+                right = (hi[a]-origins[ray,a])/direction[a]
+                if left > right:
+                    temp = left
+                    left = right
+                    right = temp
+                if left > first:
+                    first = left
+                if right < last:
+                    last = right
+            if empty or first >= last:
+                starts[ray] = ends[ray] = 0.
+                status[ray] = 2
+                continue
+            if not isfinite(first) or not isfinite(last):
+                starts[ray] = ends[ray] = NAN
+                status[ray] = 5
+                continue
+            starts[ray],ends[ray] = first,last
+            status[ray] = 0
+
+
+cdef inline bint ray_after_face(double origin,double direction,double t,double face) noexcept nogil:
+    if direction > 0.:
+        return t >= (face-origin)/direction
+    if direction < 0.:
+        return t < (face-origin)/direction
+    return origin >= face
+
+
+cdef int64_t ray_owner(
+    const double* origin, const double[::1] direction,double t,
+    const int64_t[:, :, ::1] roots,const int64_t[:, ::1] children,
+    const int64_t[::1] leaves,const double[:, ::1] nlo,const double[:, ::1] nhi,
+) noexcept nogil:
+    """One-sided interval ownership from face times, without coordinate nudges."""
+    cdef int64_t r[3]
+    cdef int64_t axis,left,right,middle,node,child,bits
+    for axis in range(3):
+        left,right = 0,roots.shape[axis]
+        while left+1 < right:
+            middle = (left+right)//2
+            if axis==0:
+                node = roots[middle,0,0]
+            elif axis==1:
+                node = roots[0,middle,0]
+            else:
+                node = roots[0,0,middle]
+            if ray_after_face(origin[axis],direction[axis],t,nlo[node,axis]):
+                left = middle
+            else:
+                right = middle
+        r[axis] = left
+    node = roots[r[0],r[1],r[2]]
+    while leaves[node] < 0:
+        child = children[node,0]
+        bits = 0
+        for axis in range(3):
+            if ray_after_face(origin[axis],direction[axis],t,nhi[child,axis]):
+                bits |= 1 << axis
+        node = children[node,bits]
+    return leaves[node]
+
+
+cdef int gauss_leaf(
+    const double* origin, const double[::1] direction, int64_t leaf, int64_t slot,
+    int64_t component, const double[:, :, ::1] bounds, const double[:, ::1] spacing,
+    const double[:, :, :, :, ::1] data, int halo, double first, double last,
+    int64_t limit, int64_t* samples, double* value,
+) noexcept nogil:
+    cdef int a,sign[3],which
+    cdef int64_t index[3],extent[3]
+    cdef double knots[3],p[3],q,cursor,stop,delta,mid,offset,t,scalar[2],weighted
+    cursor = first
+    for a in range(3):
+        extent[a] = data.shape[a+1]-2*halo
+        knots[a] = INFINITY
+        if direction[a] == 0.:
+            sign[a] = 0
+            index[a] = 0
+            continue
+        q = ((origin[a]+direction[a]*cursor)-bounds[leaf,0,a])/spacing[leaf,a]-.5
+        if not isfinite(q) or q < -halo or q >= data.shape[a+1]-halo-1:
+            return 8
+        sign[a] = 1 if direction[a]>0. else -1
+        index[a] = <int64_t>floor(q)+1 if sign[a]>0 else <int64_t>ceil(q)-1
+        while 0 <= index[a] < extent[a]:
+            t = (bounds[leaf,0,a]+(index[a]+.5)*spacing[leaf,a]-origin[a])/direction[a]
+            if t>cursor:
+                knots[a] = t
+                break
+            index[a] += sign[a]
+    while cursor < last:
+        stop = last
+        for a in range(3):
+            if knots[a] < stop:
+                stop = knots[a]
+        if stop <= cursor:
+            return 5
+        if samples[0] > limit-2:
+            return 6
+        delta = stop-cursor
+        mid = cursor+.5*delta
+        offset = .5*delta/1.7320508075688772
+        for which in range(2):
+            t = mid-offset if which==0 else mid+offset
+            for a in range(3):
+                p[a] = origin[a]+direction[a]*t
+            if not interpolate_scalar(p,leaf,slot,component,bounds,spacing,data,halo,&scalar[which]):
+                return 8
+            samples[0] += 1
+            if not isfinite(scalar[which]):
+                return 4
+        weighted = .5*scalar[0]+.5*scalar[1]
+        value[0] = value[0]+weighted*delta
+        if not isfinite(value[0]):
+            return 7
+        cursor = stop
+        for a in range(3):
+            if knots[a] <= cursor:
+                knots[a] = INFINITY
+                index[a] += sign[a]
+                while 0 <= index[a] < extent[a]:
+                    t = (bounds[leaf,0,a]+(index[a]+.5)*spacing[leaf,a]-origin[a])/direction[a]
+                    if t>cursor:
+                        knots[a] = t
+                        break
+                    index[a] += sign[a]
+    return 0
+
+
+cpdef void advance_rays(
+    const double[::1] lo, const double[::1] hi,
+    const int64_t[:, :, ::1] roots, const int64_t[:, ::1] children,
+    const int64_t[::1] leaves, const double[:, ::1] nlo,
+    const double[:, ::1] nhi, const double[:, :, ::1] bounds,
+    const double[:, ::1] spacing, const int64_t[::1] slots,
+    const double[:, :, :, :, ::1] data, int halo, int64_t component,
+    const double[:, ::1] origins, const double[::1] direction,
+    double[::1] progress, const double[::1] ends,
+    double step_fraction, int quadrature, int64_t max_samples, double[::1] values,
+    int64_t[::1] status, int64_t[::1] requested,
+    int64_t[::1] samples, int64_t[::1] misses,
+):
+    cdef int64_t ray,leaf,slot,a,j,count
+    cdef int code
+    cdef double stop,edge[3],face[3],delta,width,nsteps,t,scalar
+    cdef double p[3]
+    with nogil:
+        for ray in range(origins.shape[0]):
+            requested[ray] = -1
+            while status[ray] == 0:
+                if progress[ray] >= ends[ray]:
+                    status[ray] = 1
+                    break
+                leaf = ray_owner(&origins[ray,0],direction,progress[ray],roots,children,leaves,nlo,nhi)
+                if leaf < 0:
+                    status[ray] = 5
+                    break
+                stop = ends[ray]
+                width = spacing[leaf,0]
+                for a in range(3):
+                    if spacing[leaf,a] < width:
+                        width = spacing[leaf,a]
+                    if direction[a] == 0.:
+                        edge[a] = INFINITY
+                        face[a] = origins[ray,a]
+                    else:
+                        face[a] = bounds[leaf,1,a] if direction[a]>0. else bounds[leaf,0,a]
+                        edge[a] = (face[a]-origins[ray,a])/direction[a]
+                        if edge[a] < stop:
+                            stop = edge[a]
+                if stop <= progress[ray]:
+                    status[ray] = 5
+                    break
+                slot = slots[leaf]
+                if slot < 0:
+                    requested[ray] = leaf
+                    misses[ray] += 1
+                    break
+                if quadrature == 1:
+                    code = gauss_leaf(&origins[ray,0],direction,leaf,slot,component,bounds,
+                        spacing,data,halo,progress[ray],stop,max_samples,&samples[ray],&values[ray])
+                    if code:
+                        status[ray] = code
+                        break
+                else:
+                    nsteps = ceil((stop-progress[ray])/(width*step_fraction))
+                    if nsteps < 1.:
+                        nsteps = 1.
+                    if not isfinite(nsteps) or nsteps > max_samples-samples[ray]:
+                        status[ray] = 6
+                        break
+                    count = <int64_t>nsteps
+                    delta = (stop-progress[ray])/count
+                    for j in range(count):
+                        t = progress[ray]+(j+.5)*delta
+                        for a in range(3):
+                            p[a] = origins[ray,a]+direction[a]*t
+                        if not interpolate_scalar(p,leaf,slot,component,bounds,spacing,data,halo,&scalar):
+                            status[ray] = 8
+                            break
+                        samples[ray] += 1
+                        if not isfinite(scalar):
+                            status[ray] = 4
+                            break
+                        values[ray] = values[ray]+scalar*delta
+                        if not isfinite(values[ray]):
+                            status[ray] = 7
+                            break
+                if status[ray]!=0:
+                    break
+                progress[ray] = stop
+            if status[ray] >= 3:
+                values[ray] = NAN

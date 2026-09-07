@@ -274,3 +274,68 @@ results. No old code provides a matching twist consumer; ordinary F is a measure
 incremental-cost control, not an equal-work speed comparator. Record companion
 fills, retained/copy/trajectory memory and source startup. Also check the affected
 ordinary 2048x600 ready-data control after extending the hot kernel.
+
+## P3-L Ready Geometry Scope
+
+L1 physical response/EOS/instrument units remain pending the user question.
+Implement the independent geometric consumer for an explicitly supplied scalar
+emissivity/field; do not invent thermal physics or certify P3-L's response gate.
+Its numerical strategy is trilinear interpolation of the supplied prepared scalar
+followed by midpoint quadrature within exact ray/leaf intervals. Precomputing a
+nonlinear response then interpolating is distinct from evaluating a response on
+interpolated rho/T; the latter is not silently supplied by this scalar boundary.
+
+Observation uses a Plane of ray origins, a normalized common direction and
+per-pixel near/far arclength bounds. Clip each ray to the physical domain, traverse
+leaf intervals without covered parents or ghost path length, and subdivide each
+interval to at most `step_fraction * min(local spacing)` (default .5). Empty rays
+complete with zero integral/depth; nonfinite fields, missing coverage, geometry
+failure or a sample limit give explicit invalid pixels, not shortened valid images.
+The interval owner is the leaf immediately after entry in the ray direction;
+parallel rays on an upper half-open face are empty. Face-crossing probes do not
+add integration length. A pixel owns its ordered sum, private continuation and
+output, so one/four workers retain the same per-ray arithmetic.
+
+Use 2D image tiles for locality and bounded pool misses. Scalar input preparation
+retains the shared two-layer minimum; a valid one-halo derived scalar can also
+be consumed. Full image output and input/worker/tile resources are admitted.
+Analytic constant and affine supplied scalars verify view/depth/weights, mixed-AMR
+coverage and convergence; compare serial/parallel and resident/bounded results.
+A real WENO scalar-column case may assess actual geometry/data costs, but does
+not close the still-unspecified thermal/response physics requirement.
+
+P3-L quadrature probe: trilinear interpolation restricted to a ray is cubic
+between native cell-center planes. Splitting at those planes and applying
+2-point Gauss quadrature therefore integrates the declared scalar reconstruction
+exactly up to roundoff, including half-cell intervals at leaf faces. Compare
+that candidate with retained midpoint quadrature (fractions .5 and .125) on
+analytic fields and selected WENO scalar rays/images; allowance is two strategies,
+15 minutes per probe and the existing memory envelope. Keep a brute leaf/knots
+reference outside the kernel. Compare both accuracy and total consumer costs;
+these are distinct quadrature strategies, not bitwise interchangeable results.
+No new response/EOS meaning or global unstructured mesh is introduced.
+
+Large/canceling ray coordinates also require checked local stencil addressing.
+Shared compiled interpolation now checks finite local coordinates against actual
+buffer extents before integer conversion/access. Unrepresentable samples have
+explicit F/LOS status and invalid point results; they are not preparation misses.
+Retain these dynamic guards even when metadata is already validated.
+
+P3-L geometry correction: an oblique manufactured view exposed seven pixels
+whose final positive interval was only 1--2 ulps long. Reconstructing and nudging
+world coordinates crossed an outer face early, producing GEOMETRY_FAILURE.
+Replace probe-based interval ownership with root/tree comparisons against
+ray/face intersection times. Directional ties choose the interval immediately
+after entry; no interval is dropped or tolerance widened. Both quadrature
+strategies now pass the independent full leaf-intersection reference. This is
+a geometry/addressing correction; F's point-ownership convention is unchanged.
+
+Frozen WENO scalar probe: the file contains rho/m1/m2/m3/b1/b2/b3 but no energy
+or temperature field. Use stored rho in code units solely for a column diagnostic
+and LOS consumer assessment, not a selected thermal response. Compare 32x32
+full-box orthographic axis and oblique views, resident midpoint (.5/.125) and
+Gauss2, one/four workers, plus matching 512-slot bounded Gauss2. Use independent
+leaf/knot scalar references on eight spread nonempty pixels per view. Resident
+strategies have one warmup/three repetitions; bounded first/second passes are
+descriptive complete costs. Record reconstruction quadrature error and all field,
+worker/image resources. The missing temperature/response gate remains open.
