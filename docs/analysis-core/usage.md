@@ -60,10 +60,12 @@ can be synchronously written to an array/memmap sink.
 ```python
 from simesh.analysis import trace, iter_traces
 
+pool = PreparedPool(source, [0, 1, 2], capacity=256)
 result = trace(pool, seeds, step=0.001, max_steps=1000, workers=4)
 for chunk in iter_traces(pool, seeds, step=0.001, max_steps=1000,
                          workers=4, seed_batch=128):
     write_summary(chunk)  # Caller-supplied sink; no mandatory concatenation.
+pool.close()
 ```
 
 Seeds are finite contiguous float64 `(n,3)` with optional stable unique int64 IDs.
@@ -116,3 +118,29 @@ All admission figures describe controlled arrays, including relevant source,
 metadata, scratch and output backing. They are not hard process RSS/page-cache
 limits. Large-file, installed-adapter and additional consumer acceptance must be
 read from the current checkpoint, not inferred from these examples.
+
+## Twist And Explicit Retracing
+
+```python
+from simesh.analysis import CurlPool, retrace
+
+base_pool = PreparedPool(source, [0, 1, 2], capacity=256)
+magnetic_and_curl = CurlPool(base_pool)
+try:
+    diagnostics = trace(magnetic_and_curl, seeds, step=0.001, max_steps=1000,
+                        twist=True, workers=4)
+    chosen = diagnostics.seed_ids[np.argsort(np.abs(diagnostics.twist))[-3:]]
+    selected_lines = retrace(magnetic_and_curl, diagnostics, chosen,
+                             step=0.001, max_steps=1000, twist=True, workers=4)
+finally:
+    magnetic_and_curl.close()
+    base_pool.close()
+```
+
+The companion owns separate one-halo curl storage and borrows the primary pool.
+Closing it releases that companion. `with_curl(primary)` is the corresponding
+retained resident composition. Twist uses stage quadrature over accepted segments;
+it does not imply exact boundary endpoints or Q. Set `trajectories=True` on an
+ordinary `trace`/`iter_traces` call when points are requested from the start.
+Use `point_counts` to read valid trajectory prefixes. Full output and retained
+prior results count against admission; streaming avoids mandatory concatenation.

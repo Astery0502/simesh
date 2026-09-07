@@ -144,7 +144,7 @@ class PreparedPool:
         total += 64 * (capacity + source.mesh.leaf_count)
         if total > budget_bytes:
             raise MemoryError(f"pool needs {total} controlled bytes, budget {budget_bytes}")
-        self.source, self.field_ids, self.halo = source, fields, halo
+        self.source, self.field_ids, self.halo = source, frozen_array(fields,np.int64), halo
         self.capacity, self.controlled_bytes = capacity, total
         self._values = np.empty(shape, dtype=np.float64)
         self._directory = np.full(source.mesh.leaf_count, -1, dtype=np.int64)
@@ -185,6 +185,8 @@ class PreparedPool:
 
     @contextmanager
     def borrow(self, leaf_ids):
+        if self._closed:
+            raise RuntimeError("pool is closed")
         if self._active:
             raise RuntimeError("share the active borrow; nested borrows are not admitted")
         ids = indices(leaf_ids, self.source.mesh.leaf_count)
@@ -226,6 +228,7 @@ class PreparedPool:
             raise RuntimeError("cannot close a borrowed pool")
         self._closed = True
         self._values = self._directory = self._leaves = self._age = None
+        self.source = None
 
 
 def iter_prepared(source, leaf_ids, field_ids, *, capacity=128, budget_bytes=2*1024**3):

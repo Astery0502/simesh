@@ -87,7 +87,9 @@ class PreparedTests(unittest.TestCase):
         self.assertTrue(np.isnan(values).all())
 
     def test_borrow_eviction_failure_and_lifetime(self):
-        pool = PreparedPool(self.source, [2,0,1], 2)
+        selected_fields = np.array([2,0,1],dtype=np.int64)
+        pool = PreparedPool(self.source, selected_fields, 2)
+        selected_fields[:] = [0,1,2]  # A retained selector must be owned by the pool.
         with pool.borrow([5, 1]) as borrowed:
             saved = borrowed.values.copy()
             with self.assertRaises(RuntimeError):

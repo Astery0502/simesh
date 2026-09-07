@@ -178,11 +178,17 @@ cpdef void advance_lines(
     double[:, ::1] positions, double[::1] length, int64_t[::1] steps,
     int64_t[::1] status, int64_t[::1] stages, double[:, :, ::1] tangents,
     int64_t[::1] requested, int64_t[::1] samples, int64_t[::1] misses,
+    const int64_t[::1] curl_slots, const double[:, :, :, :, ::1] curl_data,
+    int curl_halo, double[:, ::1] alpha, double[::1] twist,
+    double[:, :, ::1] paths,
 ):
-    cdef int64_t seed, stage, a, leaf, slot
+    cdef int64_t seed, stage, a, leaf, slot, curl_slot
     cdef double p[3]
     cdef double b[3]
-    cdef double h, norm, factor, total
+    cdef double cb[3]
+    cdef double h, norm, factor, total, integrand
+    cdef bint want_twist = twist.shape[0] > 0
+    cdef bint save_paths = paths.shape[0] > 0
     with nogil:
         for seed in range(positions.shape[0]):
             requested[seed] = -1
@@ -223,6 +229,23 @@ cpdef void advance_lines(
                 if norm <= null_threshold:
                     status[seed] = 4
                     break
+                if want_twist:
+                    curl_slot = curl_slots[leaf]
+                    if curl_slot < 0:
+                        requested[seed] = leaf
+                        misses[seed] += 1
+                        break
+                    interpolate(p,leaf,curl_slot,bounds,spacing,curl_data,curl_halo,cb)
+                    # Algebraically curl(B).B / (4*pi*|B|^2), without squaring
+                    # a large norm. This ordering belongs to the named strategy.
+                    integrand = (cb[0]/norm)*(b[0]/norm)
+                    integrand = integrand + (cb[1]/norm)*(b[1]/norm)
+                    integrand = integrand + (cb[2]/norm)*(b[2]/norm)
+                    integrand = integrand / (4.*3.141592653589793)
+                    if not isfinite(integrand):
+                        status[seed] = 9
+                        break
+                    alpha[seed,stage] = integrand
                 for a in range(3):
                     tangents[seed,stage,a] = direction*(b[a]/norm)
                 if stage < 3:
@@ -239,5 +262,13 @@ cpdef void advance_lines(
                 for a in range(3):
                     positions[seed,a] = p[a]
                 length[seed] = length[seed]+h
+                if want_twist:
+                    total = alpha[seed,0]+2.*alpha[seed,1]
+                    total = total+2.*alpha[seed,2]
+                    total = total+alpha[seed,3]
+                    twist[seed] = twist[seed]+(h/6.)*total
                 steps[seed] += 1
+                if save_paths:
+                    for a in range(3):
+                        paths[seed,steps[seed],a] = p[a]
                 stages[seed] = 0

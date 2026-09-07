@@ -253,3 +253,24 @@ Selected-seed retracing is an explicit function call with supplied integration
 parameters, never automatic replay. Q remains deferred until a chosen method
 and actual endpoint/auxiliary-dynamics acceptance are supplied; accepted-prefix
 Tw does not certify full-boundary line twist or exact footpoints.
+
+P3-F implementation evaluates twist density as ordered sums of
+`(curl_component/norm)*(B_component/norm)`, divided by `4*pi`, avoiding an
+unnecessary norm square. A nonfinite diagnostic has its own terminal status;
+no current trial contributes to accepted twist or trajectories. The helical
+fixed profile admits <2e-10 twist error at h=.01/300 steps and requires >10x
+improvement on halving h; the independent augmented RK4 conformance tolerance
+is 2e-12. Owned seed selectors are frozen in pools; close drops borrowed source
+references without closing caller-owned file descriptors. Companion views share
+primary borrowing expiry. Retracing uses bounded numeric selection arrays and
+admits the still-live prior result instead of creating an uncounted Python ID map.
+
+P3-F WENO profile: the P2 long 32-seed/128-step request, 256-slot B plus separate
+curl companion, one/four workers, summaries versus optional accepted trajectories,
+first-use and one warmup/three repetitions. Independently compare the first eight
+seeds against scalar augmented RK4 on the same declared prepared fields. Select
+three diagnostic IDs and explicitly retrace with points, checking identity and
+results. No old code provides a matching twist consumer; ordinary F is a measured
+incremental-cost control, not an equal-work speed comparator. Record companion
+fills, retained/copy/trajectory memory and source startup. Also check the affected
+ordinary 2048x600 ready-data control after extending the hot kernel.
