@@ -22,11 +22,12 @@ __all__ = ["FieldDefinition", "FieldSource", "MeshIndex", "PreparedFields",
 
 
 def open_source(path,*,field_names=None,field_indices=None,field_units=None,
-                support_capacity=128,budget_bytes=2*1024**3):
+                support_capacity=128,value_cache_capacity=0,budget_bytes=2*1024**3):
     """Lazily open an owned immutable v5 ordinary-field source context."""
     from simesh.amrvac.analysis_io import open_source as implementation
     return implementation(path,field_names=field_names,field_indices=field_indices,
-                          field_units=field_units,support_capacity=support_capacity,budget_bytes=budget_bytes)
+                          field_units=field_units,support_capacity=support_capacity,
+                          value_cache_capacity=value_cache_capacity,budget_bytes=budget_bytes)
 
 
 def open_prepared(path,*,field_names=None,field_indices=None,field_units=None,budget_bytes=2*1024**3):

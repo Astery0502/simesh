@@ -52,7 +52,8 @@ class LOSResult:
         return bool(self.valid.all())
 
 
-def _tile(fields,origins,direction,near,far,component,step_fraction,quadrature,max_samples,workers,executor):
+def _tile(fields,origins,direction,near,far,component,step_fraction,quadrature,max_samples,workers,executor,
+          native_workers=1,dispatch=0):
     from simesh.utils.lib.analysis.native import initialize_rays,advance_rays
     n = len(origins)
     mesh = fields.source.mesh if isinstance(fields,PreparedPool) else fields.mesh
@@ -70,7 +71,8 @@ def _tile(fields,origins,direction,near,far,component,step_fraction,quadrature,m
         advance_rays(mesh.lower,mesh.upper,mesh.roots,mesh.children,mesh.node_leaves,
             mesh.node_lower,mesh.node_upper,mesh.bounds,mesh.spacing,product.slot_of_leaf,
             product.values,product.halo,component,origins[span],direction,progress[span],ends[span],
-            step_fraction,quadrature,max_samples,values[span],status[span],requested[span],samples[span],misses[span])
+            step_fraction,quadrature,max_samples,values[span],status[span],requested[span],samples[span],misses[span],
+            native_workers,dispatch)
     while np.any(status==LOSStatus.RUNNING):
         context = fields.borrow(fields.resident_leaf_ids) if isinstance(fields,PreparedPool) else nullcontext(fields)
         with context as product:
@@ -96,7 +98,7 @@ def _tile(fields,origins,direction,near,far,component,step_fraction,quadrature,m
 
 def integrate_los(fields,plane,direction,*,component=0,near=0.,far=np.inf,
                   step_fraction=.5,max_samples=1000000,workers=1,tile_shape=(16,16),
-                  budget_bytes=2*1024**3,quadrature="gauss2"):
+                  budget_bytes=2*1024**3,quadrature="gauss2",backend='threadpool',schedule='static'):
     """Integrate a supplied scalar over each clipped ray in physical arclength.
 
     Pixel centers follow Plane geometry; near/far can be scalars or plane-shaped
@@ -109,6 +111,8 @@ def integrate_los(fields,plane,direction,*,component=0,near=0.,far=np.inf,
         raise ValueError("LOS requires a Plane of ray origins")
     if quadrature not in ("midpoint","gauss2"):
         raise ValueError("quadrature must be midpoint or gauss2")
+    from .execution import native_dispatch
+    native,dispatch = native_dispatch(backend,schedule)
     pool = isinstance(fields,PreparedPool)
     if pool and fields._closed:
         raise RuntimeError("LOS pool is closed")
@@ -139,7 +143,7 @@ def integrate_los(fields,plane,direction,*,component=0,near=0.,far=np.inf,
     if not np.isfinite(near).all() or np.any(near<0) or np.isnan(far).any() or np.any(far<near):
         raise ValueError("near/far must be ordered nonnegative arclength bounds")
     arrays = [np.empty(plane.shape,dtype=float if i<3 else np.int64) for i in range(6)]
-    manager = ThreadPoolExecutor(max_workers=workers) if workers>1 else nullcontext(None)
+    manager = ThreadPoolExecutor(max_workers=workers) if workers>1 and not native else nullcontext(None)
     with manager as executor:
         for x in range(0,nx,tx):
             for y in range(0,ny,ty):
@@ -150,7 +154,8 @@ def integrate_los(fields,plane,direction,*,component=0,near=0.,far=np.inf,
                 part = np.s_[x:stopx,y:stopy]
                 rows = _tile(fields,np.ascontiguousarray(origins.reshape(-1,3)),direction,
                     np.ascontiguousarray(near[part].ravel()),np.ascontiguousarray(far[part].ravel()),
-                    component,step_fraction,int(quadrature=="gauss2"),max_samples,workers,executor)
+                    component,step_fraction,int(quadrature=="gauss2"),max_samples,
+                    1 if native else workers,executor,workers if native else 1,dispatch)
                 for output,row in zip(arrays,rows):
                     output[part] = row.reshape(stopx-x,stopy-y)
     direction.flags.writeable = False

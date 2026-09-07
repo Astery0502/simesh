@@ -45,7 +45,8 @@ class TraceResult:
 
 
 def _run_chunk(fields, seeds, seed_ids, step, max_steps, max_length, null_threshold,
-               direction, workers, executor, want_twist, trajectories):
+               direction, workers, executor, want_twist, trajectories,
+               native_workers=1, dispatch=0):
     from simesh.utils.lib.analysis.native import advance_lines
     n = len(seeds)
     positions = seeds.copy()
@@ -87,7 +88,7 @@ def _run_chunk(fields, seeds, seed_ids, step, max_steps, max_length, null_thresh
             companion.slot_of_leaf if want_twist else product.slot_of_leaf,
             companion.values if want_twist else empty,1,
             alpha[span] if want_twist else alpha,twist[span] if want_twist else twist,
-            paths[span] if trajectories else paths)
+            paths[span] if trajectories else paths,native_workers,dispatch)
 
     while np.any(status == Termination.RUNNING):
         context = fields.borrow(fields.resident_leaf_ids) if is_pool else nullcontext(fields)
@@ -114,7 +115,8 @@ def _run_chunk(fields, seeds, seed_ids, step, max_steps, max_length, null_thresh
 
 def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000,
                 max_length=np.inf, null_threshold=0., direction=1, workers=1,
-                seed_batch=256, budget_bytes=2*1024**3, twist=False, trajectories=False):
+                seed_batch=256, budget_bytes=2*1024**3, twist=False, trajectories=False,
+                backend='threadpool', schedule='static'):
     """Yield owned summary batches; retain or write them under caller ownership.
 
     Trajectories are optional admitted accepted prefixes; unused tails are NaN.
@@ -140,6 +142,8 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000,
         raise ValueError("invalid trace step, limits, direction or worker settings")
     if type(twist) is not bool or type(trajectories) is not bool:
         raise ValueError("twist and trajectories must be booleans")
+    from .execution import native_dispatch
+    native, dispatch = native_dispatch(backend,schedule)
     pool = isinstance(fields,(PreparedPool,CurlPool))
     if isinstance(fields,CurlPool) and fields._values is None:
         raise RuntimeError("curl companion is closed")
@@ -177,14 +181,15 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000,
     required = footprint + transient_reserve
     if required > budget_bytes:
         raise MemoryError(f"trace needs {required} controlled bytes, budget {budget_bytes}")
-    manager = ThreadPoolExecutor(max_workers=workers) if workers > 1 else nullcontext(None)
+    manager = ThreadPoolExecutor(max_workers=workers) if workers > 1 and not native else nullcontext(None)
     try:
         with manager as executor:
             for first in range(0, len(seeds), seed_batch):
                 stop = min(first+seed_batch, len(seeds))
                 yield _run_chunk(fields, seeds[first:stop], seed_ids[first:stop], step,
-                                 max_steps, max_length, null_threshold, direction, workers, executor,
-                                 twist,trajectories)
+                                 max_steps, max_length, null_threshold, direction,
+                                 1 if native else workers, executor,twist,trajectories,
+                                 workers if native else 1,dispatch)
     finally:
         if temporary is not None:
             temporary.close()

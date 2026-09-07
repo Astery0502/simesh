@@ -11,9 +11,14 @@ advanced through implementation, comparisons, integration and feasible scale.
 acceptance still require missing inputs. Do not restart completed stages or
 reinterpret the old P2 recommendation as the endpoint.
 
-Execution is **blocked on external inputs** after repeated revalidation: the
-physical response/thermodynamic inputs and a suitable large Cartesian fixture
-remain unavailable. Resume the corresponding gate when either input is supplied.
+Execution is **active again: runtime execution efficiency**, explicitly reopened
+by the user on 2026-09-08. Previous backend/cache deferrals are historical
+decisions, not stopping conditions for this round. Follow
+[runtime execution](runtime-execution.md) for the current bounded questions,
+measurements and recovery point. Another independent session owns AIA 171 Å,
+rebricking feasibility and persistent geometry preparation plans; do not duplicate
+those implementations. Missing large-input/physical acceptance does not block
+independent local runtime work.
 
 | Delivery | Actual status and evidence |
 | --- | --- |
@@ -56,7 +61,8 @@ remain unavailable. Resume the corresponding gate when either input is supplied.
 - Host: 8 GiB RAM / eight logical CPUs. Run limits: <=4 compute workers,
   <=2 GiB controlled live arrays per case, <=2 GiB task-created disk scratch,
   >=2 GiB free disk. No time/token limit was supplied. Bounds do not promise
-  process RSS or OS page-cache limits. Candidate probes are closed with outcomes.
+  process RSS or OS page-cache limits. Historical probes are closed with outcomes;
+  the new runtime round reopens selected candidates explicitly.
 
 ## Inputs Still Required
 

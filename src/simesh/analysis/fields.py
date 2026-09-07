@@ -37,6 +37,7 @@ class FieldSource:
     memory_arrays: tuple = ()
     read_interiors: Callable | None = None
     original_field_ids: tuple | None = None
+    validate_values: Callable | None = None
 
 
 @dataclass(frozen=True, eq=False)
@@ -103,6 +104,8 @@ def _footprint(source, count, fields, halo):
 def prepare(source, leaf_ids, field_ids, *, halo=2, budget_bytes=2*1024**3):
     """Detach a complete native field product, with complete controlled admission."""
     ids, fields = _request(source, leaf_ids, field_ids, halo)
+    if source.validate_values is not None:
+        source.validate_values()
     shape, total = _footprint(source, len(ids), fields, halo)
     if total > budget_bytes:
         raise MemoryError(f"preparation needs {total} controlled bytes, budget {budget_bytes}")
@@ -159,6 +162,8 @@ class PreparedPool:
     def _ensure(self, ids):
         if self._closed:
             raise RuntimeError("pool is closed")
+        if self.source.validate_values is not None:
+            self.source.validate_values()
         missing = ids[self._directory[ids] < 0]
         if len(ids) > self.capacity:
             raise MemoryError("requested simultaneous borrow exceeds pool capacity")

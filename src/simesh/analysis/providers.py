@@ -21,7 +21,8 @@ from simesh_rewrite.refined_halo import _allocate_workspace
 
 def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
                 reader, definitions, *, support_capacity=128, extra_resident_bytes=0,
-                backend_scratch_bytes=0, original_field_ids=None):
+                backend_scratch_bytes=0, original_field_ids=None,
+                value_cache_capacity=0, validate_values=None):
     """Assemble validated 3D forest/reader and continuous two-layer preparation."""
     root_shape = frozen_array(root_shape, np.int64)
     coord_to_rank = frozen_array(coord_to_rank, np.int64)
@@ -52,6 +53,17 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
         frozen_array(f.leaf_node_ids, np.int64), frozen_array(bounds, float),
         frozen_array(spacing, float))
     capacity = min(max(57, support_capacity), leaf_count)
+    if type(value_cache_capacity) is not int or value_cache_capacity < 0:
+        raise ValueError("value_cache_capacity must be a nonnegative integer")
+    value_cache = None
+    if value_cache_capacity:
+        from .value_cache import InteriorValueCache
+        value_cache = InteriorValueCache(reader,value_cache_capacity,validate_values)
+        reader = value_cache.reader
+        # Miss staging and bounded selector/LRU temporaries are independent of
+        # the retained cache payload already included in reader.memory_arrays.
+        backend_scratch_bytes += (capacity*len(definitions)*8*int(np.prod(block))+
+                                  64*(capacity+value_cache.capacity)+4096)
     # Query fixed provider overhead using a zero-capacity, zero-field workspace;
     # admission never allocates the requested full payload just to count bytes.
     _, fixed_arrays = _allocate_workspace(0, 0, tuple(block), tuple(block+4))
@@ -71,6 +83,8 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
                 32*leaf_count + 4096 + backend_scratch_bytes)
 
     def read_interiors(ids, fields, output, *, batch_size=None):
+        if validate_values is not None:
+            validate_values()
         ids = indices(ids,leaf_count)
         fields = indices(fields,len(definitions),"field_ids")
         if (not isinstance(output,np.ndarray) or output.dtype!=np.float64 or
@@ -94,6 +108,9 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
                 "total_seconds":time.perf_counter()-start}
 
     def fill(ids, fields, halo, output):
+        if validate_values is not None:
+            validate_values()
+        cache_before = dict(value_cache.stats) if value_cache is not None else {}
         if halo == 0:
             temporary = np.empty((min(capacity,len(ids)),len(fields),*block),dtype=float)
             stats = {"reader_call_count":0,"selected_load_count":0,"read_value_bytes":0}
@@ -130,7 +147,9 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
             fields, root_shape, coord_to_rank, f.root_node_ids, f.node_levels, f.node_coords,
             f.child_node_ids, f.node_leaf_ids, f.leaf_node_ids, widths, widths, modes,
             normals, capacity)
-        return {**stats._asdict(), "total_seconds": time.perf_counter()-start,
+        cache_stats = ({key:value-cache_before[key] for key,value in value_cache.stats.items()}
+                       if value_cache is not None else {})
+        return {**stats._asdict(), **cache_stats, "total_seconds": time.perf_counter()-start,
                 "packing_seconds": packing_seconds,
                 "read_value_bytes": stats.selected_load_count*len(fields)*8*int(np.prod(block)),
                 "scratch_admission_bytes": scratch_bytes(fields, halo)}
@@ -138,4 +157,4 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
     return FieldSource(mesh, tuple(definitions), fill, scratch_bytes, resident,
                        "rewrite-ratio2-minmod-exactphase-cont-v1",
                        memory_arrays=reader.memory_arrays,read_interiors=read_interiors,
-                       original_field_ids=original_field_ids)
+                       original_field_ids=original_field_ids,validate_values=validate_values)

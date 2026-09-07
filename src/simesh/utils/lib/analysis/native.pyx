@@ -7,6 +7,23 @@ No file, cache, Dataset or Python callback participates in a value query.
 
 from libc.math cimport floor, isfinite, NAN, sqrt, hypot, ceil, nextafter, INFINITY
 from libc.stdint cimport int64_t
+from cython.parallel cimport prange
+
+cdef extern from *:
+    """
+    #ifdef _OPENMP
+    #define SIMESH_ANALYSIS_OPENMP _OPENMP
+    #else
+    #define SIMESH_ANALYSIS_OPENMP 0
+    #endif
+    """
+    int SIMESH_ANALYSIS_OPENMP
+
+
+def openmp_build_info():
+    return {"enabled": SIMESH_ANALYSIS_OPENMP != 0,
+            "openmp_version": SIMESH_ANALYSIS_OPENMP}
+
 
 
 cdef inline int64_t owner(
@@ -173,6 +190,115 @@ cpdef void differentiate(
                             output[s,i,j,k,out] = output[s,i,j,k,out] + coefficient*delta
 
 
+cdef inline void _advance_line(int64_t seed,
+    const double[::1] lo, const double[::1] hi,
+    const int64_t[:, :, ::1] roots, const int64_t[:, ::1] children,
+    const int64_t[::1] leaves, const double[:, ::1] nlo,
+    const double[:, ::1] nhi, const double[:, :, ::1] bounds,
+    const double[:, ::1] spacing, const int64_t[::1] slots,
+    const double[:, :, :, :, ::1] data, int halo,
+    double step, int64_t max_steps, double max_length, double null_threshold, int direction,
+    double[:, ::1] positions, double[::1] length, int64_t[::1] steps,
+    int64_t[::1] status, int64_t[::1] stages, double[:, :, ::1] tangents,
+    int64_t[::1] requested, int64_t[::1] samples, int64_t[::1] misses,
+    const int64_t[::1] curl_slots, const double[:, :, :, :, ::1] curl_data,
+    int curl_halo, double[:, ::1] alpha, double[::1] twist,
+    double[:, :, ::1] paths,
+) noexcept nogil:
+    cdef int64_t  stage, a, leaf, slot, curl_slot
+    cdef double p[3]
+    cdef double b[3]
+    cdef double cb[3]
+    cdef double h, norm, factor, total, integrand
+    cdef bint want_twist = twist.shape[0] > 0
+    cdef bint save_paths = paths.shape[0] > 0
+    requested[seed] = -1
+    while status[seed] == 0:
+        if steps[seed] >= max_steps:
+            status[seed] = 1
+            break
+        if length[seed] >= max_length:
+            status[seed] = 2
+            break
+        h = step
+        if max_length-length[seed] < h:
+            h = max_length-length[seed]
+        stage = stages[seed]
+        for a in range(3):
+            p[a] = positions[seed,a]
+            if stage > 0:
+                factor = .5 if stage < 3 else 1.
+                p[a] = p[a] + factor*h*tangents[seed,stage-1,a]
+        leaf = owner(p,lo,hi,roots,children,leaves,nlo,nhi)
+        if leaf < 0:
+            status[seed] = 3
+            break
+        slot = slots[leaf]
+        if slot < 0:
+            requested[seed] = leaf
+            misses[seed] += 1
+            break
+        if not interpolate(p,leaf,slot,bounds,spacing,data,halo,b):
+            status[seed] = 10
+            break
+        samples[seed] += 1
+        if not (isfinite(b[0]) and isfinite(b[1]) and isfinite(b[2])):
+            status[seed] = 5
+            break
+        norm = hypot(hypot(b[0],b[1]),b[2])
+        if not isfinite(norm):
+            status[seed] = 8
+            break
+        if norm <= null_threshold:
+            status[seed] = 4
+            break
+        if want_twist:
+            curl_slot = curl_slots[leaf]
+            if curl_slot < 0:
+                requested[seed] = leaf
+                misses[seed] += 1
+                break
+            if not interpolate(p,leaf,curl_slot,bounds,spacing,curl_data,curl_halo,cb):
+                status[seed] = 10
+                break
+            # Algebraically curl(B).B / (4*pi*|B|^2), without squaring
+            # a large norm. This ordering belongs to the named strategy.
+            integrand = (cb[0]/norm)*(b[0]/norm)
+            integrand = integrand + (cb[1]/norm)*(b[1]/norm)
+            integrand = integrand + (cb[2]/norm)*(b[2]/norm)
+            integrand = integrand / (4.*3.141592653589793)
+            if not isfinite(integrand):
+                status[seed] = 9
+                break
+            alpha[seed,stage] = integrand
+        for a in range(3):
+            tangents[seed,stage,a] = direction*(b[a]/norm)
+        if stage < 3:
+            stages[seed] += 1
+            continue
+        for a in range(3):
+            total = tangents[seed,0,a] + 2.*tangents[seed,1,a]
+            total = total + 2.*tangents[seed,2,a]
+            total = total + tangents[seed,3,a]
+            p[a] = positions[seed,a] + (h/6.)*total
+        if owner(p,lo,hi,roots,children,leaves,nlo,nhi) < 0:
+            status[seed] = 3
+            break
+        for a in range(3):
+            positions[seed,a] = p[a]
+        length[seed] = length[seed]+h
+        if want_twist:
+            total = alpha[seed,0]+2.*alpha[seed,1]
+            total = total+2.*alpha[seed,2]
+            total = total+alpha[seed,3]
+            twist[seed] = twist[seed]+(h/6.)*total
+        steps[seed] += 1
+        if save_paths:
+            for a in range(3):
+                paths[seed,steps[seed],a] = p[a]
+        stages[seed] = 0
+
+
 cpdef void advance_lines(
     const double[::1] lo, const double[::1] hi,
     const int64_t[:, :, ::1] roots, const int64_t[:, ::1] children,
@@ -187,101 +313,23 @@ cpdef void advance_lines(
     const int64_t[::1] curl_slots, const double[:, :, :, :, ::1] curl_data,
     int curl_halo, double[:, ::1] alpha, double[::1] twist,
     double[:, :, ::1] paths,
+    int workers=1, int dispatch=0,
 ):
-    cdef int64_t seed, stage, a, leaf, slot, curl_slot
-    cdef double p[3]
-    cdef double b[3]
-    cdef double cb[3]
-    cdef double h, norm, factor, total, integrand
-    cdef bint want_twist = twist.shape[0] > 0
-    cdef bint save_paths = paths.shape[0] > 0
+    cdef int64_t seed
+    if workers < 1 or workers > 4 or dispatch not in (0,1):
+        raise ValueError("invalid native worker/dispatch setting")
+    if workers > 1 and not SIMESH_ANALYSIS_OPENMP:
+        raise RuntimeError("native analysis was built without OpenMP")
     with nogil:
-        for seed in range(positions.shape[0]):
-            requested[seed] = -1
-            while status[seed] == 0:
-                if steps[seed] >= max_steps:
-                    status[seed] = 1
-                    break
-                if length[seed] >= max_length:
-                    status[seed] = 2
-                    break
-                h = step
-                if max_length-length[seed] < h:
-                    h = max_length-length[seed]
-                stage = stages[seed]
-                for a in range(3):
-                    p[a] = positions[seed,a]
-                    if stage > 0:
-                        factor = .5 if stage < 3 else 1.
-                        p[a] = p[a] + factor*h*tangents[seed,stage-1,a]
-                leaf = owner(p,lo,hi,roots,children,leaves,nlo,nhi)
-                if leaf < 0:
-                    status[seed] = 3
-                    break
-                slot = slots[leaf]
-                if slot < 0:
-                    requested[seed] = leaf
-                    misses[seed] += 1
-                    break
-                if not interpolate(p,leaf,slot,bounds,spacing,data,halo,b):
-                    status[seed] = 10
-                    break
-                samples[seed] += 1
-                if not (isfinite(b[0]) and isfinite(b[1]) and isfinite(b[2])):
-                    status[seed] = 5
-                    break
-                norm = hypot(hypot(b[0],b[1]),b[2])
-                if not isfinite(norm):
-                    status[seed] = 8
-                    break
-                if norm <= null_threshold:
-                    status[seed] = 4
-                    break
-                if want_twist:
-                    curl_slot = curl_slots[leaf]
-                    if curl_slot < 0:
-                        requested[seed] = leaf
-                        misses[seed] += 1
-                        break
-                    if not interpolate(p,leaf,curl_slot,bounds,spacing,curl_data,curl_halo,cb):
-                        status[seed] = 10
-                        break
-                    # Algebraically curl(B).B / (4*pi*|B|^2), without squaring
-                    # a large norm. This ordering belongs to the named strategy.
-                    integrand = (cb[0]/norm)*(b[0]/norm)
-                    integrand = integrand + (cb[1]/norm)*(b[1]/norm)
-                    integrand = integrand + (cb[2]/norm)*(b[2]/norm)
-                    integrand = integrand / (4.*3.141592653589793)
-                    if not isfinite(integrand):
-                        status[seed] = 9
-                        break
-                    alpha[seed,stage] = integrand
-                for a in range(3):
-                    tangents[seed,stage,a] = direction*(b[a]/norm)
-                if stage < 3:
-                    stages[seed] += 1
-                    continue
-                for a in range(3):
-                    total = tangents[seed,0,a] + 2.*tangents[seed,1,a]
-                    total = total + 2.*tangents[seed,2,a]
-                    total = total + tangents[seed,3,a]
-                    p[a] = positions[seed,a] + (h/6.)*total
-                if owner(p,lo,hi,roots,children,leaves,nlo,nhi) < 0:
-                    status[seed] = 3
-                    break
-                for a in range(3):
-                    positions[seed,a] = p[a]
-                length[seed] = length[seed]+h
-                if want_twist:
-                    total = alpha[seed,0]+2.*alpha[seed,1]
-                    total = total+2.*alpha[seed,2]
-                    total = total+alpha[seed,3]
-                    twist[seed] = twist[seed]+(h/6.)*total
-                steps[seed] += 1
-                if save_paths:
-                    for a in range(3):
-                        paths[seed,steps[seed],a] = p[a]
-                stages[seed] = 0
+        if workers == 1:
+            for seed in range(positions.shape[0]):
+                _advance_line(seed, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths)
+        elif dispatch == 0:
+            for seed in prange(positions.shape[0], schedule='static', num_threads=workers):
+                _advance_line(seed, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths)
+        else:
+            for seed in prange(positions.shape[0], schedule='dynamic', chunksize=8, num_threads=workers):
+                _advance_line(seed, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths)
 
 
 cdef inline bint interpolate_scalar(
@@ -461,6 +509,90 @@ cdef int gauss_leaf(
     return 0
 
 
+cdef inline void _advance_ray(int64_t ray,
+    const double[::1] lo, const double[::1] hi,
+    const int64_t[:, :, ::1] roots, const int64_t[:, ::1] children,
+    const int64_t[::1] leaves, const double[:, ::1] nlo,
+    const double[:, ::1] nhi, const double[:, :, ::1] bounds,
+    const double[:, ::1] spacing, const int64_t[::1] slots,
+    const double[:, :, :, :, ::1] data, int halo, int64_t component,
+    const double[:, ::1] origins, const double[::1] direction,
+    double[::1] progress, const double[::1] ends,
+    double step_fraction, int quadrature, int64_t max_samples, double[::1] values,
+    int64_t[::1] status, int64_t[::1] requested,
+    int64_t[::1] samples, int64_t[::1] misses,
+) noexcept nogil:
+    cdef int64_t leaf,slot,a,j,count
+    cdef int code
+    cdef double stop,edge[3],face[3],delta,width,nsteps,t,scalar
+    cdef double p[3]
+    requested[ray] = -1
+    while status[ray] == 0:
+        if progress[ray] >= ends[ray]:
+            status[ray] = 1
+            break
+        leaf = ray_owner(&origins[ray,0],direction,progress[ray],roots,children,leaves,nlo,nhi)
+        if leaf < 0:
+            status[ray] = 5
+            break
+        stop = ends[ray]
+        width = spacing[leaf,0]
+        for a in range(3):
+            if spacing[leaf,a] < width:
+                width = spacing[leaf,a]
+            if direction[a] == 0.:
+                edge[a] = INFINITY
+                face[a] = origins[ray,a]
+            else:
+                face[a] = bounds[leaf,1,a] if direction[a]>0. else bounds[leaf,0,a]
+                edge[a] = (face[a]-origins[ray,a])/direction[a]
+                if edge[a] < stop:
+                    stop = edge[a]
+        if stop <= progress[ray]:
+            status[ray] = 5
+            break
+        slot = slots[leaf]
+        if slot < 0:
+            requested[ray] = leaf
+            misses[ray] += 1
+            break
+        if quadrature == 1:
+            code = gauss_leaf(&origins[ray,0],direction,leaf,slot,component,bounds,
+                spacing,data,halo,progress[ray],stop,max_samples,&samples[ray],&values[ray])
+            if code:
+                status[ray] = code
+                break
+        else:
+            nsteps = ceil((stop-progress[ray])/(width*step_fraction))
+            if nsteps < 1.:
+                nsteps = 1.
+            if not isfinite(nsteps) or nsteps > max_samples-samples[ray]:
+                status[ray] = 6
+                break
+            count = <int64_t>nsteps
+            delta = (stop-progress[ray])/count
+            for j in range(count):
+                t = progress[ray]+(j+.5)*delta
+                for a in range(3):
+                    p[a] = origins[ray,a]+direction[a]*t
+                if not interpolate_scalar(p,leaf,slot,component,bounds,spacing,data,halo,&scalar):
+                    status[ray] = 8
+                    break
+                samples[ray] += 1
+                if not isfinite(scalar):
+                    status[ray] = 4
+                    break
+                values[ray] = values[ray]+scalar*delta
+                if not isfinite(values[ray]):
+                    status[ray] = 7
+                    break
+        if status[ray]!=0:
+            break
+        progress[ray] = stop
+    if status[ray] >= 3:
+        values[ray] = NAN
+
+
 cpdef void advance_rays(
     const double[::1] lo, const double[::1] hi,
     const int64_t[:, :, ::1] roots, const int64_t[:, ::1] children,
@@ -473,75 +605,20 @@ cpdef void advance_rays(
     double step_fraction, int quadrature, int64_t max_samples, double[::1] values,
     int64_t[::1] status, int64_t[::1] requested,
     int64_t[::1] samples, int64_t[::1] misses,
+    int workers=1, int dispatch=0,
 ):
-    cdef int64_t ray,leaf,slot,a,j,count
-    cdef int code
-    cdef double stop,edge[3],face[3],delta,width,nsteps,t,scalar
-    cdef double p[3]
+    cdef int64_t ray
+    if workers < 1 or workers > 4 or dispatch not in (0,1):
+        raise ValueError("invalid native worker/dispatch setting")
+    if workers > 1 and not SIMESH_ANALYSIS_OPENMP:
+        raise RuntimeError("native analysis was built without OpenMP")
     with nogil:
-        for ray in range(origins.shape[0]):
-            requested[ray] = -1
-            while status[ray] == 0:
-                if progress[ray] >= ends[ray]:
-                    status[ray] = 1
-                    break
-                leaf = ray_owner(&origins[ray,0],direction,progress[ray],roots,children,leaves,nlo,nhi)
-                if leaf < 0:
-                    status[ray] = 5
-                    break
-                stop = ends[ray]
-                width = spacing[leaf,0]
-                for a in range(3):
-                    if spacing[leaf,a] < width:
-                        width = spacing[leaf,a]
-                    if direction[a] == 0.:
-                        edge[a] = INFINITY
-                        face[a] = origins[ray,a]
-                    else:
-                        face[a] = bounds[leaf,1,a] if direction[a]>0. else bounds[leaf,0,a]
-                        edge[a] = (face[a]-origins[ray,a])/direction[a]
-                        if edge[a] < stop:
-                            stop = edge[a]
-                if stop <= progress[ray]:
-                    status[ray] = 5
-                    break
-                slot = slots[leaf]
-                if slot < 0:
-                    requested[ray] = leaf
-                    misses[ray] += 1
-                    break
-                if quadrature == 1:
-                    code = gauss_leaf(&origins[ray,0],direction,leaf,slot,component,bounds,
-                        spacing,data,halo,progress[ray],stop,max_samples,&samples[ray],&values[ray])
-                    if code:
-                        status[ray] = code
-                        break
-                else:
-                    nsteps = ceil((stop-progress[ray])/(width*step_fraction))
-                    if nsteps < 1.:
-                        nsteps = 1.
-                    if not isfinite(nsteps) or nsteps > max_samples-samples[ray]:
-                        status[ray] = 6
-                        break
-                    count = <int64_t>nsteps
-                    delta = (stop-progress[ray])/count
-                    for j in range(count):
-                        t = progress[ray]+(j+.5)*delta
-                        for a in range(3):
-                            p[a] = origins[ray,a]+direction[a]*t
-                        if not interpolate_scalar(p,leaf,slot,component,bounds,spacing,data,halo,&scalar):
-                            status[ray] = 8
-                            break
-                        samples[ray] += 1
-                        if not isfinite(scalar):
-                            status[ray] = 4
-                            break
-                        values[ray] = values[ray]+scalar*delta
-                        if not isfinite(values[ray]):
-                            status[ray] = 7
-                            break
-                if status[ray]!=0:
-                    break
-                progress[ray] = stop
-            if status[ray] >= 3:
-                values[ray] = NAN
+        if workers == 1:
+            for ray in range(origins.shape[0]):
+                _advance_ray(ray, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses)
+        elif dispatch == 0:
+            for ray in prange(origins.shape[0], schedule='static', num_threads=workers):
+                _advance_ray(ray, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses)
+        else:
+            for ray in prange(origins.shape[0], schedule='dynamic', chunksize=8, num_threads=workers):
+                _advance_ray(ray, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses)

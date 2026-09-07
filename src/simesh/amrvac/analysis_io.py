@@ -13,7 +13,7 @@ from simesh.analysis.mesh import indices,frozen_array
 
 @contextmanager
 def open_source(path,*,field_names=None,field_indices=None,field_units=None,
-                support_capacity=128,budget_bytes=2*1024**3):
+                support_capacity=128,value_cache_capacity=0,budget_bytes=2*1024**3):
     """Open immutable Cartesian 3D, nonperiodic v5 ordinary fields for analysis.
 
     Staggered tails are validated/skipped, not exposed as CT fields. Selected
@@ -30,6 +30,7 @@ def open_source(path,*,field_names=None,field_indices=None,field_units=None,
     if field_units is not None and not isinstance(field_units,(str,Mapping)):
         raise ValueError("field_units must be a unit string or field-name mapping")
     fd = os.open(os.fspath(path),os.O_RDONLY)
+    active = True
     try:
         index = read_amrvac_v5_index(fd)
         if index.dimension_count!=3 or index.geometry!='Cartesian_3D' or np.any(index.periodic):
@@ -50,10 +51,15 @@ def open_source(path,*,field_names=None,field_indices=None,field_units=None,
         if not len(original):
             raise ValueError("select at least one ordinary field")
         original = frozen_array(original,np.int64)
+        if type(value_cache_capacity) is not int or value_cache_capacity<0:
+            raise ValueError("value_cache_capacity must be a nonnegative integer")
+        cache_bound = (min(value_cache_capacity,index.leaf_count)*
+                       (len(original)*8*int(np.prod(index.block_cell_counts))+128)+
+                       (8*index.leaf_count if value_cache_capacity else 0))
         # Metadata is O(nodes/leaves), admitted before constructing geometry.
         metadata_bytes = sum(a.nbytes for a in index if isinstance(a,np.ndarray))
         metadata_upper = metadata_bytes+index.leaf_count*2048+len(index.forest_flags)*512
-        if metadata_upper>budget_bytes:
+        if metadata_upper+cache_bound>budget_bytes:
             raise MemoryError("analysis metadata exceeds the supplied budget")
         binding = bind_amrvac_v5_forest(index)
         raw_reader = make_amrvac_v5_ordinary_block_reader(fd,index,binding)
@@ -74,14 +80,23 @@ def open_source(path,*,field_names=None,field_indices=None,field_units=None,
         # by the adapter's transfer capacity and included conservatively.
         backend_bound = 2*maximum_record+max(57,support_capacity)*4096
         extra = metadata_bytes+binding.rank_to_coord.nbytes+binding.coord_to_rank.nbytes+binding.root_shape.nbytes
+        def validate_values():
+            if not active:
+                raise OSError("analysis source context is closed")
+            st = os.fstat(fd)
+            identity = (st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns)
+            if identity != index.file_identity:
+                raise OSError("analysis source values changed; open a new source and numerical pools")
         source = make_source(binding.root_shape,binding.coord_to_rank,binding.forest,
             index.domain_lower,index.domain_upper,index.block_cell_counts,reader,definitions,
             support_capacity=support_capacity,extra_resident_bytes=extra,
-            backend_scratch_bytes=backend_bound,original_field_ids=tuple(map(int,original)))
+            backend_scratch_bytes=backend_bound,original_field_ids=tuple(map(int,original)),
+            value_cache_capacity=value_cache_capacity,validate_values=validate_values)
         if source.mesh.nbytes+source.resident_bytes+source.scratch_bytes(np.arange(len(original)),2)>budget_bytes:
             raise MemoryError("minimum source/preparation working set exceeds budget")
         yield source
     finally:
+        active = False
         os.close(fd)
 
 
