@@ -718,13 +718,18 @@ def _validate_point_plan(state, points, plan) -> None:
         raise RuntimeError(f"unexpected refined sampling status {status}")
 
 
-def _cache_access_plan(state, owner_leaf_ids: np.ndarray):
+def _cache_access_plan(state, owner_leaf_ids: np.ndarray, *, _indexed: bool = True):
     owner_count = int(owner_leaf_ids.shape[0])
     capacity = state.cache_capacity
     if capacity and state.clock > _INDEX_MAX - owner_count:
         raise OverflowError("cache recency clock would overflow int64")
     simulated_keys = state.cache_leaf_ids.copy()
     simulated_recency = state.cache_recency.copy()
+    # Amortize the index only across larger owner batches; no state escapes.
+    lookup = (
+        {int(key): slot for slot, key in enumerate(simulated_keys) if key >= 0}
+        if _indexed and capacity >= 16 and owner_count >= 8 else None
+    )
     planned_slots = np.full(owner_count, -1, dtype=np.int64)
     planned_hits = np.zeros(owner_count, dtype=np.uint8)
     planned_selected_counts = np.zeros(owner_count, dtype=np.int64)
@@ -733,10 +738,13 @@ def _cache_access_plan(state, owner_leaf_ids: np.ndarray):
     for position, owner_value in enumerate(owner_leaf_ids):
         owner = int(owner_value)
         slot = -1
-        for candidate in range(capacity):
-            if int(simulated_keys[candidate]) == owner:
-                slot = candidate
-                break
+        if lookup is not None:
+            slot = lookup.get(owner, -1)
+        else:
+            for candidate in range(capacity):
+                if int(simulated_keys[candidate]) == owner:
+                    slot = candidate
+                    break
         if slot >= 0:
             planned_hits[position] = 1
         else:
@@ -773,6 +781,11 @@ def _cache_access_plan(state, owner_leaf_ids: np.ndarray):
                             int(simulated_recency[value]), value
                         ),
                     )
+                if lookup is not None:
+                    previous = int(simulated_keys[slot])
+                    if previous >= 0:
+                        del lookup[previous]
+                    lookup[owner] = slot
                 simulated_keys[slot] = owner
         planned_slots[position] = slot
         if capacity:

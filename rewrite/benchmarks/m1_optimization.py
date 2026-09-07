@@ -31,10 +31,13 @@ def original_module(name):
 def sle_controls(output):
     """Interleave only controls with >10% drift in separate standard runs."""
     import sle_001 as b
+    import simesh_rewrite.completed_halo_sampling as cache
     case = b.synthetic_case("constant")
     specs = b.trajectory_specs(case, 2, 32)
     baseline = original_module("refined_halo")._preflight_chunk_actions
     retained = halo._preflight_chunk_actions
+    old_cache = original_module("completed_halo_sampling")._cache_access_plan
+    retained_cache = cache._cache_access_plan
     records = []
     try:
         for index, capacity, warm in ((0, 1, True), (1, 1, True),
@@ -48,6 +51,7 @@ def sle_controls(output):
                 stats = [None, None]
                 for variant in ((0, 1) if repeat % 2 == 0 else (1, 0)):
                     halo._preflight_chunk_actions = (baseline, retained)[variant]
+                    cache._cache_access_plan = (old_cache, retained_cache)[variant]
                     b.clear_completed_halo_sampling_session(sessions[variant])
                     if warm:
                         b.run_trajectory(sessions[variant], spec, outputs[variant])
@@ -64,6 +68,7 @@ def sle_controls(output):
                             "bits_and_stats_equal": True})
     finally:
         halo._preflight_chunk_actions = retained
+        cache._cache_access_plan = retained_cache
     output.write_text(json.dumps({"environment": b.environment_record(),
                                   "records": records}, indent=2) + "\n", encoding="utf-8")
 
@@ -81,6 +86,8 @@ def main():
     if args.baseline:
         original = original_module("refined_halo")
         halo._preflight_chunk_actions = original._preflight_chunk_actions
+        import simesh_rewrite.completed_halo_sampling as cache
+        cache._cache_access_plan = original_module("completed_halo_sampling")._cache_access_plan
     path = Path(__file__).with_name(f"{args.family}_001.py")
     sys.argv = [str(path), *remaining]
     runpy.run_path(str(path), run_name="__main__")
