@@ -31,6 +31,8 @@ from .blockio import (
 from .coarser_support import (
     CANONICAL_DIRECTIONS,
     PLAN_CAPACITY,
+    _validate_plan_geometry,
+    _validate_relation_row,
     fill_coarser_slope_support_plan,
 )
 from .coarser_workspace import fill_coarser_workspace_boxes
@@ -592,7 +594,7 @@ def _preflight_chunk_actions_checked_reference(
         )
 
 
-def _preflight_chunk_actions(
+def _preflight_chunk_actions_m1_reference(
     workspace: _RHEWorkspace,
     primary_count: int,
     selected_count: int,
@@ -600,10 +602,13 @@ def _preflight_chunk_actions(
     interior_upper: np.ndarray,
     boundary_modes: np.ndarray,
     normal_field_slots: np.ndarray,
+    *,
+    _owned: bool = False,
 ) -> None:
     """Validate actual action geometry without repeating proven value kernels."""
     empty_fields = slice(0, 0)
     for primary in range(primary_count):
+        relation_validated = False
         for direction_row in range(_DIRECTION_COUNT):
             if int(workspace.physical_masks[primary, direction_row]) != 0:
                 continue
@@ -686,23 +691,38 @@ def _preflight_chunk_actions(
                     workspace.action_target_upper[:1],
                     *workspace.cwp_outputs,
                 )
-                transfer_count, record_count = fill_coarser_slope_support_plan(
-                    interior_lower,
-                    interior_upper,
-                    selected_count,
-                    primary,
-                    int(workspace.action_phases[0]),
-                    workspace.action_directions[0],
-                    CANONICAL_DIRECTIONS,
-                    workspace.relation_kinds[primary],
-                    workspace.physical_masks[primary],
-                    workspace.source_counts[primary],
-                    workspace.source_slots[primary],
-                    workspace.action_target_lower[0],
-                    workspace.action_target_upper[0],
-                    *(value[0] for value in workspace.cwp_outputs),
-                    *workspace.csp_outputs,
-                )
+                if _owned:
+                    if not relation_validated:
+                        _validate_relation_row(
+                            CANONICAL_DIRECTIONS,
+                            workspace.relation_kinds[primary],
+                            workspace.physical_masks[primary],
+                            workspace.source_counts[primary],
+                            workspace.source_slots[primary],
+                            selected_count,
+                        )
+                        relation_validated = True
+                    transfer_count, record_count = _fill_owned_coarser_plan(
+                        workspace, primary, interior_lower, interior_upper
+                    )
+                else:
+                    transfer_count, record_count = fill_coarser_slope_support_plan(
+                        interior_lower,
+                        interior_upper,
+                        selected_count,
+                        primary,
+                        int(workspace.action_phases[0]),
+                        workspace.action_directions[0],
+                        CANONICAL_DIRECTIONS,
+                        workspace.relation_kinds[primary],
+                        workspace.physical_masks[primary],
+                        workspace.source_counts[primary],
+                        workspace.source_slots[primary],
+                        workspace.action_target_lower[0],
+                        workspace.action_target_upper[0],
+                        *(value[0] for value in workspace.cwp_outputs),
+                        *workspace.csp_outputs,
+                    )
                 if (
                     transfer_count < 1
                     or transfer_count > record_count
@@ -767,6 +787,39 @@ def _preflight_chunk_actions(
             boundary_modes,
             normal_field_slots,
         )
+
+
+def _fill_owned_coarser_plan(workspace, primary, interior_lower, interior_upper):
+    """Consume allocator, checked CWP and relation-row proofs; check geometry."""
+    boxes = tuple(tuple(int(v) for v in box[0]) for box in workspace.cwp_outputs)
+    _validate_plan_geometry(
+        tuple(int(v) for v in interior_lower),
+        tuple(int(v) for v in interior_upper),
+        primary,
+        int(workspace.action_phases[0]),
+        tuple(int(v) for v in workspace.action_directions[0]),
+        workspace.relation_kinds[primary],
+        workspace.physical_masks[primary],
+        workspace.source_slots[primary],
+        *boxes,
+    )
+    return fill_coarser_slope_support_plan_unchecked(
+        interior_lower,
+        interior_upper,
+        primary,
+        int(workspace.action_phases[0]),
+        workspace.action_directions[0],
+        workspace.relation_kinds[primary],
+        workspace.physical_masks[primary],
+        workspace.source_slots[primary],
+        *(box[0] for box in workspace.cwp_outputs),
+        *workspace.csp_outputs,
+    )
+
+
+def _preflight_chunk_actions(*args):
+    """Validate actions with invocation-local reuse of owned CSP invariants."""
+    return _preflight_chunk_actions_m1_reference(*args, _owned=True)
 
 
 def _apply_chunk_actions_unchecked(

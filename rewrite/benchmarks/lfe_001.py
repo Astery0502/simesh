@@ -346,6 +346,8 @@ def roi_bounds(fixture: Fixture) -> list[tuple[str, np.ndarray, np.ndarray]]:
     lower = fixture.domain_lower
     extent = fixture.domain_upper - lower
     return [
+        ("thin", lower.copy() + np.asarray((0.0, 0.22, 0.22)) * extent,
+         lower + np.asarray((0.06, 0.78, 0.78)) * extent),
         ("small", lower + 0.42 * extent, lower + 0.58 * extent),
         ("medium", lower + 0.22 * extent, lower + 0.78 * extent),
         ("full", lower.copy(), fixture.domain_upper.copy()),
@@ -565,6 +567,9 @@ def instrument_stages(recorder: StageRecorder):
         (local_field_module, "cartesian_curl_unchecked", "curl"),
         (local_field_module, "accumulate_field_sum_unchecked", "reduction"),
         (refined_halo_module, "read_blocks_into", "reader_boundary"),
+        (refined_halo_module, "_prepare_refined_halo_chunk", "halo_prepare"),
+        (refined_halo_module, "_preflight_chunk_actions", "action_preflight"),
+        (refined_halo_module, "_apply_chunk_actions_unchecked", "halo_apply"),
     ]
     originals: list[tuple[object, str, object]] = []
     for module, attribute, stage in targets:
