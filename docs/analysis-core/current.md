@@ -21,6 +21,8 @@ The earlier whole P0--P4 target-scale input gate is separate from this round.
 
 - Isolated worktree: `/Users/astery/science/simesh-euv-geometry`.
 - Branch: `codex/analysis-core-euv-geometry`; original base `bdfda30`.
+- Round delivery checkpoint: `ab75a17` (implementation, tests, bounded comparisons
+  and evidence); this record has a subsequent recovery-note commit.
 - Inherited dirty/untracked documentation was preserved separately in `d1aaf66`.
   The original `/Users/astery/science/simesh` checkout was not edited by this round.
   Do not merge the inherited snapshot blindly over concurrently maintained docs;
@@ -72,7 +74,7 @@ Field values/count/order can rebind on the same immutable mesh; geometry, source
 cell ordering, selection, partition, boundary or transfer-rule changes rebuild.
 
 No further ready work is required for this round. The next integration action is
-to review the separate delivery commit and use these interfaces in the main
+to review delivery commit `ab75a17` and use these interfaces in the main
 session without automatically replacing native leaf organization or cache policy.
 Reopen E1 only with a direct brick-boundary/native-consumer cost case; reopen E5
 full-domain retention/fusion only when its measured workload and memory justify it.
