@@ -37,6 +37,7 @@ class FieldSource:
     memory_arrays: tuple = ()
     read_interiors: Callable | None = None
     original_field_ids: tuple | None = None
+    plan_builder: Callable | None = None
 
 
 @dataclass(frozen=True, eq=False)

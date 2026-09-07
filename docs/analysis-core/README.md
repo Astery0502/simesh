@@ -74,7 +74,7 @@ implementations and claims. New goals do not retroactively change them.
 ## Current Checkpoint
 
 The actual scope, completion state and next action have one owner:
-[current.md](current.md). The P0--P4 implementation run is active. Its
+[current.md](current.md). The delivered P0--P4 baseline and subsequent authorized rounds share this record. Its
 [selected design](native-core-design.md) records provider assembly, E1--E5
 dispositions, preparation/consumption choices and linked executable evidence.
 Consult the checkpoint for delivered versus still-unverified scope; the

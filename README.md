@@ -16,7 +16,8 @@ AMRVAC files or AMR meshes live in `simesh.tools`.
 
 The experimental `simesh.analysis` layer provides native prepared field groups,
 bounded original-file access, parallel magnetic tracing/twist, global derivatives,
-scalar LOS and streamed uniform sampling.
+scalar LOS, historical AIA 171 thermal synthesis with explicit temperature/units,
+optional reusable geometric fill plans and streamed uniform sampling.
 [Analysis-core documentation](docs/analysis-core/README.md) records its selected
 design, measured scope and remaining integration work. Canonical AMRVAC workflows
 below remain the supported default.

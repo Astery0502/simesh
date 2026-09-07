@@ -135,7 +135,11 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
                 "read_value_bytes": stats.selected_load_count*len(fields)*8*int(np.prod(block)),
                 "scratch_admission_bytes": scratch_bytes(fields, halo)}
 
+    def plan_builder(source, ids, capacity, budget):
+        from .geometry_plans import _build
+        return _build(source, ids, capacity, budget, root_shape, coord_to_rank, f)
+
     return FieldSource(mesh, tuple(definitions), fill, scratch_bytes, resident,
                        "rewrite-ratio2-minmod-exactphase-cont-v1",
                        memory_arrays=reader.memory_arrays,read_interiors=read_interiors,
-                       original_field_ids=original_field_ids)
+                       original_field_ids=original_field_ids,plan_builder=plan_builder)

@@ -2,95 +2,85 @@
 
 Updated: 2026-09-08. Resume through this file and [development](development.md).
 
-## Authorized Scope And Actual State
+## Completed Round: Thermal Response, Organization And Geometry Plans
 
-The user explicitly authorized autonomous **P0 through P4**, including P3-D,
-P3-L and P3-F; P2 was an intermediate checkpoint. All currently ready work has
-advanced through implementation, comparisons, integration and feasible scale.
-**The whole scope is not marked complete:** physical P3-L and actual large-input
-acceptance still require missing inputs. Do not restart completed stages or
-reinterpret the old P2 recommendation as the endpoint.
+This explicitly authorized round is **complete in its declared feasible scope**.
+The user delegated the first response/EOS/unit choices and routine implementation;
+missing WENO temperature did not block manufactured/isothermal verification or
+the organization/plan work. No renewed authorization is pending. Actual snapshot
+thermal truth and current-instrument calibration remain explicitly unverified.
+The earlier whole P0--P4 target-scale input gate is separate from this round.
 
-Execution is **blocked on external inputs** after repeated revalidation: the
-physical response/thermodynamic inputs and a suitable large Cartesian fixture
-remain unavailable. Resume the corresponding gate when either input is supplied.
+| Direction | Delivered / measured disposition | Evidence |
+| --- | --- | --- |
+| AIA171 optically thin response | Adopt pinned historical table, explicit H/He EOS, electron vs upstream hydrogen-proxy normalization, external K/isothermal input and both LOS reconstruction orders. Thermodynamics-first with four subdivisions is the default; refine for the scientific request. | [Thermal](evidence/p3-l-thermal.md) |
+| E1 rebricking | Bounded whole-WENO geometry plus mapped F/D/LOS prototype completed. Defer default adoption: octets merge 93.15% of leaves and save 39.24% total padding, but sparse primaries expand 4.38x. Retain exact mapping/probe outside production compute identity. | [Rebricking](evidence/rebricking.md) |
+| E5 geometric plans | Adopt explicit optional selected fill plans. Exact prepared/consumer output and equal reads; repeated composed costs improve 2.56x sparse and 6.67x dense. Plan construction amortizes after two executions in this profile. | [Plans](evidence/geometry-plans.md) |
 
-| Delivery | Actual status and evidence |
-| --- | --- |
-| P0/P1 | Complete selected design, provider assembly, native interior/two-halo products, stable bounded borrowing and direct consumption; [P1](evidence/p1-native-fields.md) |
-| P2 | Complete declared accepted-prefix parallel F, terminal/length results and cache comparisons; [P2](evidence/p2-field-lines.md) |
-| P3-D | Complete whole-domain curl(B), independent retained groups and axis/oblique slices; [D](evidence/p3-d-global-slices.md) |
-| P3-F | Complete selected accepted-segment twist, optional trajectories and explicit selected-ID retracing; [F](evidence/p3-f-twist.md) |
-| P3-L | Scalar/emissivity-field integration core and WENO rho columns complete; **physical response/EOS/units gate open**; [L](evidence/p3-l-scalar-los.md) |
-| P4 | Additive installed source/workflow/build compatibility and actual million-seed/1000^3 output checks complete; **10--20 GB / larger-than-RAM input unverified**; [integration](evidence/p4-integration.md), [scale](evidence/p4-scale.md) |
+## Checkout And Recovery
 
-## Checkout And Recoverable Work
+- Isolated worktree: `/Users/astery/science/simesh-euv-geometry`.
+- Branch: `codex/analysis-core-euv-geometry`; original base `bdfda30`.
+- Inherited dirty/untracked documentation was preserved separately in `d1aaf66`.
+  The original `/Users/astery/science/simesh` checkout was not edited by this round.
+  Do not merge the inherited snapshot blindly over concurrently maintained docs;
+  the subsequent round delivery is a separate checkpoint for review/integration.
+- Ignored `.venv` and `data` symlinks borrow the existing runtime/fixtures. No pip
+  installation, shared-environment mutation or source-fixture rewrite occurred.
+  Existing compiled extensions were copied into this worktree; no Cython source
+  or executor/scheduler was changed.
+- Code: `src/simesh/analysis/thermal.py`, `_aia171_table.py`, `geometry_plans.py`;
+  one optional plan-builder hook in fields/providers. The E1 code is evidence
+  tooling under `scripts/analysis_core/rebricking.py`.
+- Use [usage](usage.md) for concrete thermal/external-temperature and plan calls.
+  The existing [selected design](native-core-design.md) owns all decisions.
 
-- Checkout: `/Users/astery/science/simesh`, branch `codex/analysis-core-p0-p4`.
-- Source checkpoints: `ee96824` (P1), `f6dc48e` (P2), `6558286` (D),
-  `8a80a2f` (twist), `2c00792` (scalar LOS), `a5f1f88` (file/packaging integration).
-  Final acceptance/navigation has its own subsequent checkpoint.
-- Substantial pre-existing modified/untracked documentation remains preserved.
-  Stage only owned work; no blanket reset, staging or source-fixture cleanup.
-- Core: `src/simesh/analysis/`; compiled consumers: `src/simesh/utils/lib/analysis/`;
-  file adapters: `src/simesh/amrvac/analysis*.py`. Existing rewrite is an explicit
-  bundled provider with its original numerical directives and contracts.
-- Design/route decisions: [native-core-design](native-core-design.md).
-  Runnable examples and restrictions: [usage](usage.md).
+## Verification And Resources
 
-## Latest Verification And Resource Profile
+The complete analysis suite passed **22 tests**, including existing field/source,
+F/D/scalar LOS/twist/uniform checks and the new thermal/geometry-plan/rebrick cases:
 
-- Safe `make clean` and complete `make test PYTHON=.venv/bin/python` passed;
-  virtualenv NumPy remained intact. Provider suite: 1232 passed. Public/AMR/helper
-  checks: 92 passed, two opt-in heavy cases excluded. New-core composed checks:
-  17 passed. OpenMP build plus 23 AMR checks passed; default non-OpenMP restored.
-- Fresh-source wheel (~9.35 MB) built and passed isolated `python -S` imports and
-  file-to-result execution without editable checkout hooks.
-- Actual one million seeds (maximum 32 steps): one/four workers agree; trace
-  8.176 / 2.274 s; 17,273,160 accepted steps; last-accepted endpoint semantics.
-- Actual 1000^3 output stream: every billion point valid, 24 GB cumulative values,
-  81.283 s, maximum 33 MB slab. Peak run RSS 1,438,449,664 bytes.
-- Direct original-file WENO short trace: 0.129 s and ~3 MB reads versus 5.118 s
-  eager-source comparison, identical results. Dense checked B reading improved
-  to ~5.01 s through record-order I/O, retaining full callback checks.
-- Host: 8 GiB RAM / eight logical CPUs. Run limits: <=4 compute workers,
-  <=2 GiB controlled live arrays per case, <=2 GiB task-created disk scratch,
-  >=2 GiB free disk. No time/token limit was supplied. Bounds do not promise
-  process RSS or OS page-cache limits. Candidate probes are closed with outcomes.
+```bash
+PYTHONPATH=src:rewrite/src:scripts:tests/analysis:rewrite/benchmarks .venv/bin/python -m unittest discover -s tests/analysis -v
+PYTHONPATH=src:rewrite/src:scripts .venv/bin/python -m analysis_core.benchmark_thermal
+PYTHONPATH=src:rewrite/src:scripts .venv/bin/python -m analysis_core.benchmark_organization --stage bricks
+PYTHONPATH=src:rewrite/src:scripts .venv/bin/python -m analysis_core.benchmark_organization --stage plans
+```
 
-## Inputs Still Required
+Raw JSON/logs are retained in ignored `benchmark-results/analysis-core/` (under
+1 MiB before any later user output). No large numerical scratch was created.
+Host: inherited 8 GiB RAM/eight logical CPUs; up to four existing workers allowed,
+new probes used one worker. Bounds: 2 GiB controlled live arrays/case, 2 GiB new
+scratch, at least 2 GiB free disk. Measured peaks: thermal RSS 997.9 MB, E1 495.6 MB,
+E5 527.5 MB; thermal coexistence admission 1.518 GB. OS cache is uncontrolled.
+Discretionary variants are closed; no time/token budget was supplied.
 
-1. **P3-L physical definition and data:** an asynchronous question remains pending
-   for epsilon(rho,T), EOS/normalization/units/instrument response or explicit
-   delegation of a first model. WENO and tdm have no energy/temperature. Do not
-   relabel stored-rho columns as a thermal image. Additional temperature/physical
-   inputs must match the selected response before its independent verification.
-2. **Large Cartesian input fixture:** an asynchronous question requests a readable
-   path to an existing 10--20 GB file, including an external drive if available.
-   Repository inventory found WENO (~1 GB), tdm (~1.5 MB) and spherical bw
-   (~3.6 MB). The spherical reference is outside the selected geometry. Neither
-   million-seed output nor a sparse/fake large file substitutes for this input gate.
+The table/source and full input/output unit derivation are recorded in thermal
+evidence. Its manufacturing/reference errors are distinct from WENO /64 quadrature
+comparisons. The first model's independent continuum maximum error reached
+7.24e-7 at subdivision 16, versus 1.39e-3 for prepared-node emissivity on that test.
+WENO manufactured-temperature /4 relative L2 differences from /64 are 3.19e-5
+axis and 1.79e-5 oblique. None is a claimed real-snapshot physical accuracy.
 
-No ready authorized implementation or verification remains blocked merely by a
-milestone report. On a supplied response/model or fixture, resume that specific
-gate using the existing core and record, not an unrestricted new exploration.
+## Main-Session Handoff And Remaining Gaps
 
-## Explicit Limits And Dispositions
+The main session owns execution backends, parallel dispatch and runtime ghost
+numerical caches. This work supplies optional immutable geometry plans with local
+support ordinals, source-to-brick maps, and explicit thermal field/result meaning.
+Do not put cache slots, value generations or minmod slopes into persistent plans.
+Field values/count/order can rebind on the same immutable mesh; geometry, source
+cell ordering, selection, partition, boundary or transfer-rule changes rebuild.
 
-Canonical APIs remain the default/rollback path. Their generated 2D read/write,
-bilinear/coarse-fine, Dataset, VTK and helper workflows are verified. New native
-consumers are nonperiodic Cartesian 3D; periodic metadata roundtrips are not
-periodic halo computation (canonical forest currently disables periodic links).
-No new 2D extrusion, periodic tracing, CT or non-Cartesian computation is claimed.
-Exact boundary footpoints, Q and GPU remain outside the selected delivered
-profiles, with reopen conditions in the design. E1/E2/E3/E4 and new compact
-persistent fill plans are evidence-backed deferred routes, not unfinished
-mandatory prototypes. Retain fast resident and memory-bounded preparations.
+No further ready work is required for this round. The next integration action is
+to review the separate delivery commit and use these interfaces in the main
+session without automatically replacing native leaf organization or cache policy.
+Reopen E1 only with a direct brick-boundary/native-consumer cost case; reopen E5
+full-domain retention/fusion only when its measured workload and memory justify it.
 
-## Retained Outputs
-
-Ignored `benchmark-results/analysis-core/` contains all raw JSON/logs, the ~543 MB
-global-curl native product, ~96 MB million-seed summary, LOS scalar arrays/figure,
-and clean-source build/wheel artifacts. The 24 GB uniform value stream was
-consumed, not saved as a cube. Preserve these useful results; reclaim only owned
-scratch if needed under the recorded resource limit.
+Still unverified: actual WENO thermal state and physical normalization, the pinned
+table's missing CHIANTI/abundance/calibration generation metadata, current-date
+instrument effects, nonlinear parallel/bounded thermal execution, whole-domain
+persistent plan feasibility, production direct-brick preparation, and the earlier
+10--20 GB/larger-than-RAM Cartesian input acceptance. Missing inputs do not undo
+the completed manufactured/actual-geometry evidence. Canonical public paths and
+previous P0--P4 source checkpoints remain preserved.

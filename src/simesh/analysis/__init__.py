@@ -37,3 +37,8 @@ def open_prepared(path,*,field_names=None,field_indices=None,field_units=None,bu
 
 
 __all__ += ["open_source","open_prepared"]
+
+from .thermal import AIA171, CoronalComposition, ThermalLOSResult, thermal_fields, emissivity_fields, integrate_thermal_los
+from .geometry_plans import FillPlan, build_fill_plan
+__all__ += ["AIA171", "CoronalComposition", "ThermalLOSResult", "thermal_fields", "emissivity_fields", "integrate_thermal_los",
+            "FillPlan", "build_fill_plan"]

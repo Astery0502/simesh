@@ -65,11 +65,11 @@ measured startup justifies it, without enabling CT computation.
 
 | Route | Decision and reason | Reopen condition |
 | --- | --- | --- |
-| E1 | Defer merged bricks. Keep source/slot identity separate. Bigger bricks reduce padding but amplify sparse requests and need coordinate/interface proof; current evidence does not quantify WENO merging. | Full F/D costs identify padding as limiting; a bounded geometry probe finds useful filled same-level bricks. |
+| E1 | Defer default merged bricks after measured WENO geometry and F/D/LOS prototype; retain source/compute/slot separation. | Direct brick-boundary preparation and native mapped consumers justify full costs; see [E1 evidence](evidence/rebricking.md). |
 | E2 | Defer basis reconstruction, which changes interpolated/derived meaning and is unnecessary for the confirmed baseline. | A named consumer needs continuity/analytic reconstruction derivatives with applicable acceptance. |
 | E3 | Defer gridlets/dual mesh. Sampled slices and rays can use native prepared groups. | Native intersections/isosurface seams justify explicit interface topology. |
 | E4 | Defer RT hardware: no selected RTX/OptiX platform on this CPU host. | Suitable resources and measured location bottleneck. |
-| E5 | Adopt geometry/value/slot lifetime separation and direct compiled consumption; bootstrap with RHE, then assess retained fill facts/fused batches if preparation dominates. | Equivalent support/arithmetic/failures, bounded plan bytes and improved complete consumer costs. |
+| E5 | Adopt optional selected retained fill plans after exact conformance and repeated F/D/LOS cost comparisons; keep ordinary preparation. | Automatic retention or fused execution requires full resource/runtime evidence; see [E5 evidence](evidence/geometry-plans.md). |
 
 These decisions use the preserved [route analysis](algorithmic-directions.md)
 and existing WENO evidence; no external result is a new simesh measurement.
@@ -275,9 +275,11 @@ incremental-cost control, not an equal-work speed comparator. Record companion
 fills, retained/copy/trajectory memory and source startup. Also check the affected
 ordinary 2048x600 ready-data control after extending the hot kernel.
 
-## P3-L Ready Geometry Scope
+## P3-L Initial Scalar Geometry Scope (Historical)
 
-L1 physical response/EOS/instrument units remain pending the user question.
+At the initial scalar checkpoint, L1 physical response/EOS/instrument units
+were pending the user question. The new explicitly delegated thermal selection
+and evidence below supersede that question; this section records the old scope.
 Implement the independent geometric consumer for an explicitly supplied scalar
 emissivity/field; do not invent thermal physics or certify P3-L's response gate.
 Its numerical strategy is trilinear interpolation of the supplied prepared scalar
@@ -437,3 +439,79 @@ Retained 2D roundtrip/bilinear and periodic-metadata/VTK value workflows pass.
 Canonical forest source explicitly initializes periodic connectivity off; neither
 this work nor header preservation establishes periodic ghost computation. New
 native sources reject that flag rather than silently using nonperiodic halos.
+
+## 2026-09-08 Thermal / E1 / E5 Round
+
+The active user instruction delegates the first physical model and routine
+choices. Retain the existing architecture/process. AIA171 selects the pinned
+MPI-AMRVAC numerical response with log-log interpolation, explicit cgs density
+and path-length scales, fully ionized H/He (n_He/n_H=0.1), and n_e squared.
+Expose the upstream eq_state_units=True hydrogen-density convention separately;
+its brightness differs by (1+2a)^2. The historical table's calibration generation
+settings are not identified in its source. No current-instrument/observational
+accuracy claim follows. Missing T requires explicitly labelled external prepared
+K values or an isothermal scalar. Physical snapshot validation remains open.
+
+Compare pointwise response on prepared thermodynamic nodes before interpolation
+against interpolation of n,T before response. This keeps nodal support identical;
+it does not silently replace thermodynamic halo transfer with emissivity transfer.
+The nonlinear path uses knot-split composite Gauss2 with refinement; scalar Gauss2
+exactness certifies only the node-emissivity interpolant. Core acceptance includes
+independent tabular power-law normalization and manufactured continuum quadrature;
+record observed errors without inventing an observational SLA. WENO profile: full
+domain 8x8 axis/oblique images, actual rho, declared demonstration density/length
+scales, manufactured 0.45--1.65 MK z sinusoid; subdivisions 1,4,16 (then 64 to
+quantify reference residual) and node-response
+order. One run per expensive variant is descriptive; no speedup inferred from
+unmatched quadrature or Python versus compiled backends.
+
+E1 bounded probe: native leaves, aligned 2x1x1 and 2x2x2 filled groups with native
+fallback. Scan every WENO leaf for exact coverage. Quantify merged fraction,
+retained halos, source-to-brick mapping and sparse expansion. Measure selected
+preparation/packing and complete sparse F, dense D and full-depth LOS request
+with identical per-consumer arithmetic. Prototype packing may reuse native fills;
+report this amplification explicitly, never call theoretical compact halos saved
+preparation. Keep native direct consumer as a separately identified comparator.
+
+E5 bounded probe: persist checked source-leaf support, same/fine/coarse transfer
+boxes and physical widening records for the selected immutable mesh and two-halo
+continuous strategy. Local support ordinals are not runtime cache slots. Bind new
+field IDs and private arrays at each execution; restriction retains ordered 1/8
+averages and prolongation +/-1/4 geometry, while minmod slopes remain numerical
+execution. Probe at most unretained versus retained actions, plan budget 128 MiB,
+selected sparse and dense/ray geometry, one warmup/three repetitions. Include
+construction, Python/array plan storage, fresh reads, scratch, output and complete
+consumption. Rebuild on geometry, source-cell order, width, boundary/transfer rule,
+selection or support partition changes; value/field changes do not themselves
+invalidate geometric facts. Runtime ghost caches and parallel scheduling belong
+to the main session. No automatic plan retention or global cache is introduced.
+
+### Thermal And E1 Outcomes
+
+Thermal: adopt the pinned AIA171 API, explicit electron/H-proxy distinction and
+thermodynamics-first LOS with a default four subdivisions. Manufactured continuum
+and actual WENO rho/geometry with labelled manufactured T verify the chain;
+[thermal evidence](evidence/p3-l-thermal.md) records remaining calibration/physical
+input gaps. A 64-subdivision follow-up quantified the /16 reference's residual,
+and separate retained-emissivity repeats established its request-specific view
+amortization. No scalar integral exactness was transferred to nonlinear response.
+
+E1: defer default rebricking after the bounded probe. WENO supports 96.67% paired
+and 93.15% octet leaves; octets reduce all-domain padding by 39.24%, but sparse
+primary selection expands 4.38x and compact storage for that request grows 2.31x.
+Dense compact storage falls to 63.38% of native requested storage; current packing
+still prepares expanded native halos. Full mapped F and dense D/LOS results
+conform, with no mapped-consumer throughput advantage in the prototype. Keep the
+exact geometry mapping outside production identity and reopen only with direct
+brick-boundary preparation/native consumers and complete-cost evidence.
+[Rebricking evidence](evidence/rebricking.md) owns details and reproduction.
+
+E5: adopt explicit optional selected geometric plans. Source reads and every
+prepared/consumer value match ordinary preparation; repeated composed F and D/LOS
+costs improve 2.56x and 6.67x in the declared WENO profile. Sparse/dense plans retain
+0.64/52.18 MB and construction amortizes at the second execution. Keep unretained
+one-shot preparation, and defer automatic retention/full-domain/fused execution.
+[Geometry-plan evidence](evidence/geometry-plans.md) owns lifetime, invalidation,
+complete costs and the runtime handoff boundary. The 128 MiB retained-plan build
+allowance additionally needs one bounded prospective chunk/accounting temporary
+at peak; it is not a hard RSS limit.
