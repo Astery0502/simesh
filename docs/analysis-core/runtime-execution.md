@@ -59,6 +59,7 @@ and cross-machine runs remain unverified when unavailable.
 
 ## Recovery Point
 
+Validated selected source: `6172bbb`. Default non-OpenMP is the restored build.
 Checkpoint `ce97fed` preserves all feedback/staging experiments before their
 selective rollback; `775a0b9` preserves the initial cache/OpenMP candidates.
 The selected source keeps process preparation, optional raw-value caching and

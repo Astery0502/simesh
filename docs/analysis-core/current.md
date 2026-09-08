@@ -41,7 +41,7 @@ large-input/physical acceptance was not used to stop independent runtime work.
   Final acceptance/navigation has its own subsequent checkpoint.
 - Runtime experiment checkpoints: `775a0b9` (cache and backend candidates),
   `ce97fed` (recoverable preparation/scheduling/feedback/staging experiments).
-  The selected-source checkpoint follows with rejected candidates removed.
+  Validated selected source: `6172bbb`, with rejected candidates removed.
 - Substantial pre-existing modified/untracked documentation remains preserved.
   Stage only owned work; no blanket reset, staging or source-fixture cleanup.
 - Core: `src/simesh/analysis/`; compiled consumers: `src/simesh/utils/lib/analysis/`;
