@@ -21,8 +21,10 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--workload',choices=('f','l'),required=True)
     p.add_argument('--repeats',type=int,default=5)
+    p.add_argument('--thread-dynamic-only',action='store_true')
     args=p.parse_args()
-    output=Path(f'benchmark-results/analysis-core/runtime-ready-{args.workload}.json')
+    suffix='-thread-dynamic' if args.thread_dynamic_only else ''
+    output=Path(f'benchmark-results/analysis-core/runtime-ready-{args.workload}{suffix}.json')
     result={'openmp':openmp_build_info(),'wait_policy':os.environ.get('OMP_WAIT_POLICY','runtime default'),
             'preparation':'one shared file-to-ready preparation; OS cache uncontrolled','cases':[]}
     start=time.perf_counter()
@@ -45,7 +47,8 @@ def main():
         granularities=(16,64)
     reference=None
     for grain in granularities:
-        for backend,schedule in [('threadpool','static'),('openmp','static'),('openmp','dynamic')]:
+        for backend,schedule in ([('threadpool','dynamic')] if args.thread_dynamic_only else
+                                 [('threadpool','static'),('openmp','static'),('openmp','dynamic')]):
             for workers in (1,2,4):
                 row={'backend':backend,'schedule':schedule,'workers':workers,'grain':grain,'wall':[],'cpu':[]}
                 for repeat in range(args.repeats+1):

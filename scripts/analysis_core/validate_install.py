@@ -9,6 +9,7 @@ import sys
 import sysconfig
 import tempfile
 import time
+import textwrap
 import zipfile
 
 
@@ -45,7 +46,8 @@ sys.path.insert(0,wheel)
 sys.path.append(dependencies)
 import numpy as np
 import simesh, simesh_rewrite
-from simesh.analysis import open_source, PreparedPool, trace, open_prepared, sample
+from simesh.analysis import (open_source, PreparedPool, trace, open_prepared, sample,
+                            global_curl_file, integrate_los_views, Plane)
 from simesh.amrvac import write_datfile_from_uniform, read_blocks
 assert str(simesh.__file__).startswith(wheel)
 assert str(simesh_rewrite.__file__).startswith(wheel)
@@ -53,7 +55,7 @@ with tempfile.TemporaryDirectory() as directory:
     path = pathlib.Path(directory)/"snapshot.dat"
     data = np.zeros((8,8,8,3)); data[...,0]=1.
     write_datfile_from_uniform(path,data,["b1","b2","b3"],[0.,0.,0.],[1.,1.,1.],[4,4,4])
-    with open_source(path,field_names=["b1","b2","b3"]) as source:
+    with open_source(path,field_names=["b1","b2","b3"],value_cache_capacity=8) as source:
         pool=PreparedPool(source,[0,1,2],2)
         result=trace(pool,np.array([[.2,.4,.5]]),step=.05,max_steps=3)
         np.testing.assert_allclose(result.positions,[[.35,.4,.5]],atol=1e-14)
@@ -61,11 +63,19 @@ with tempfile.TemporaryDirectory() as directory:
     fields=open_prepared(path,field_names=["b1","b2","b3"])
     np.testing.assert_array_equal(sample(fields,np.array([[.2,.4,.5]]))[0],[[1.,0.,0.]])
     assert read_blocks(path).shape == (8,3,4,4,4)
+    derived=global_curl_file(path,workers=2,task_size=4,batch_size=2)
+    np.testing.assert_array_equal(derived.values,0.)
+    plane=Plane([0.,0.,-1.],[1.,0.,0.],[0.,1.,0.],(4,4))
+    images=integrate_los_views(fields,[plane,plane],[[0.,0.,1.],[0.,0.,1.]])
+    for image in images:
+        np.testing.assert_array_equal(image.values,1.)
 print(json.dumps({"simesh":simesh.__file__,"provider":simesh_rewrite.__file__,"result":result.positions.tolist()}))
 '''
     environment=dict(os.environ)
     environment.pop('PYTHONPATH',None)
-    checked=subprocess.run([sys.executable,'-S','-c',code,str(installed),sysconfig.get_paths()['purelib']],
+    smoke=stage/'smoke.py'
+    smoke.write_text('def main():\n'+textwrap.indent(code,'    ')+"\nif __name__=='__main__':\n    main()\n")
+    checked=subprocess.run([sys.executable,'-S',str(smoke),str(installed),sysconfig.get_paths()['purelib']],
         cwd=installed,env=environment,text=True,capture_output=True,check=True)
     record={'stage':str(stage),'wheel':str(wheel),'wheel_bytes':wheel.stat().st_size,
             'build_seconds':elapsed,'isolated_result':json.loads(checked.stdout),

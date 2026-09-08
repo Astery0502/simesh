@@ -6,8 +6,8 @@ No file, cache, Dataset or Python callback participates in a value query.
 """
 
 from libc.math cimport floor, isfinite, NAN, sqrt, hypot, ceil, nextafter, INFINITY
-from libc.stdint cimport int64_t
-from cython.parallel cimport prange
+from libc.stdint cimport int64_t, uint8_t
+from cython.parallel cimport prange, threadid
 
 cdef extern from *:
     """
@@ -204,6 +204,7 @@ cdef inline void _advance_line(int64_t seed,
     const int64_t[::1] curl_slots, const double[:, :, :, :, ::1] curl_data,
     int curl_halo, double[:, ::1] alpha, double[::1] twist,
     double[:, :, ::1] paths,
+    uint8_t[:, ::1] touched, int lane,
 ) noexcept nogil:
     cdef int64_t  stage, a, leaf, slot, curl_slot
     cdef double p[3]
@@ -238,6 +239,8 @@ cdef inline void _advance_line(int64_t seed,
             requested[seed] = leaf
             misses[seed] += 1
             break
+        if touched.shape[1]:
+            touched[lane,slot] = 1
         if not interpolate(p,leaf,slot,bounds,spacing,data,halo,b):
             status[seed] = 10
             break
@@ -314,6 +317,7 @@ cpdef void advance_lines(
     int curl_halo, double[:, ::1] alpha, double[::1] twist,
     double[:, :, ::1] paths,
     int workers=1, int dispatch=0,
+    uint8_t[:, ::1] touched=None,
 ):
     cdef int64_t seed
     if workers < 1 or workers > 4 or dispatch not in (0,1):
@@ -323,13 +327,13 @@ cpdef void advance_lines(
     with nogil:
         if workers == 1:
             for seed in range(positions.shape[0]):
-                _advance_line(seed, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths)
+                _advance_line(seed, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths, touched, 0)
         elif dispatch == 0:
             for seed in prange(positions.shape[0], schedule='static', num_threads=workers):
-                _advance_line(seed, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths)
+                _advance_line(seed, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths, touched, threadid())
         else:
             for seed in prange(positions.shape[0], schedule='dynamic', chunksize=8, num_threads=workers):
-                _advance_line(seed, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths)
+                _advance_line(seed, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths, touched, threadid())
 
 
 cdef inline bint interpolate_scalar(
@@ -521,6 +525,7 @@ cdef inline void _advance_ray(int64_t ray,
     double step_fraction, int quadrature, int64_t max_samples, double[::1] values,
     int64_t[::1] status, int64_t[::1] requested,
     int64_t[::1] samples, int64_t[::1] misses,
+    uint8_t[:, ::1] touched, int lane,
 ) noexcept nogil:
     cdef int64_t leaf,slot,a,j,count
     cdef int code
@@ -556,6 +561,8 @@ cdef inline void _advance_ray(int64_t ray,
             requested[ray] = leaf
             misses[ray] += 1
             break
+        if touched.shape[1]:
+            touched[lane,slot] = 1
         if quadrature == 1:
             code = gauss_leaf(&origins[ray,0],direction,leaf,slot,component,bounds,
                 spacing,data,halo,progress[ray],stop,max_samples,&samples[ray],&values[ray])
@@ -606,6 +613,7 @@ cpdef void advance_rays(
     int64_t[::1] status, int64_t[::1] requested,
     int64_t[::1] samples, int64_t[::1] misses,
     int workers=1, int dispatch=0,
+    uint8_t[:, ::1] touched=None,
 ):
     cdef int64_t ray
     if workers < 1 or workers > 4 or dispatch not in (0,1):
@@ -615,10 +623,10 @@ cpdef void advance_rays(
     with nogil:
         if workers == 1:
             for ray in range(origins.shape[0]):
-                _advance_ray(ray, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses)
+                _advance_ray(ray, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses, touched, 0)
         elif dispatch == 0:
             for ray in prange(origins.shape[0], schedule='static', num_threads=workers):
-                _advance_ray(ray, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses)
+                _advance_ray(ray, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses, touched, threadid())
         else:
             for ray in prange(origins.shape[0], schedule='dynamic', chunksize=8, num_threads=workers):
-                _advance_ray(ray, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses)
+                _advance_ray(ray, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses, touched, threadid())

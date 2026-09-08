@@ -86,6 +86,49 @@ class PreparedTests(unittest.TestCase):
         self.assertFalse(okay[0])
         self.assertTrue(np.isnan(values).all())
 
+    def test_coverage_lease_preserves_actual_request_recency(self):
+        pool=PreparedPool(self.source,[0],3)
+        try:
+            with pool.borrow([1,2,3]):
+                pass
+            with pool.borrow([1]):
+                pass
+            with pool.borrow(pool.resident_leaf_ids,touch=False):
+                pass
+            with pool.borrow([4]):
+                pass
+            before=pool.prepared_count
+            with pool.borrow([1]) as hot:
+                expected=prepare(self.source,[1],[0])
+                np.testing.assert_array_equal(hot.window(1,[0,0,0],self.source.mesh.block_shape),
+                                              expected.interior()[0])
+            self.assertEqual(pool.prepared_count,before)
+        finally:
+            pool.close()
+
+    def test_staged_misses_publish_only_after_all_batches_succeed(self):
+        calls=0
+        failing=True
+        def fill(*args):
+            nonlocal calls
+            calls+=1
+            result=self.source.fill(*args)
+            if failing and calls==2:
+                raise OSError('failed final staging batch')
+            return result
+        pool=PreparedPool(replace(self.source,fill=fill),[0,1,2],3,fill_batch_size=2)
+        try:
+            with self.assertRaises(OSError):
+                with pool.borrow([1,2,3]):
+                    pass
+            self.assertEqual(len(pool.resident_leaf_ids),0)
+            failing=False
+            with pool.borrow([1,2,3]) as ready:
+                expected=prepare(self.source,[1,2,3],[0,1,2])
+                np.testing.assert_array_equal(ready.interior(),expected.interior())
+        finally:
+            pool.close()
+
     def test_borrow_eviction_failure_and_lifetime(self):
         selected_fields = np.array([2,0,1],dtype=np.int64)
         pool = PreparedPool(self.source, selected_fields, 2)

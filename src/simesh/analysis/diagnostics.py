@@ -55,10 +55,10 @@ class CurlPool:
         return self.primary.resident_leaf_ids
 
     @contextmanager
-    def borrow(self, ids):
+    def borrow(self, ids, *, touch=True):
         if self._values is None:
             raise RuntimeError("curl companion is closed")
-        with self.primary.borrow(ids) as primary:
+        with self.primary.borrow(ids,touch=touch) as primary:
             slots = primary.slot_of_leaf[primary.leaf_ids]
             missing = primary.leaf_ids[self._keys[slots] != primary.leaf_ids]
             if len(missing):

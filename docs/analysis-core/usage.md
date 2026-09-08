@@ -205,3 +205,83 @@ a PreparedPool for bounded source access. It never constructs a full coordinate
 cube or concatenates the full output. Each returned slab is owned; arbitrary
 additional retention is the caller's explicit memory choice. The active budget
 reserves a current and one normally retained previous slab.
+
+## Runtime Reuse And File Lifetimes
+
+[Runtime execution](runtime-execution.md) distinguishes numerical reuse,
+scheduling and backend evidence. A `PreparedPool` retains complete two-halo
+blocks, including their ghost values. Size it for the measured working set when
+possible. F/LOS coverage leases no longer count every resident block as a cache
+hit; explicit block requests still update recency. Between such accesses,
+completed preparations provide the insertion-age eviction order. This is not
+sample-level exact LRU.
+
+`open_source(..., value_cache_capacity=2048)` additionally retains up to 2,048
+ordinary-interior blocks behind the provider, deduplicating repeated support
+reads. It defaults to zero and can be less effective than using those bytes for
+complete prepared blocks. Its one ordered field-group binding is cleared when
+the selected fields/order change. `read_value_bytes` reports underlying loaded
+values; `requested_value_bytes` and the provider's `selected_load_count` include
+support requests served from cache. File-record/header bytes are separate.
+
+File sources check their opened file identity and context lifetime even for
+prepared-cache hits. Changed values require a new source and new pools; shared
+geometry does not validate old values. Detached products remain snapshots after
+source closure. Array-backed sources require the owner's immutable-lifetime
+promise, or a `validate_values` callback that raises when their epoch changes.
+Closing the source context closes its file; its cache storage remains owned by
+source/pool references until those references are released.
+
+## Nearby LOS Views
+
+Use one finite pool for views of the same immutable scalar field. This returns
+all requested images in input order; tile scheduling changes no per-pixel sum.
+The common `near`/`far` bounds can be scalars or image-shaped arrays. All planes
+must have the same image shape, and every output image is admitted together.
+
+```python
+from simesh.analysis import integrate_los_views, orthographic_plane
+
+directions = [[0.3, 0.2, 1.0], [0.31, 0.2, 1.0], [0.3, 0.21, 1.0]]
+planes = [orthographic_plane(source.mesh.lower, source.mesh.upper, d, (32, 32))
+          for d in directions]
+images = integrate_los_views(scalar_pool, planes, directions,
+                             tile_shape=(4, 4), view_order="tile")
+```
+
+The measured benefit is for nearby views whose tile working sets overlap. Use
+`view_order="view"` for the sequential comparison. Single-image `integrate_los`
+keeps its existing behavior. These are supplied-scalar integrals; this interface
+does not select AIA response or thermodynamic inputs.
+
+## Independent Preparation For Dense Curl
+
+`global_curl_file` uses bounded file/preparation tasks and returns the complete
+native one-halo curl product, usable by the existing slice/sampling APIs. It
+admits full output, private providers, derivative buffers, in-flight results and
+IPC copies together. The optional process path can parallelize preparation that
+remains serial under Python threads. `global_curl(source, ...)` stays available.
+
+Run the process path from an importable script with a main guard:
+
+```python
+from simesh.analysis import global_curl_file
+
+
+def main():
+    current = global_curl_file("snapshot.dat", workers=2, task_size=512,
+                               batch_size=256, support_capacity=256,
+                               budget_bytes=1024**3)
+    # current covers every native leaf, independently of later slice geometry.
+
+
+if __name__ == "__main__":
+    main()
+```
+
+`backend="thread"` retains the matched independent-thread preparation comparator;
+it was not faster on the measured preparation-bound WENO case. No provider/pool
+is shared mutably between workers. A file change aborts publication. Failure may
+leave completed ranges in an explicitly supplied output sink, as in `global_curl`.
+Larger retained outputs require their own admitted budget; this does not establish
+10--20 GB input acceptance.

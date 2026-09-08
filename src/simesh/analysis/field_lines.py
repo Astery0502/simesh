@@ -74,8 +74,11 @@ def _run_chunk(fields, seeds, seed_ids, step, max_steps, max_length, null_thresh
     if trajectories:
         paths[initial>=0,0] = seeds[initial>=0]
     partitions = [part for part in np.array_split(np.arange(n), workers) if len(part)]
+    primary_pool=fields.primary if isinstance(fields,CurlPool) else fields
+    used=np.zeros((len(partitions)*native_workers,primary_pool.capacity+128),dtype=np.uint8) if is_pool else np.empty((0,0),dtype=np.uint8)
 
     def advance(product, part):
+        part_index,part=part
         companion = product.curl if want_twist else None
         product = product.primary if isinstance(product,WithCurl) else product
         span = slice(int(part[0]), int(part[-1])+1)
@@ -88,17 +91,21 @@ def _run_chunk(fields, seeds, seed_ids, step, max_steps, max_length, null_thresh
             companion.slot_of_leaf if want_twist else product.slot_of_leaf,
             companion.values if want_twist else empty,1,
             alpha[span] if want_twist else alpha,twist[span] if want_twist else twist,
-            paths[span] if trajectories else paths,native_workers,dispatch)
+            paths[span] if trajectories else paths,native_workers,dispatch,
+            used[part_index*native_workers:(part_index+1)*native_workers] if is_pool else used)
 
     while np.any(status == Termination.RUNNING):
-        context = fields.borrow(fields.resident_leaf_ids) if is_pool else nullcontext(fields)
+        used.fill(0)
+        context = fields.borrow(fields.resident_leaf_ids,touch=False) if is_pool else nullcontext(fields)
         with context as product:
             if executor is None:
-                advance(product, partitions[0])
+                advance(product, (0,partitions[0]))
             else:
-                futures = [executor.submit(advance, product, part) for part in partitions]
+                futures = [executor.submit(advance, product, part) for part in enumerate(partitions)]
                 for future in futures:
                     future.result()
+        if is_pool:
+            primary_pool._record_hits(used[:,:primary_pool.capacity].any(axis=0))
         missing = np.unique(requested[(status == Termination.RUNNING) & (requested >= 0)])
         if missing.size:
             if is_pool:
@@ -161,6 +168,9 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000,
     # Reserve current paths and one previously yielded path batch during advance.
     private = seed_batch*(576+(48*(max_steps+1) if trajectories else 0))
     transient_reserve = seeds.nbytes+3*seed_ids.nbytes+private
+    if pool:
+        lanes=workers*(8 if not native and dispatch and workers>1 else 1)
+        transient_reserve+=lanes*(fields.capacity+128)+9*fields.capacity
     temporary = None
     if twist and max_steps > 0 and max_length > 0:
         if isinstance(fields,PreparedPool):
@@ -188,7 +198,7 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000,
                 stop = min(first+seed_batch, len(seeds))
                 yield _run_chunk(fields, seeds[first:stop], seed_ids[first:stop], step,
                                  max_steps, max_length, null_threshold, direction,
-                                 1 if native else workers, executor,twist,trajectories,
+                                 1 if native else workers*(8 if dispatch and workers>1 else 1), executor,twist,trajectories,
                                  workers if native else 1,dispatch)
     finally:
         if temporary is not None:

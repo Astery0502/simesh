@@ -14,11 +14,24 @@ class ExecutionTests(unittest.TestCase):
         seeds[0]=mesh.upper+1
         ready=prepare(source,range(mesh.leaf_count),[0,1,2])
         opts=dict(step=.15,max_steps=32,seed_batch=8,twist=True,trajectories=True)
+        reference=trace(ready,seeds,**opts)
+        direction=[.3,.2,1.]
+        plane=orthographic_plane(mesh.lower,mesh.upper,direction,(12,12))
+        expected=integrate_los(ready,plane,direction,tile_shape=(2,4))
+        pool=PreparedPool(source,[0,1,2],8,fill_batch_size=2)
+        try:
+            threaded=trace(pool,seeds,workers=4,schedule='dynamic',**opts)
+            for name in ('positions','length','steps','termination','samples','twist','trajectories'):
+                np.testing.assert_array_equal(getattr(threaded,name),getattr(reference,name))
+            image=integrate_los(pool,plane,direction,tile_shape=(2,4),workers=4,schedule='dynamic')
+            for name in ('values','entry','exit','status','samples'):
+                np.testing.assert_array_equal(getattr(image,name),getattr(expected,name))
+        finally:
+            pool.close()
         if not openmp_build_info()['enabled']:
             with self.assertRaises(RuntimeError):
                 trace(ready,seeds,backend='openmp',**opts)
             return
-        reference=trace(ready,seeds,**opts)
         for schedule in ('static','dynamic'):
             for workers in (1,2,4):
                 pool=PreparedPool(source,[0,1,2],8)
@@ -27,9 +40,6 @@ class ExecutionTests(unittest.TestCase):
                     for name in ('seed_ids','seeds','positions','length','steps','termination','samples',
                                  'twist','trajectories'):
                         np.testing.assert_array_equal(getattr(actual,name),getattr(reference,name))
-                    direction=[.3,.2,1.]
-                    plane=orthographic_plane(mesh.lower,mesh.upper,direction,(12,12))
-                    expected=integrate_los(ready,plane,direction,tile_shape=(2,4))
                     image=integrate_los(pool,plane,direction,tile_shape=(2,4),
                                         workers=workers,backend='openmp',schedule=schedule)
                     for name in ('values','entry','exit','status','samples'):

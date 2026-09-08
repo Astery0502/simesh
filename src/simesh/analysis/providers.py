@@ -23,7 +23,12 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
                 reader, definitions, *, support_capacity=128, extra_resident_bytes=0,
                 backend_scratch_bytes=0, original_field_ids=None,
                 value_cache_capacity=0, validate_values=None):
-    """Assemble validated 3D forest/reader and continuous two-layer preparation."""
+    """Assemble validated 3D forest/reader and continuous two-layer preparation.
+
+    Optional value_cache_capacity retains raw interiors for one ordered field
+    group at a time. The reader/source values remain immutable for this entire
+    source lifecycle; validate_values may raise when that promise ends.
+    """
     root_shape = frozen_array(root_shape, np.int64)
     coord_to_rank = frozen_array(coord_to_rank, np.int64)
     lower, upper = frozen_array(lower, float), frozen_array(upper, float)
@@ -98,13 +103,16 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
         if type(batch) is not int or batch<1 or batch>capacity:
             raise ValueError("raw I/O batch size must fit the admitted support capacity")
         calls = 0
+        cache_before = dict(value_cache.stats) if value_cache is not None else {}
         start = time.perf_counter()
         for first in range(0,len(ids),batch):
             stop = min(first+batch,len(ids))
             read_blocks_into(reader,zero,block,ids[first:stop],fields,output[first:stop],zero)
             calls += 1
+        loaded = value_cache.stats['value_cache_misses']-cache_before['value_cache_misses'] if value_cache else len(ids)
         return {"reader_call_count":calls,"selected_load_count":len(ids),
-                "read_value_bytes":len(ids)*len(fields)*8*int(np.prod(block)),
+                "read_value_bytes":loaded*len(fields)*8*int(np.prod(block)),
+                "requested_value_bytes":len(ids)*len(fields)*8*int(np.prod(block)),
                 "total_seconds":time.perf_counter()-start}
 
     def fill(ids, fields, halo, output):
@@ -113,7 +121,7 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
         cache_before = dict(value_cache.stats) if value_cache is not None else {}
         if halo == 0:
             temporary = np.empty((min(capacity,len(ids)),len(fields),*block),dtype=float)
-            stats = {"reader_call_count":0,"selected_load_count":0,"read_value_bytes":0}
+            stats = {"reader_call_count":0,"selected_load_count":0,"read_value_bytes":0,"requested_value_bytes":0}
             start = time.perf_counter()
             for first in range(0,len(ids),capacity):
                 stop = min(first+capacity,len(ids))
@@ -121,7 +129,9 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
                 output[first:stop] = np.moveaxis(temporary[:stop-first],1,-1)
                 for name in stats:
                     stats[name] += current[name]
-            return {**stats,"total_seconds":time.perf_counter()-start,
+            cache_stats = ({key:value-cache_before[key] for key,value in value_cache.stats.items()}
+                           if value_cache is not None else {})
+            return {**stats,**cache_stats,"total_seconds":time.perf_counter()-start,
                     "scratch_admission_bytes":scratch_bytes(fields,halo)}
         order = np.argsort(ids, kind="stable")
         sorted_ids = np.ascontiguousarray(ids[order])
@@ -151,7 +161,8 @@ def make_source(root_shape, coord_to_rank, forest, lower, upper, block_shape,
                        if value_cache is not None else {})
         return {**stats._asdict(), **cache_stats, "total_seconds": time.perf_counter()-start,
                 "packing_seconds": packing_seconds,
-                "read_value_bytes": stats.selected_load_count*len(fields)*8*int(np.prod(block)),
+                "read_value_bytes": cache_stats.get('value_cache_misses',stats.selected_load_count)*len(fields)*8*int(np.prod(block)),
+                "requested_value_bytes": stats.selected_load_count*len(fields)*8*int(np.prod(block)),
                 "scratch_admission_bytes": scratch_bytes(fields, halo)}
 
     return FieldSource(mesh, tuple(definitions), fill, scratch_bytes, resident,

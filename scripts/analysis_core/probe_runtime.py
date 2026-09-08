@@ -58,7 +58,7 @@ class Attribution:
             self.stats['fill_seconds'] += time.perf_counter()-start
             self.stats['fill_calls'] += 1
             self.stats['prepared_owners'] += len(ids)
-            for name in ('packing_seconds', 'selected_load_count', 'chunk_count', 'read_value_bytes',
+            for name in ('packing_seconds', 'selected_load_count', 'chunk_count', 'read_value_bytes','requested_value_bytes',
                          'value_cache_hits','value_cache_misses','value_cache_read_seconds',
                          'value_cache_copy_seconds'):
                 self.stats[name] += result.get(name, 0)
@@ -83,6 +83,7 @@ def main():
     p.add_argument('--backend', choices=('threadpool','openmp'), default='threadpool')
     p.add_argument('--schedule', choices=('static','dynamic'), default='static')
     p.add_argument('--pool', type=int, default=256)
+    p.add_argument('--fill-batch', type=int, default=0)
     p.add_argument('--support', type=int, default=128)
     p.add_argument('--value-cache', type=int, default=0)
     p.add_argument('--batch', type=int, default=32)
@@ -120,7 +121,7 @@ def main():
             step = float(.25*np.min(mesh.spacing[chosen]))
             result['step'] = step
         if args.workload in ('f','l'):
-            pool = PreparedPool(source,range(len(definitions)),args.pool)
+            pool = PreparedPool(source,range(len(definitions)),args.pool,fill_batch_size=args.fill_batch)
             stack.callback(pool.close)
             result['pool_controlled_bytes'] = pool.controlled_bytes
         if args.workload=='l':
@@ -160,6 +161,8 @@ def main():
             row = {'repeat':repeat,'wall_seconds':time.perf_counter()-wall,
                    'cpu_seconds':time.process_time()-cpu,'signature':signature,**details,
                    'io':{k:io[k]-before_io[k] for k in io}}
+            if repeat==0:
+                row['source_to_first_result_seconds']=time.perf_counter()-clock
             if reference is not None and signature!=reference:
                 raise AssertionError('repeated result changed')
             reference=signature

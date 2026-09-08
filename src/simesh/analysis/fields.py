@@ -25,6 +25,8 @@ class FieldSource:
     must keep the source alive during preparation, not during detached queries.
     scratch_bytes bounds provider arrays/conversion for the admitted field set.
     resident_bytes counts source/provider backing separately from core storage.
+    validate_values, when supplied, must raise if the source lifecycle changed
+    or ended. Array owners otherwise promise immutability until pools close.
     """
 
     mesh: MeshIndex
@@ -56,7 +58,9 @@ class PreparedFields:
 
     @property
     def nbytes(self):
-        return (self.values.nbytes + self.leaf_ids.nbytes + self.slot_of_leaf.nbytes +
+        # Whole-domain products intentionally share one IDs/directory array.
+        directory_bytes = 0 if self.leaf_ids is self.slot_of_leaf else self.slot_of_leaf.nbytes
+        return (self.values.nbytes + self.leaf_ids.nbytes + directory_bytes +
                 self.owner_extra_bytes)
 
     def interior(self):
@@ -138,20 +142,27 @@ class PreparedPool:
     A miss failure invalidates all overwritten candidate slots before publication.
     """
 
-    def __init__(self, source, field_ids, capacity, *, halo=2, budget_bytes=2*1024**3):
+    def __init__(self, source, field_ids, capacity, *, halo=2, budget_bytes=2*1024**3,
+                 fill_batch_size=0):
         _, fields = _request(source, np.empty(0, dtype=np.int64), field_ids, halo)
         if type(capacity) is not int or capacity < 1:
             raise ValueError("capacity must be a positive integer")
         capacity = min(capacity, source.mesh.leaf_count)
+        if type(fill_batch_size) is not int or fill_batch_size<0:
+            raise ValueError("fill_batch_size must be a nonnegative integer")
+        fill_batch_size=min(fill_batch_size,capacity)
         shape, total = _footprint(source, capacity, fields, halo)
-        # Miss preparation writes final cache slots one contiguous run at a time.
-        # Selector/directory/recency bookkeeping is included conservatively.
+        # Default misses write contiguous final slots; optional staging batches
+        # fragmented destinations. Selector/recency storage is conservative.
         total += 64 * (capacity + source.mesh.leaf_count)
+        staging_shape=(fill_batch_size,*shape[1:])
+        total += 8*int(np.prod(staging_shape))
         if total > budget_bytes:
             raise MemoryError(f"pool needs {total} controlled bytes, budget {budget_bytes}")
         self.source, self.field_ids, self.halo = source, frozen_array(fields,np.int64), halo
         self.capacity, self.controlled_bytes = capacity, total
         self._values = np.empty(shape, dtype=np.float64)
+        self._staging = np.empty(staging_shape,dtype=np.float64) if fill_batch_size else None
         self._directory = np.full(source.mesh.leaf_count, -1, dtype=np.int64)
         self._leaves = np.full(capacity, -1, dtype=np.int64)
         self._age = np.zeros(capacity, dtype=np.int64)
@@ -159,7 +170,7 @@ class PreparedPool:
         self._closed = False
         self.prepared_count = 0
 
-    def _ensure(self, ids):
+    def _ensure(self, ids, *, touch=True):
         if self._closed:
             raise RuntimeError("pool is closed")
         if self.source.validate_values is not None:
@@ -179,25 +190,40 @@ class PreparedPool:
             old = self._leaves[slots]
             self._directory[old[old >= 0]] = -1
             self._leaves[slots] = -1
-            starts = np.r_[0, np.flatnonzero(np.diff(slots) != 1)+1, len(slots)]
-            for first, last in zip(starts[:-1], starts[1:]):
-                run = slots[first:last]
-                self.source.fill(missing[first:last], self.field_ids, self.halo,
-                                 self._values[run[0]:run[-1]+1])
+            if self._staging is not None:
+                for first in range(0,len(missing),len(self._staging)):
+                    last=min(first+len(self._staging),len(missing))
+                    self.source.fill(missing[first:last],self.field_ids,self.halo,
+                                     self._staging[:last-first])
+                    self._values[slots[first:last]]=self._staging[:last-first]
+            else:
+                starts = np.r_[0, np.flatnonzero(np.diff(slots) != 1)+1, len(slots)]
+                for first, last in zip(starts[:-1], starts[1:]):
+                    run = slots[first:last]
+                    self.source.fill(missing[first:last], self.field_ids, self.halo,
+                                     self._values[run[0]:run[-1]+1])
             self._leaves[slots] = missing
             self._directory[missing] = slots
             self.prepared_count += len(missing)
         self._clock += 1
-        self._age[self._directory[ids]] = self._clock
+        accessed = ids if touch else missing
+        self._age[self._directory[accessed]] = self._clock
 
     @contextmanager
-    def borrow(self, leaf_ids):
+    def borrow(self, leaf_ids, *, touch=True):
+        """Freeze requested coverage; `touch=False` does not claim cache hits.
+
+        Consumers exposing the complete directory use a non-touching lease.
+        Successful newly prepared entries always receive a fresh timestamp.
+        """
         if self._closed:
             raise RuntimeError("pool is closed")
         if self._active:
             raise RuntimeError("share the active borrow; nested borrows are not admitted")
+        if type(touch) is not bool:
+            raise ValueError("touch must be a boolean")
         ids = indices(leaf_ids, self.source.mesh.leaf_count)
-        self._ensure(ids)
+        self._ensure(ids,touch=touch)
         self._active += 1
         values = self._values.view()
         values.flags.writeable = False
@@ -224,6 +250,13 @@ class PreparedPool:
         self._leaves.fill(-1)
         self._age.fill(0)
 
+    def _record_hits(self, touched):
+        """Coordinator feedback after a coverage lease and all workers return."""
+        if self._closed or self._active:
+            raise RuntimeError("record accesses after returning the active lease")
+        self._clock += 1
+        self._age[touched] = self._clock
+
     @property
     def resident_leaf_ids(self):
         if self._closed:
@@ -234,7 +267,7 @@ class PreparedPool:
         if self._active:
             raise RuntimeError("cannot close a borrowed pool")
         self._closed = True
-        self._values = self._directory = self._leaves = self._age = None
+        self._values = self._staging = self._directory = self._leaves = self._age = None
         self.source = None
 
 

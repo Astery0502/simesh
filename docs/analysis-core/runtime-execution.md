@@ -59,9 +59,13 @@ and cross-machine runs remain unverified when unavailable.
 
 ## Recovery Point
 
-Initial audit complete; no runtime candidate adopted yet. Next: instrument the
-existing file-backed F/D/LOS paths, then select the first finite-reuse experiment.
-No source fixtures or previous evidence products should be deleted for this work.
+Checkpoint `775a0b9` contains finite value reuse, file-lifecycle guards and optional
+native OpenMP dispatch; 20 composed checks passed with OpenMP enabled. R1 has
+initial matched F/D/L data, R2 backend timings are pending, R3 process/thread
+preparation and R4 nearby-view scheduling are under comparison. Keep default
+paths while selecting outcomes. No fixtures or previous evidence products should
+be deleted. Current native extension is OpenMP-enabled for R2; restore the default
+build and verify the explicit unavailable-backend branch before final delivery.
 
 ## Probe R1: Finite Numerical Reuse (Selected)
 
@@ -122,3 +126,96 @@ first implementation must factor private scalar/stack state per row (no shared
 C arrays), preserve accepted-prefix/twist/trajectory semantics and permit no
 parallel cache mutation. Compare 1/2/4 workers and both cold and warm execution.
 Process/device backends are not selected without a bottleneck they can remove.
+
+## Probe R3: Parallel Preparation For Dense Delivery (Selected)
+
+The dense profile spends ~16.6 s in Python-involved planning versus ~0.2 s in
+GIL-free derivatives. Native row dispatch cannot address this bottleneck.
+Compare serial preparation with two independent thread/provider tasks and two
+spawned process/provider tasks. Each task opens and validates the same immutable
+file, prepares a bounded contiguous leaf range, computes the unchanged curl and
+returns that owned range. The coordinator admits at most `workers` tasks, writes
+disjoint result ranges and performs both slices only after full output completion.
+
+Use bounded returned arrays initially; include serialization, source startup,
+coordination and final copies in complete time. Do not add shared-memory lifetime
+machinery unless transfer is measured to dominate. Workers share the job budget,
+not a budget each. Compare task sizes only for a concrete startup/load-balance
+question. Existing `global_curl(source)` remains the reference and usable path.
+This is runtime task scheduling within the current leaf layout, not rebricking or
+persistent geometry-plan reuse.
+
+## Probe R4: Nearby LOS Views With Tile-Local Value Reuse (Selected)
+
+The single-view tile-4 probe increases preparations (10,488 versus 9,876 cold)
+without improving latency; do not adopt smaller tiles for a single image. Each
+small tile, however, visits far fewer owners than a complete view. Test three
+nearby full-domain views, keeping all three requested images, first sequentially
+and then interleaving matching tiles across views within the same 512-slot pool.
+Use identical per-view pixel-coordinate arithmetic, ray integration and output
+order; only task order changes. Compare tile-4 and original tile-16 view-major
+execution. This reuses completed numerical ghosts, not geometry plans or output
+memoization. Admit all images and one active tile together; use one executor for
+the entire group, with no simultaneous cache mutation.
+
+R4's first tile-interleaved attempt did **not** reduce numerical preparations:
+30,411 cold / 29,964 warm owners for three views. Inspection found an execution
+recency problem: each F/LOS advance borrows every resident leaf to expose coverage,
+and that lease marks every slot equally recent. At capacity, deterministic ties
+keep evicting low slots while old unrelated slots remain. Coverage publication
+is not evidence that every available block was sampled.
+
+Selected correction: preserve normal request-touching borrows, add a non-touching
+coverage lease for F/LOS, and timestamp successful missing preparations. This
+uses insertion age between explicit accesses when native consumers cannot report
+all hits; do not call it exact sample-level LRU. No numerical kernel, output or
+memory capacity changes. Re-run representative sparse F, single LOS and nearby
+views against the original recency behavior before promoting the correction.
+
+R4 recency correction passes focused borrowing/F/twist/LOS/file-task checks.
+The three nearby-view images retain the exact same complete SHA-256 signature
+before and after the change (`2b9f734b...e7b5`). At the same 512 prepared slots,
+tile-4 interleaving falls from 37.44/36.35 s to 19.05/17.53 s (cold/warm), and
+30,411/29,964 preparations to 13,768/13,768. These are avoided numerical work,
+not parallel speedup. A corrected-recency view-major control is also required.
+
+Corrected-recency view-major tile-4 still costs 40.29/40.42 s and prepares 28,707
+owners. Thus the 19.05/17.53 s nearby-view result comes from tile-local reuse once
+coverage leases stop destroying recency. It does not establish a universal
+single-view improvement. Eviction can now leave noncontiguous destination slots;
+current preparation invokes the provider separately for each contiguous run.
+
+R1 follow-up: compare optional bounded miss staging, which prepares sorted
+requests together then scatters complete values to cache slots, against spending
+the same storage on more complete prepared slots. This can deduplicate support
+across fragmented destinations. Default staging remains disabled; dense full-slot
+passes should not pay an unnecessary copy. Admit staging before allocation, and
+publish no new keys if any stage of a miss request fails.
+
+## Actual Access Feedback Follow-Up
+
+Insertion age alone regressed shuffled short-batch F: ~1.07 s warm versus the
+~0.83 s original median, with 845--847 versus 659 preparations. Spatial F still
+prepared only 590 owners. Before promoting the recency change, add bounded
+private per-task/per-OpenMP-lane slot-use bytes to the native consumers. The
+coordinator merges those hit sets only after every worker returns and updates
+ages before the next miss. This preserves actual hot blocks without pretending
+that every published block was accessed. Feedback storage is admitted explicitly;
+no worker mutates cache keys, values or recency. This is recency per advance, not
+per individual scalar sample. The OpenMP build completed; behavior and workload
+rechecks are next after the interrupted turn.
+
+Some late timing rows experienced a changing host load (one-worker LOS increased
+from ~0.41 s to ~0.65 s, despite identical samples and output hashes). Do not use
+that cross-run change to judge a backend. Use matched/interleaved controls for
+small differences; retain all raw rows and distinguish clear algorithmic gains
+from uncertain latency differences.
+
+Actual-hit F feedback preserved all numerical outputs but fragmented destination
+slots severely: ~750 provider calls per warm trace, versus ~42 originally.
+Preparing 838 owners still exceeds the original 659. The final bounded follow-up
+pairs actual feedback with 32-slot staging on F and nearby LOS to distinguish
+fragmented preparation from eviction quality. Do not promote precise-access
+feedback merely because it sounds more accurate; preserve the cheaper existing
+F heuristic if complete-work evidence favors it. Candidate source remains
+recoverable before rollback.

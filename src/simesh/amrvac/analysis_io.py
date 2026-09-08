@@ -20,6 +20,9 @@ def open_source(path,*,field_names=None,field_indices=None,field_units=None,
     file fields become source columns 0..K-1; original IDs remain recorded.
     The context owns its fd. Detached products survive context exit; new reads
     must finish before exit. No payload is eagerly loaded by this operation.
+    value_cache_capacity optionally retains that many ordinary-interior blocks;
+    it is separate from PreparedPool's completed two-halo values. File changes
+    or context exit reject subsequent preparation/borrows, including cache hits.
     """
     from simesh_rewrite.amrvac_dat import read_amrvac_v5_index,bind_amrvac_v5_forest
     from simesh_rewrite.amrvac_dat_reader import make_amrvac_v5_ordinary_block_reader
