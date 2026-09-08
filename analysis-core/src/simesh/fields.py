@@ -132,6 +132,13 @@ def require_fields(value, *, halo=0):
     return value
 
 
+def _field_index(definitions, name):
+    matches = [i for i, definition in enumerate(definitions) if definition.name == name]
+    if len(matches) != 1:
+        raise ValueError(f"field {name!r} must identify exactly one component (missing or ambiguous)")
+    return matches[0]
+
+
 def source_value_identity(source_identity, field_ids, scheme):
     """Logical immutable primary values, independent of packing or retention."""
     return source_identity, tuple(map(int,field_ids)), scheme

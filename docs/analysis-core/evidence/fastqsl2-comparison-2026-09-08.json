@@ -1,0 +1,83 @@
+{
+  "reference": "https://github.com/el2718/FastQSL2",
+  "revision": "314bbf01ab72e43f82cb6b2e1c2a4d22d93aacdd",
+  "cells": 64,
+  "native_scheme": "exact-phase",
+  "native_method": "finite-difference",
+  "reference_method": "variational",
+  "normalization": "flux",
+  "cases": {
+    "hyperbolic": {
+      "valid_native": 15,
+      "seeds": 15,
+      "q": {
+        "compared": 15,
+        "max_absolute_error": 0.0005598018157844109,
+        "max_relative_error": 0.00016745881152425697
+      },
+      "q_perp": {
+        "compared": 15,
+        "max_absolute_error": 0.0005073676408260397,
+        "max_relative_error": 0.00016691036885368762
+      },
+      "twist": {
+        "compared": 15,
+        "max_absolute_error": 0.0,
+        "max_relative_error": 0.0
+      },
+      "length": {
+        "compared": 15,
+        "max_absolute_error": 7.178023224696517e-07,
+        "max_relative_error": 6.833400579081951e-07
+      }
+    },
+    "helical": {
+      "valid_native": 15,
+      "seeds": 15,
+      "q": {
+        "compared": 15,
+        "max_absolute_error": 6.902946587672432e-07,
+        "max_relative_error": 3.4514720594936195e-07
+      },
+      "q_perp": {
+        "compared": 15,
+        "max_absolute_error": 9.287132374247165e-07,
+        "max_relative_error": 4.6435639728997333e-07
+      },
+      "twist": {
+        "compared": 15,
+        "max_absolute_error": 4.439716669579763e-07,
+        "max_relative_error": 5.869562664998741e-06
+      },
+      "length": {
+        "compared": 15,
+        "max_absolute_error": 4.95780841447413e-06,
+        "max_relative_error": 4.863270232422861e-06
+      }
+    },
+    "quadrupole": {
+      "valid_native": 15,
+      "seeds": 15,
+      "q": {
+        "compared": 15,
+        "max_absolute_error": 0.019404607356410697,
+        "max_relative_error": 0.00854014253014988
+      },
+      "q_perp": {
+        "compared": 15,
+        "max_absolute_error": 0.017873286538757416,
+        "max_relative_error": 0.008197308075775338
+      },
+      "twist": {
+        "compared": 15,
+        "max_absolute_error": 5.9014226397157526e-05,
+        "max_relative_error": 1.221073832857806
+      },
+      "length": {
+        "compared": 15,
+        "max_absolute_error": 3.7560530472546816e-06,
+        "max_relative_error": 3.316539062480126e-06
+      }
+    }
+  }
+}

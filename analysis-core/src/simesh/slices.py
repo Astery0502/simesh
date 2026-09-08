@@ -9,6 +9,13 @@ from ._execution import worker_context
 from .operators.sampling import _sample
 
 
+def _transverse_basis(direction):
+    basis = np.eye(3)[np.argmin(np.abs(direction))]
+    u = basis-np.dot(basis,direction)*direction
+    u /= np.linalg.norm(u)
+    return u, np.cross(direction,u)
+
+
 @dataclass(frozen=True)
 class Plane:
     origin: np.ndarray

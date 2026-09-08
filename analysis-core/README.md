@@ -136,6 +136,60 @@ Names, unit labels and cell-average/derived interpretation describe fields.
 They do not automatically convert units, recover thermodynamics, or turn
 `curl(B)` into physically normalized current.
 
+## Custom pointwise fields and named derivatives
+
+`derive` evaluates an explicit pointwise recipe and returns an independently
+owned `Fields`, ready for the usual scientific consumers:
+
+```python
+b_squared = sm.derive(
+    magnetic, "b_squared",
+    lambda ctx: sum(ctx.field(name)**2 for name in ("b1", "b2", "b3")),
+    units="code^2",
+)
+gradient_x = sm.derivative(
+    b_squared,
+    terms=[[("b_squared", "x", 1.)]],
+    definitions=[sm.FieldDefinition("gradient_x", "code^2 / coordinate-length",
+                                    "centered-derivative")],
+)
+combined = sm.derive(
+    {"magnetic": magnetic, "curl": curl_b}, "b_dot_curl_b",
+    lambda ctx: sum(
+        ctx.field(b, group="magnetic") * ctx.field(c, group="curl")
+        for b, c in zip(("b1", "b2", "b3"), ("curl_x", "curl_y", "curl_z"))
+    ),
+    units="code^2 / coordinate-length",
+)
+```
+
+Derivative terms accept either component indices or unique names, and axes
+`0`, `1`, `2` or `"x"`, `"y"`, `"z"`. Each output is a sum of weighted
+directional derivatives; supply multiple term lists and definitions for multiple
+outputs. A derivative consumes one valid halo layer.
+
+Recipes run once per leaf on read-only arrays containing interiors and the
+common valid halo. Return a scalar constant or a same-shaped array. Formulas
+must be pointwise: spatial shifts, `np.gradient`, spatial reductions and other
+stencils belong outside this callback contract. Use `derivative` for spatial
+operations. Nonlinear formulas are evaluated on prepared values, including
+their support; applying a nonlinear formula before preparation is a different
+reconstruction. No automatic thermodynamic or unit conversion is performed.
+
+Multiple inputs must share the same Mesh object and leaf coverage, although
+their slot and leaf ordering may differ. The recipe explicitly chooses its
+input groups; callers ensure compatible physical meanings, times and schemes.
+The result uses the first group's selection order and the minimum valid halo
+of all supplied groups. Zero-halo results support interior access, but need
+explicit preparation through a suitable source before stencil consumption.
+Only pass groups needed by the recipe, since every supplied group limits support.
+
+Results own their arrays even when an input is a scoped prepared batch. Recipes
+and input arrays are not retained, and there is no registry or automatic
+recomputation. `memory_limit` covers the input/output arrays and a result block;
+arbitrary temporary allocations in user callbacks are outside that estimate.
+Nonfinite formula values propagate; choose explicit handling for invalid physics.
+
 ## Explicit bounded preparation
 
 ```python
@@ -215,6 +269,12 @@ the independent Python ray path and requires one worker.
 
 ## Repeated geometry, bounded consumers and large outputs
 
+For QSL maps, localized magnetic footpoints and full-line twist, use
+`qsl(magnetic, seeds)` or `iter_qsl`. These consume native AMR Fields and offer
+explicit endpoint finite differences or transverse-vector integration, along
+with local-sphere maps. See [magnetic connectivity](docs/connectivity.md) for
+methods, validity, units and the distinction from accepted-prefix `trace`.
+
 ```python
 from simesh import bounded
 
@@ -276,8 +336,10 @@ export and the independent potential-field helper are available through the
 bundled compatibility interfaces. `source_from_dataset` snapshots loaded interior
 values; `write_amrvac` exports complete native Fields with explicit metadata.
 See [migration and examples](MIGRATION.md) for layouts, memory costs, periodic/CT
-file limits and the preserved VTK coordinate convention. New 2D/periodic/CT/GPU analysis,
-Q, exact footpoints and real 10–20 GB input acceptance are not claimed.
+file limits and the preserved VTK coordinate convention. New native
+2D/periodic/CT/GPU analysis is not claimed.
+The separate `qsl` consumer now supplies Q and localized footpoints under its
+documented validity rules. Real 10–20 GB input acceptance is not claimed.
 
 [ASSETS.md](ASSETS.md) records implementation provenance. The
 [fixed core design](../docs/analysis-core/next-generation-design.md) and

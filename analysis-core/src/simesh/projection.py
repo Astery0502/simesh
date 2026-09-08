@@ -57,10 +57,8 @@ def orthographic_plane(lower,upper,direction,shape):
         raise ValueError("finite ordered bounds and a nonzero direction are required")
     d = d/np.max(np.abs(d))
     d = d/np.sqrt(np.dot(d,d))
-    basis = np.eye(3)[np.argmin(np.abs(d))]
-    u = basis-np.dot(basis,d)*d
-    u /= np.linalg.norm(u)
-    v = np.cross(d,u)
+    from .slices import _transverse_basis
+    u,v = _transverse_basis(d)
     corners = lower+(upper-lower)*np.indices((2,2,2)).reshape(3,-1).T
     pu,pv,pd = corners@u,corners@v,corners@d
     origin = u*pu.min()+v*pv.min()+d*(pd.min()-.1*np.linalg.norm(upper-lower))

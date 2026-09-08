@@ -5,13 +5,14 @@ from dataclasses import replace
 
 from .._validation import admit, workers_count, indices
 from .._execution import worker_context, run_ranges
-from ..fields import FieldDefinition, publish, require_fields
+from ..fields import FieldDefinition, publish, require_fields, _field_index
 
 
 def derivative(fields, terms, definitions, *, workers=1, memory_limit=None):
     """Sum ordered (component, axis, coefficient) terms for each output field.
 
-    A derivative consumes one valid layer. Allocated but invalid padding is
+    Components accept indices or unique field names; axes accept 0/1/2 or
+    "x"/"y"/"z". A derivative consumes one valid layer. Invalid padding is
     not differentiated. No physical current or unit conversion is inferred.
     """
     from .._kernels.native import differentiate
@@ -26,6 +27,10 @@ def derivative(fields, terms, definitions, *, workers=1, memory_limit=None):
         if not entries:
             raise ValueError("a derivative output requires a term")
         for component, axis, coefficient in entries:
+            if isinstance(component, str):
+                component = _field_index(fields.fields, component)
+            if isinstance(axis, str):
+                axis = {"x": 0, "y": 1, "z": 2}.get(axis.lower(), -1)
             if (not isinstance(component, (int, np.integer)) or
                     not 0 <= component < len(fields.fields) or
                     not isinstance(axis, (int, np.integer)) or not 0 <= axis < 3 or

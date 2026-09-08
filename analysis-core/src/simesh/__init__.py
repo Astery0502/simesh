@@ -17,6 +17,8 @@ from .preparation.plans import FillPlan, plan_preparation
 from .bounded import iter_prepared, global_curl
 from .operators.sampling import sample
 from .operators.derivatives import derivative, curl
+from .operators.derived import derive, DerivedContext
+from .connectivity import qsl, iter_qsl, QSLResult, Boundary, ConnectivityTermination
 from .slices import Plane, SliceResult, sample_plane, iter_uniform
 from .tracing import Termination, TraceResult, trace, iter_traces, retrace
 from .projection import LOSResult, LOSStatus, integrate_los, integrate_los_views, orthographic_plane
@@ -31,4 +33,6 @@ __all__ += ["cache_source", "FillPlan", "plan_preparation", "global_curl", "glob
             "orthographic_plane", "AIA171", "CoronalComposition", "ThermalLOSResult", "thermal_fields",
             "emissivity_fields", "integrate_thermal_los"]
 __all__ += ["source_from_dataset", "write_amrvac"]
+__all__ += ["derive", "DerivedContext"]
+__all__ += ["qsl", "iter_qsl", "QSLResult", "Boundary", "ConnectivityTermination"]
 __version__ = "0.2.0.dev0"

@@ -4,7 +4,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from .._validation import indices, array_bytes, admit
-from ..fields import FieldDefinition, publish, source_value_identity
+from ..fields import FieldDefinition, publish, source_value_identity, _field_index
 from ..mesh import resolve_selection
 from .._amr.blockio import array_block_reader, read_blocks_into
 
@@ -79,12 +79,7 @@ class Source:
         if not selected:
             raise ValueError("select at least one field")
         if all(isinstance(x, str) for x in selected):
-            ids = []
-            for name in selected:
-                matches = [i for i, f in enumerate(self.fields) if f.name == name]
-                if len(matches) != 1:
-                    raise ValueError(f"field name is missing or ambiguous: {name}")
-                ids.append(matches[0])
+            ids = [_field_index(self.fields, name) for name in selected]
             return indices(ids, len(self.fields), "fields")
         return indices(selected, len(self.fields), "fields")
 

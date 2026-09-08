@@ -16,6 +16,8 @@
 | 同一数据上的重复计算 | 一次 `prepare` 后复用 `Fields` |
 | 图像/截面/固定网格消费 | `sample_plane`、`iter_uniform` |
 | 轨迹与沿线诊断 | `trace`、`iter_traces`、`retrace`、显式 curl |
+| 自定义派生量与微分组合 | `derive`、按名称指定的 `derivative` |
+| 磁连接性、QSL 与完整线 twist | `qsl`、`iter_qsl`，检查端点状态与映射有效性 |
 | 视角图像 | `integrate_los`、`integrate_thermal_los` |
 | 既有 Dataset 或文件交付 | `source_from_dataset`、`write_amrvac` 和兼容接口 |
 

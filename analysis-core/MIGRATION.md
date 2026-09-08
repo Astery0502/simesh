@@ -43,6 +43,14 @@ when the previous interface made those choices implicitly.
 
 ## Existing Dataset workflows
 
+For native pointwise formulas, use top-level `derive(fields, name, func,
+units=...)`. The callback selects arrays with `ctx.field(name)`; a mapping of
+input groups supports formulas combining original and derivative products.
+Unlike Dataset registration, this immediately returns an independent field
+group and does not mutate inputs or store a recipe. Native `derivative` also
+accepts field names and `"x"`/`"y"`/`"z"` axes. See the README for common-halo
+and pointwise-reconstruction semantics.
+
 The eight public AMRVAC entrypoints retain their signatures:
 `open_dataset`, `read_blocks`, `read_uniform`, `load_from_uniform`,
 `write_datfile`, `write_datfile_from_uniform`, `load_uniform_data` and
@@ -159,7 +167,9 @@ convolution when available and otherwise uses the retained direct NumPy path.
 Install `pip install '.[fft]'` from this directory to enable the optional FFT
 dependency; the base package requires only NumPy at runtime.
 
-The independent N1–N4 delivery does not claim Q, exact boundary footpoints,
-GPU/CT/periodic native analysis, bounded nonlinear thermal LOS, or acceptance of
-real 10–20 GB input files. Existing output-scale validation does not establish
-those capabilities.
+The N1–N4 baseline did not deliver Q or localized boundary footpoints. The
+subsequent native `qsl`/`iter_qsl` consumer adds these and complete-line twist;
+see [magnetic connectivity](docs/connectivity.md) for methods and validity.
+Existing `trace` still returns accepted prefixes. GPU/CT/periodic native analysis,
+bounded nonlinear thermal LOS, and acceptance of real 10–20 GB input files
+remain outside the delivered scope.

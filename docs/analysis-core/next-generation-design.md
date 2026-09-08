@@ -3,7 +3,8 @@
 状态：2026-09-08 用户确认固定。面向开发协作。
 本页记录已经交付、后续应用应依赖的边界；完整建设过程和旧方案比较见
 [历史设计](archive/core-development-2026-09-08/next-generation-design.md)。
-当前运行源码为根目录 `analysis-core/` 的 N4 实现，基线提交 `a817221`。
+当前运行源码为根目录 `analysis-core/`，以 N4 提交 `a817221` 为核心基线，
+后续应用扩展记录在[当前方向](current.md)。
 两个采样复用候选均未合入。
 
 ## 数据与依赖
@@ -54,8 +55,9 @@
 [MIGRATION.md](../../analysis-core/MIGRATION.md)。
 
 原生文件入口仍限非周期 Cartesian 3D v5 普通字段，数组来源使用等价的 3D 网格。
-周期/CT/GPU 原生分析、精确脚点/Q、有界非线性热 LOS 和真实超内存输入
-不属于已交付保证。
+N4 当时未交付脚点定位和 Q；后续独立 `qsl` 消费者已补上这部分，原有
+`trace` 的接受前缀语义保持不变。详见[磁连接性](../../analysis-core/docs/connectivity.md)。
+周期/CT/GPU 原生分析、有界非线性热 LOS 和真实超内存输入仍不属于已交付保证。
 
 ## 后续变化原则
 
