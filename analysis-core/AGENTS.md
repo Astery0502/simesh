@@ -1,8 +1,8 @@
 # Independent simesh development
 
-For the active sampling reuse experiments, start with
-`../docs/analysis-core/explorations/sampling-reuse.md` and the task-specific brief.
-They define the authorized endpoint, shared baseline and serialized compute use.
+The sampling reuse experiments are closed without adoption. Their historical
+briefs and outcome live in `../docs/analysis-core/explorations/sampling-reuse.md`.
+Do not resume them without a new user instruction; the N4 core remains selected.
 
 Read `../docs/analysis-core/next-generation-design.md` and
 `../docs/analysis-core/current.md` before
