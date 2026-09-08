@@ -271,8 +271,34 @@ values by the explicit cm-per-coordinate multiplier. The scalar consumer returns
 its usual scalar-times-coordinate units; retain the thermal input provenance
 alongside that lower-level result. Node-emissivity scalar Gauss2 exactness does
 not establish accuracy with respect to nonlinear thermodynamic reconstruction.
-Both options are currently resident; a bounded response provider and parallel
-nonlinear ray backend are separate integrations, not implicit cache changes.
+Both options are currently resident. The default nonlinear implementation now
+uses compiled AMR-tree traversal; `workers=1`, `2` or `4` selects independent
+GIL-free ray workers. `implementation="reference"` keeps the earlier Python
+all-leaf implementation and requires one worker. These have the same response,
+reconstruction and subdivision count, with tolerance-level agreement and exact
+native serial/parallel equality. The main session's numerical cache and broader
+execution backends remain separate. A bounded response provider is still open.
+
+```python
+image = integrate_thermal_los(
+    state, plane, [0.3, 0.2, 1.0], length_unit_cm=1.0e8,
+    subdivisions=4, workers=4,
+)
+reference = integrate_thermal_los(
+    state, plane, [0.3, 0.2, 1.0], length_unit_cm=1.0e8,
+    subdivisions=4, implementation="reference",
+)
+```
+
+The Python thread-pool startup is included in each call. Small images may not
+benefit from more workers; choose using the actual request's measured cost.
+The native kernel advances complete ray intervals and counts samples actually
+computed. A limit failure always invalidates the pixel; partial counter values
+can differ from the reference, which admits a whole leaf's quadrature first.
+Native response supports the built-in AIA171 model; custom response subclasses
+must use the explicit reference path until given a compiled implementation.
+See [thermal ray evidence](evidence/thermal-rays.md) for source comparisons,
+acceptance, measured image sizes and parallel scaling.
 
 ## Optional Retained Geometric Fill Plan
 

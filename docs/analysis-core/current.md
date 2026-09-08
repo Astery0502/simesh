@@ -2,6 +2,40 @@
 
 Updated: 2026-09-08. Resume through this file and [development](development.md).
 
+## Active Follow-up: Thermal Ray Traversal And Parallelism
+
+The latest user instruction explicitly authorizes online ray-tracing research,
+profiling, bounded optimization and tests, including parallel thermal LOS. This
+supersedes the previous no-new-500x500-test request for this follow-up. Continue
+in the same clean isolated worktree, based on `a61a0ac`, preserving the completed
+round below. Scope is the resident thermal ray consumer; the main session still
+owns broader backend, preparation and numerical cache work. Do not merge its
+concurrent changes or duplicate its OpenMP/runtime policy work.
+
+Endpoint: source-backed algorithm/library disposition, actual hotspot evidence,
+a numerically conforming accelerated thermal consumer with 1/2/4 worker results,
+and measured representative image scaling. Keep the Python implementation as
+an explicit scientific/reference comparator. Limits remain four workers, 2 GiB
+controlled arrays, 2 GiB scratch and at least 2 GiB free disk. One active probe:
+existing all-leaf/Python path versus reused AMR-tree compiled ray traversal,
+then identical row work shared across existing-style GIL-free thread calls.
+Allowance: 30 minutes of comparative execution, no new external dependency or
+hardware unless current evidence makes it necessary. Do not infer instrument
+accuracy or generic library superiority from this implementation comparison.
+
+Status: compiled tree traversal and shared inline interpolation implemented;
+all 23 analysis checks passed after inline relocation. The first C-API
+candidate's partial 64x64 comparisons are preserved in `capi-probe/`. Generated-C
+inspection established avoidable per-point descriptor passing; shared inline
+arithmetic is unchanged. Final timing is paused until main-session process
+`probe_paired_backends.py` exits, using a kernel process-exit notification rather
+than repeated polling. Do not interrupt or edit that independent work.
+
+Next: verify the completed check log, then run benchmark_thermal_rays when the
+main benchmark has exited; record 64x64 parity and true 500x500 1/2/4-worker timings,
+render the labelled manufactured-temperature images, close evidence and commit.
+Later checkpoints below remain historical until updated.
+
 ## Completed Round: Thermal Response, Organization And Geometry Plans
 
 This explicitly authorized round is **complete in its declared feasible scope**.

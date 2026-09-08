@@ -87,5 +87,39 @@ class ThermalTests(unittest.TestCase):
         self.assertGreater(pre_error,errors[-1]*10)
         print("thermal continuum relative errors",errors,"node response first",pre_error)
 
+    def test_native_reference_parallel_and_failure_conformance(self):
+        from simesh.analysis import orthographic_plane
+        source,_ = source_fixture(lambda x,y,z:np.array([2+.03*x*y, 8e5+1e4*x*y+2e4*z, 0*x]))
+        source = replace(source,fields=(FieldDefinition('rho','code'),FieldDefinition('T','K'),FieldDefinition('unused','code')))
+        ready = prepare(source,np.arange(source.mesh.leaf_count),[0,1])
+        state = thermal_fields(ready,ready,density_unit_g_cm3=1.4*PROTON_MASS_G*1e9,
+                               temperature_component=1,temperature_label='manufactured nonaffine')
+        mesh = state.mesh
+        for direction in ([1.,0.,0.],[1.,.3,.2],[-1.,-.8,.6],[0.,0.,-1.]):
+            plane = orthographic_plane(mesh.lower,mesh.upper,direction,(7,9))
+            near = np.linspace(0.,.5,63).reshape(7,9)
+            reference = integrate_thermal_los(state,plane,direction,length_unit_cm=1e8,
+                near=near,implementation='reference')
+            native = integrate_thermal_los(state,plane,direction,length_unit_cm=1e8,near=near)
+            np.testing.assert_array_equal(native.status,reference.status)
+            np.testing.assert_allclose(native.values,reference.values,rtol=1e-10,atol=1e-10)
+            np.testing.assert_allclose(native.depth,reference.depth,rtol=2e-13,atol=2e-12)
+            for workers in (2,4):
+                parallel = integrate_thermal_los(state,plane,direction,length_unit_cm=1e8,near=near,workers=workers)
+                np.testing.assert_array_equal(parallel.values,native.values)
+                np.testing.assert_array_equal(parallel.samples,native.samples)
+                np.testing.assert_array_equal(parallel.status,native.status)
+        plane = Plane([0.,2.5,-.5],[0.,3.,0.],[0.,0.,1.],(3,4))
+        for data in (np.full_like(state.values,np.nan),np.full_like(state.values,-1.)):
+            invalid = replace(state,values=data)
+            reference = integrate_thermal_los(invalid,plane,[1.,0.,0.],length_unit_cm=1e8,implementation='reference')
+            native = integrate_thermal_los(invalid,plane,[1.,0.,0.],length_unit_cm=1e8,workers=4)
+            np.testing.assert_array_equal(native.status,reference.status)
+            self.assertTrue(np.isnan(native.values).all())
+        with self.assertRaises(ValueError):
+            integrate_thermal_los(state,plane,[1,0,0],length_unit_cm=1e8,implementation='reference',workers=2)
+        with self.assertRaises(MemoryError):
+            integrate_thermal_los(state,plane,[1,0,0],length_unit_cm=1e8,budget_bytes=1)
+
 
 if __name__ == "__main__": unittest.main()

@@ -6,6 +6,7 @@ implicit. Temperature must be supplied; stored density never determines it.
 """
 
 from dataclasses import dataclass, replace
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 from ._aia171_table import LOG_T, RESPONSE, UPSTREAM_COMMIT
@@ -17,6 +18,9 @@ from .slices import Plane
 
 PROTON_MASS_G = 1.67262192369e-24
 BOLTZMANN_ERG_K = 1.380649e-16
+_RESPONSE_GRID = frozen_array(LOG_T, float)
+_LOG_RESPONSE = frozen_array(np.log10(RESPONSE), float)
+_RESPONSE_SLOPES = frozen_array(np.diff(_LOG_RESPONSE)/np.diff(_RESPONSE_GRID), float)
 
 
 @dataclass(frozen=True)
@@ -226,16 +230,26 @@ def ray_nodes(mesh, leaf, origin, direction, first, last, subdivisions):
 def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
                           model=AIA171(), order="thermodynamics-first", subdivisions=4,
                           near=0., far=np.inf, max_samples=1000000,
-                          budget_bytes=2*1024**3):
+                          workers=1, implementation="native", budget_bytes=2*1024**3):
     """Full box LOS of the explicitly selected nonlinear thermal reconstruction.
 
     thermodynamics-first samples n,T then evaluates n^2 R(T). Composite Gauss2
     is a convergent approximation, NEVER an exact nonlinear-response integral.
     emissivity-first computes prepared-node emissivity then uses scalar gauss2.
-    This resident scientific boundary uses existing sampling; backend/scheduling
-    and numerical cache policy remain separate work. Per-pixel limits fail closed.
+    native reuses AMR-tree interval ownership and compiled interpolation, with
+    independent rays dispatched to 1--4 GIL-free workers. reference retains the
+    original Python/all-leaf oracle and requires one worker. Both keep the same
+    nonlinear reconstruction and quadrature; per-pixel limits fail closed.
     """
     _check_thermal(thermodynamics, model)
+    if type(workers) is not int or not 1 <= workers <= 4:
+        raise ValueError("workers must be an integer in 1..4")
+    if implementation not in ("native", "reference"):
+        raise ValueError("implementation must be native or reference")
+    if implementation == "reference" and workers != 1:
+        raise ValueError("reference implementation requires one worker")
+    if implementation == "native" and type(model) is not AIA171:
+        raise ValueError("native response requires AIA171; use reference for customized models")
     if not np.isfinite(length_unit_cm) or length_unit_cm <= 0:
         raise ValueError("length unit must be a positive finite cm multiplier")
     if order not in ("thermodynamics-first", "emissivity-first"):
@@ -243,11 +257,12 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
     if order == "emissivity-first":
         emissivity = emissivity_fields(thermodynamics, model=model, budget_bytes=budget_bytes)
         result = integrate_los(emissivity, plane, direction, near=near, far=far, max_samples=max_samples,
-                               budget_bytes=budget_bytes-thermodynamics.nbytes)
+                               workers=workers, budget_bytes=budget_bytes-thermodynamics.nbytes)
         return _physical_result(result, length_unit_cm, "prepared-node-emissivity/gauss2", thermodynamics, model)
     if not isinstance(plane, Plane) or type(subdivisions) is not int or subdivisions < 1:
         raise ValueError("thermal LOS requires a Plane and positive subdivisions")
-    if type(max_samples) is not int or max_samples < 1:
+    if (type(max_samples) is not int or not 1 <= max_samples <= np.iinfo(np.int64).max or
+            subdivisions > np.iinfo(np.int64).max//2):
         raise ValueError("positive max_samples required")
     direction = np.array(direction, dtype=float)
     if direction.shape != (3,) or not np.isfinite(direction).all() or not np.any(direction):
@@ -257,7 +272,8 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
     mesh = thermodynamics.mesh
     # One leaf's query arrays at a time, plus leaf intersection vectors and image.
     per_leaf = 2*subdivisions*(sum(mesh.block_shape)+1)
-    required = thermodynamics.nbytes+mesh.nbytes+mesh.leaf_count*128+int(np.prod(plane.shape))*128+per_leaf*384
+    required = (thermodynamics.nbytes+mesh.nbytes+mesh.leaf_count*128+
+                int(np.prod(plane.shape))*128+per_leaf*384+workers*65536)
     if required > budget_bytes:
         raise MemoryError(f"thermal LOS needs {required} controlled bytes")
     near = np.broadcast_to(np.asarray(near, dtype=float), plane.shape)
@@ -267,7 +283,10 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
     values, entry, exit = (np.zeros(plane.shape) for _ in range(3))
     status = np.full(plane.shape, int(LOSStatus.EMPTY), dtype=np.int64)
     samples, misses = (np.zeros(plane.shape, dtype=np.int64) for _ in range(2))
-    for pixel in np.ndindex(plane.shape):
+    if implementation == "native":
+        _native_los(thermodynamics,plane,direction,near,far,subdivisions,max_samples,
+                    workers,values,entry,exit,status,samples)
+    for pixel in (np.ndindex(plane.shape) if implementation == "reference" else ()):
         origin = plane.origin+(pixel[0]+.5)/plane.shape[0]*plane.u+(pixel[1]+.5)/plane.shape[1]*plane.v
         leaves, first, last = ray_segments(mesh, origin, direction, near[pixel], far[pixel])
         if not len(leaves):
@@ -309,6 +328,36 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
                        samples, misses, "DN s^-1 pixel^-1 cm^-1 * coordinate-length",
                        f"thermodynamics-first/composite-gauss2/{subdivisions}")
     return _physical_result(result, length_unit_cm, result.quadrature, thermodynamics, model)
+
+
+def _native_los(fields,plane,direction,near,far,subdivisions,max_samples,
+                workers,values,entry,exit,status,samples):
+    from simesh.utils.lib.analysis.native import initialize_rays
+    from simesh.utils.lib.analysis.thermal_rays import integrate_ready
+    mesh = fields.mesh
+    nx,ny = plane.shape
+    origins = (plane.origin+((np.arange(nx)+.5)/nx)[:,None,None]*plane.u+
+               ((np.arange(ny)+.5)/ny)[None,:,None]*plane.v).reshape(-1,3)
+    starts,ends = entry.ravel(),exit.ravel()
+    flags = status.ravel()
+    flags.fill(0)
+    initialize_rays(mesh.lower,mesh.upper,origins,direction,
+        np.ascontiguousarray(near.ravel()),np.ascontiguousarray(far.ravel()),starts,ends,flags)
+    output,counts = values.ravel(),samples.ravel()
+    def run(span):
+        integrate_ready(mesh.roots,mesh.children,mesh.node_leaves,mesh.node_lower,mesh.node_upper,
+            mesh.bounds,mesh.spacing,fields.slot_of_leaf,fields.values,fields.halo,
+            origins[span],direction,starts[span],ends[span],subdivisions,max_samples,
+            _RESPONSE_GRID,_LOG_RESPONSE,_RESPONSE_SLOPES,output[span],flags[span],counts[span])
+    if workers == 1:
+        run(slice(None))
+    else:
+        # Bounded, coherent row ranges. No numeric cache or provider is mutated.
+        edges = np.linspace(0,nx*ny,min(workers*4,nx*ny)+1,dtype=int)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(run,slice(a,b)) for a,b in zip(edges[:-1],edges[1:])]
+            for future in futures:
+                future.result()
 
 
 def _physical_result(result, length_unit_cm, quadrature, thermodynamics, model):

@@ -515,3 +515,50 @@ one-shot preparation, and defer automatic retention/full-domain/fused execution.
 complete costs and the runtime handoff boundary. The 128 MiB retained-plan build
 allowance additionally needs one bounded prospective chunk/accounting temporary
 at peak; it is not a hard RSS limit.
+
+
+## Thermal LOS Traversal / Parallel Follow-up
+
+Authorized after `a61a0ac`: research ray-tracing libraries/algorithms, identify
+thermal hotspots and implement a bounded measured improvement. Preserve the
+historical response, H/He normalization, thermodynamics-first nodal meaning,
+knot-split composite Gauss2 and per-pixel complete/failure semantics. No opacity
+termination, color transfer function, stochastic scattering or unconstrained
+reconstruction change is an optimization of this optically thin integral.
+
+Candidate: replace Python all-leaf intersections and point-array allocation with
+existing native AMR tree interval ownership, incremental cell-center knot
+traversal and compiled interpolation/response/accumulation. Reuse native geometry
+through a small Cython declaration boundary; do not fork a general locator or
+modify main-session numerical caches. Precompute only response-table logarithms
+and interpolation slopes; no approximation of R(T) or reduced quadrature.
+Then dispatch independent complete rays to 1/2/4 GIL-free calls with readonly
+shared state and disjoint image writes. Default workers remains one.
+
+Acceptance before implementation: manufactured constant/affine thermal cases,
+AMR faces/grazing/negative directions, variable near/far, incomplete coverage,
+invalid values and limits; optimized/reference finite agreement rtol=1e-10 and
+atol=1e-10 DN/s/pixel, identical completion classifications except an evidenced
+geometric bug must be fixed, and exact serial/parallel equality. Knot degeneracy
+can change roundoff-size intervals/sample counts; preserve full path length and
+declare any different sample-limit arithmetic. Existing continuum convergence
+remains the physical reconstruction check. Profile old code separately from
+wall-time comparisons. WENO uses the same explicit manufactured temperature and
+unit scales, axis, prior 20-degree oblique and a more diagonal view. Matched
+64x64 reference/native comparisons use one warmup/three repetitions; measure
+larger native 500x500 images only after conformance and affordable throughput are
+established. Do not run the old 500x500 path just to spend the earlier extrapolated
+time. Include complete setup, retained memory, thread startup, outputs and actual
+sample counts. This is an implementation comparison, not a new physical model.
+
+A bounded follow-up to the first compiled candidate is justified by generated-C
+inspection: each point calls the exported interpolate C-API pointer with three
+memoryview descriptors passed by value. The 64x64 axis preliminary comparison
+passed, but the candidate's per-sample metadata cost is avoidable. Preserve its
+partial measurements, interrupt its larger run, and relocate the existing
+interpolation body unchanged into a shared inline native.pxd definition. Keep
+ray_owner exported only at the per-leaf boundary. This is one implementation
+refinement within the same numerical strategy, not another reconstruction.
+Rebuild and rerun affected checks, then complete the frozen comparison. Record
+wall/CPU and major faults because initial timings show host-state sensitivity;
+no claim of an external-library comparison or hard RSS/disk-cache isolation.
