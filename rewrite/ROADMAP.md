@@ -1,205 +1,186 @@
 # Rewrite Roadmap
 
-The roadmap is ordered by semantic dependency. It may evolve through the
-contract-change workflow, but each milestone must remain independently usable
-and verifiable.
+This is the retained rewrite milestone/dependency map. Current project planning
+is in [docs/analysis-core](../docs/analysis-core/README.md); the paired
+preparation/consumption spec precedes selecting a new pipeline implementation.
 
-## Foundation
+This document owns stage outcomes and sequencing. CAPABILITIES owns exact member
+status; CURRENT owns the active group. Each stage must have a useful composed
+result and the scientific/resource acceptance in ANALYSIS_WORKLOADS.
 
-Establish the common vocabulary and the smallest executable contracts:
+Current selection authority is [baseline.md](../docs/analysis-core/baseline.md): spec convergence only,
+with [three pipeline result contracts](../docs/analysis-core/pipeline-results.md) to close
+before a proposed independent-seed parallel tracing outcome, not an active group. The old
+repeated-sampling phase suggestion is superseded. F tracing/Q/twist and D global
+current/gradient-to-slice have similar priority, F slightly preferred; L full-domain
+LOS synthesis is confirmed. F does not require D's full-domain preparation.
+The requirement/evidence map and entry conditions supersede
+earlier operational priority suggestions below. M0/M1 completion and later
+milestone families remain history and a dependency/compatibility horizon, not an
+automatic execution queue. No implementation starts under the current task.
 
-- scalar, index, and layout conventions;
-- explicit array ownership and valid regions;
-- operator access patterns;
-- block sources, block sinks, workspaces, and memory budgets;
-- a minimal build and test path isolated from the current package.
+The 2026-09-07 intent clarification precedes selecting another implementation.
+Use the [workflow catalog](../docs/analysis-core/workflows.md) to name the result and matching
+baseline first. Fast dense/resident analysis, slices, isosurfaces and isovolumes
+join the explicit product outcomes; adjacent candidates remain unscheduled.
+This is an intent checkpoint, not a new execution plan or a change to completed
+M0/M1 contracts.
 
-## Migration And Performance Baseline
+## Established Foundation And M0
 
-Status: complete as a protocol; individual feature rows and baselines close as
-their capabilities become active.
+Status: complete under the original contracts.
 
-- maintain the source-wide supported-feature ledger in `SOURCE_MIGRATION.md`;
-- distinguish rewrite, adapter, retain, replace, retire, and unsupported
-  dispositions;
-- use the benchmark levels, recording format, and regression policy in
-  `PERFORMANCE.md`;
-- require a real-data vertical slice and milestone performance summary in
-  addition to kernel evidence.
+Foundation established layout/index/ownership/valid-region conventions, access
+requirements, functional storage, explicit workspaces, migration disposition,
+performance protocol, and an isolated build/test path.
 
-## M0: Cartesian 3D Level-1
-
-Status: complete.
-
-Target: a complete non-periodic, non-staggered 3D path without refinement.
-
-Required capabilities:
-
-- layout and block-index primitives;
-- level-1 Morton ordering;
-- validated level-1 topology and Cartesian block geometry;
-- in-memory and bounded block/chunk field sources;
-- physical-boundary and same-level halo provision;
-- exact level-1 placement, zero-order sampling, and trilinear sampling;
-- one pointwise operator, one stencil operator, and one streaming reduction;
-- numerical comparison with the current implementation;
-- a bounded-memory path whose complete field payload need not reside in memory.
-
-The existing AMRVAC reader may initially feed the new core through an adapter.
-A native block source should be added when it is needed to demonstrate genuine
-out-of-core execution.
+M0 supplies Cartesian 3D level-1, non-periodic, non-staggered topology/geometry,
+physical and same-level halos, exact placement, zero/trilinear sampling,
+pointwise/stencil/reduction primitives, and a bounded composition compared with
+the current path. These remain references and compatibility strategies.
 
 ## M1: Cartesian 3D Refined AMR
 
-Status: complete with the qualified real-fixture limitation recorded in
-`evidence/M1-ARCHITECTURE-HORIZON.md`.
+Status: complete for its original scope with the qualified real-fixture
+limitation in [M1 horizon](evidence/M1-ARCHITECTURE-HORIZON.md).
 
-The milestone includes validated refined forest/topology/balance/geometry;
-sparse selected support and complete SAME/FINER/COARSER/physical halo
-application; restriction/prolongation; exact refined zero/trilinear sampling;
-native selective v5 input; bounded selected curl/reduction; completed-owner
-sampling cache; and fixed-step native field lines. The analysis-priority local-
-field and streamline gates both have synthetic refined native and real tdm
-workflow evidence. All-26 execution remains the exact 3D reference; direction-
-projected support is carried into dimension-aware M2 design rather than added as
-a 3D-only patch.
+M1 includes refined reconstruction/conformance, contacts/balance/geometry,
+selected support, SAME/FINER/COARSER/physical halo application,
+restriction/prolongation, refined ownership/sampling, native selective v5 input,
+selected curl/reduction, completed-owner caching, and fixed-step field lines.
+Its original local-field and streamline priority gates are complete.
 
-The completed functional-composition checkpoint established:
+There is no direct real fixture simultaneously refined, non-staggered, native,
+and Cartesian 3D. Existing evidence combines real tdm, WENO metadata, a streamed
+regular-field bridge, and synthetic refined native files. Preserve that
+qualification; new documentation is not fresh numerical validation.
 
-- expose block readers and writers as explicit coarse-grained function
-  adapters over canonical buffers;
-- retain array/memmap behavior as one backend rather than a semantic
-  dependency;
-- keep resident and bounded traversal as interchangeable execution strategies;
-- separate halo requirements, support closure, relation planning, and value
-  transfer before adding coarse/fine behavior.
+## Post-M1 Native Derived Analysis
 
-M1 then added:
+Status: retained planning horizon; BASELINE owns current outcome selection.
+This added product scope preserves M1 completion. Earlier planning advanced a
+small part of M4/M6 before broad M2/M3 generalization; that order does not select
+the next group. A complete Dataset or generic derived-field framework is not a
+prerequisite for a concrete consumer.
 
-- validated parent/child reconstruction;
-- coarse, sibling, and fine neighbor relations;
-- explicit selected-primary support planning for sparse/ROI leaf streams;
-- restriction and prolongation;
-- refined ghost provision;
-- refined zero-order and trilinear sampling;
-- a native selective AMRVAC block-reader adapter;
-- refined real-data correctness, runtime, memory, and I/O comparison.
+Select the next outcome from actual missing contracts and measured bottlenecks,
+splitting implementation into groups of at most four under WORKFLOW. Retained
+directions are:
 
-M1 storage and halo implementations must compose through the same canonical
-contracts. Native AMRVAC, mapped, resident, cached, or other adapters may alter
-I/O and scheduling but not refined numerical semantics.
+1. **Reusable bounded analysis.** Exercise raw and derived queries repeatedly
+   under an explicit complete resource budget. Use another concrete operator to
+   test shared reads/halos. Choose retained artifacts and bounded output from
+   measured reuse, not a mandatory cache stack.
+2. **Efficient halo support and storage.** Assess requested-direction support,
+   support-interior versus padded storage, shared halo provision, and plan reuse
+   without losing required slope/base closure or active-dimension compatibility.
+3. **Along-field diagnostics.** Share location/field preparation while tracing,
+   evaluating derived quantities and directional derivatives, and integrating a
+   named quantity. Provide bounded/accumulator output and separate trajectory,
+   diagnostic, endpoint, and integral acceptance as appropriate.
 
-## Analysis Priority Gate Before M2
+The completed optimization round's first objective was to reduce selected
+native-analysis halo preparation cost. Its
+[execution plan](designs/M1-ANALYSIS-OPTIMIZATION.md#execution-order)
+records the order: fixed comparison set, halo support/planning, cache scaling,
+storage/output amplification, conditional compute, and round closure. These
+are assessment priorities, not mandatory algorithms or predeclared capability
+groups. Dependencies or blocking resource constraints may change the order with
+an explicit reason. No field-specific demonstration is a
+prerequisite. Operator access, produced valid regions, and downstream sampling
+are general requirements applied when selecting and composing real consumers.
+The former DVA-001 proposal is withdrawn. Freeze only a demonstrated missing
+behavior or selected strategy; do not reopen all M1 capabilities. Existing
+full-halo and strict numerical paths remain references.
 
-Status: complete. See `evidence/M1-ARCHITECTURE-HORIZON.md`.
+Directional support, raw caches, halo storage changes, adaptive steps, and
+parallel execution are candidates, not prerequisites for every outcome.
+Historical reopen conditions remain in
+[M1 strategy records](evidence/M1-ANALYSIS-DECISIONS.md). New query/validity/reuse
+assumptions can justify reconsideration with a recorded cost model or probe.
 
-Before broad dimensional and periodic generalization, validate that the
-completed Cartesian 3D refined core supports the primary analysis direction in
-`ANALYSIS_WORKLOADS.md`. Activate the minimum selected M4-style capabilities
-needed for two vertical slices:
+Preserve M2's active-dimension requirements. Before changing a shared direction,
+child-phase, halo, or session representation, assess its 2D implications and
+activate the minimum DIM-001 prerequisite if needed. Do not entrench a new
+3D-only shared representation or require all 2D implementation before a valid
+3D composition.
 
-- a native selective read feeding a bounded physical-region local diagnostic,
-  with shared input/halo work and a regional output or reduction;
-- an exact spatial locator and field sampler feeding one representative
-  streamline composition with explicit stepping, termination, and cache
-  behavior.
-
-This gate does not require the complete derived-field public lifecycle or every
-scientific operator. Its purpose is to let real analysis consumers test the
-storage, layout, ownership, caching, and execution boundaries before M2/M3 make
-them dimension- and periodic-aware. Record time to first result, useful/read
-bytes, support amplification, peak memory, query latency, cache behavior, and
-the appropriate numerical comparisons.
+The optimization round uses its own
+[exit criteria](designs/M1-ANALYSIS-OPTIMIZATION.md#group-and-round-completion):
+validated retained gains or a justified unchanged baseline, resolved direction
+dispositions, no unmet hard requirements/regressions, and final composed
+evidence. It does not claim all post-M1 functionality complete. The round is
+closed; CURRENT now records an intent checkpoint with no implementation selected.
+Future work must select a justified user outcome and schedule its dependencies;
+there is no automatic transition to DIM-001/M2 during intent clarification. Product
+acceptance, not optimization completion alone, closes this broader stage.
 
 ## M2: Cartesian 2D
 
-Status: active at the foundation boundary. The first group is **Active-
-Dimension Foundation**, initially singleton DIM-001. It makes `active_ndim`
-explicit, keeps `ndir` separate, and preserves the canonical singleton-z array
-layout before quadtree, DAT, geometry, halo, or sampling behavior is generalized.
+Status: queued; DIM-001 remains proposed. Its former active group is deferred
+while post-M1 analysis planning is active.
 
-Generalize established concepts to active x/y dimensions:
+DIM-001 must precede all 2D forest, DAT, geometry, halo, and sampling consumers.
+It makes `active_ndim` explicit, keeps `ndir` separate, and preserves canonical
+five-dimensional singleton-z arrays. A legitimate 3D singleton axis is not 2D.
 
-- quadtree traversal;
-- singleton-z external arrays;
-- 2D halo provision and refined interfaces;
-- exact placement, bilinear sampling, and operator behavior.
-- a representative real Cartesian 2D `.dat` vertical slice.
+Then generalize quadtree/Morton, variable-width v5 input, active-axis geometry,
+refined/physical halos, bilinear sampling, and a representative 2D operator.
+Requested target directions remain distinct from extra COARSER slope/physical
+base support. Preserve exact 3D wrappers and generalize proven shared concepts
+rather than creating unrelated 2D copies.
 
-Do not implement 2D as unrelated duplicate logic. Generalize only after the 3D
-contracts make the shared and dimension-specific parts visible.
+Close a representative real 2D singleton-z workflow. No such fixture is currently
+recorded; acquire or generate one with provenance before closure.
 
 ## M3: Periodic Cartesian Meshes
 
-Add periodicity as an explicit topology and halo input, then validate periodic
-connectivity, refined periodic interfaces, sampling, and stencil behavior.
+Add explicit periodic topology, support/halo transfer, refined sampling, and
+stencil behavior, followed by periodic integration. Distinguish parity with
+current supported behavior from new periodic capability; validate both honestly.
 
-Separate parity from new capability: periodic metadata or behavior already
-supported by the current canonical path is compared directly; newly completed
-periodic execution is labeled and validated as an extension rather than
-reported as migrated parity.
+## M4: Scientific Breadth And Derived Lifecycle
 
-## M4: Scientific Operators And Derived Fields
+Extend the post-M1 concrete analysis contracts to pointwise transforms,
+derivative batching, AMR operators, geometry-aware sampling, reductions,
+current/divergence diagnostics, and broader field-line integration.
 
-Complete and generalize the scientific and field-lifecycle families. Selected
-Cartesian 3D local-analysis and streamline primitives may already exist from
-the analysis priority gate; preserve their contracts and extend them rather
-than implementing unrelated replacements:
+Complete derived dependency registration, materialization, field selectors,
+dropping, and ghost-valid-layer lifecycle. Audit independent potential-field
+and configuration helpers, retaining suitable functional implementations.
+Local-stencil execution and trajectory execution remain distinct.
 
-- pointwise field transforms;
-- derivative batching and local stencils;
-- AMR block operators;
-- associative reductions;
-- geometry-aware sampling;
-- field-line traversal and integration.
-- derived-field dependency registration, materialization, selectors, dropping,
-  and ghost-valid-layer behavior;
-- current/divergence diagnostics represented by concrete operator contracts;
-- an audit of `simesh.tools` and configuration helpers, retaining already good
-  independent functional implementations where appropriate.
+## M5: Complete I/O, Construction, And Export
 
-Field-line work should compose a spatial locator, field sampler, stepper,
-termination policy, and reducer. It should not be forced into the local stencil
-kernel interface.
+Complete supported header/forest/tree/offset/block reading, mapped/native
+sources, DAT writing and roundtrip, uniform-to-SFC construction, singleton-z
+conversion, and VTK export. Record unsupported format behavior and cold/warm
+I/O, bytes, faults, memory, and throughput. Native reading from M1 remains a
+foundation, not a claim that writing/export is already migrated.
 
-## M5: AMRVAC I/O, Construction, And Export
+## M6: Dataset And Public Integration
 
-Complete format-facing behavior over functional adapters:
+Compose metadata and loaded-field lifecycle, boundary/name normalization,
+derived public workflows, `open_dataset`, block/uniform readers, construction,
+and write APIs. Specify compatibility for signatures, defaults, layouts,
+mutation, and failures before replacing a public workflow. Reuse the internal
+analysis session rather than adding scientific semantics to Dataset methods.
 
-- header, forest, tree, offset, and selective block parsing;
-- resident, mapped, and native bounded block sources;
-- `.dat` writing and read/write roundtrip;
-- uniform-to-SFC construction and Cartesian 2D singleton-z behavior;
-- VTK export and explicit unsupported-format rejection;
-- cold/warm I/O, bytes transferred, page-fault, memory, and throughput evidence.
-
-## M6: Dataset And Public API Integration
-
-Build the user-facing functional composition:
-
-- dataset metadata and loaded-field lifecycle;
-- boundary-condition normalization and field-name adapters;
-- derived-field public workflows;
-- `open_dataset`, `read_blocks`, `read_uniform`, uniform construction, and
-  write APIs;
-- compatibility tests and real workflow benchmarks through canonical
-  `simesh.amrvac` entrypoints;
-- a staged backend-selection and fallback path.
-
-The user-facing facade may use small stateful convenience objects, but domain
-semantics and heavy work remain explicit functional transformations.
+Small stateful convenience facades are allowed over the functional core.
+Validate public workflows and staged backend selection/fallback through the
+canonical package; SOURCE_MIGRATION remains the closure authority.
 
 ## M7: Packaging, Parallelism, And Cutover
 
-- integrate rewrite extensions into clean/editable package builds and clean
-  flows;
-- establish OpenMP or other parallel implementations through the same
-  contracts, including one-thread baselines, speedup, and efficiency;
-- verify supported-platform build/test/benchmark profiles;
-- complete the source migration ledger and public documentation;
-- exercise fallback and rollback, switch canonical defaults, then retire or
-  archive superseded current/legacy computational paths.
+Integrate clean/editable extension builds and cleanup, supported-platform
+evidence, OpenMP or other useful parallel strategies with one-thread baselines,
+public documentation, feature disposition, fallback/rollback, and default
+backend switching. Retire/archive superseded paths only after the final
+SOURCE_MIGRATION and public performance gates pass.
 
-M7 completes the project only when the final cutover gate in
-`SOURCE_MIGRATION.md` and public-workflow performance gates in `PERFORMANCE.md`
-are satisfied.
+GPU portability is a durable design constraint, not an implemented backend
+claim or an automatic M7 blocker. Activate a GPU implementation only with a
+concrete useful workload, explicit buffer/numerical contracts, available
+validation, and end-to-end host/device resource evidence. An earlier measured
+CPU/OpenMP or device opportunity may be scheduled through WORKFLOW without
+silently relaxing existing contracts or skipping final cutover obligations.

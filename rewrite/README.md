@@ -1,84 +1,108 @@
 # Functional AMR Rewrite
 
-This directory is an isolated, from-scratch rewrite of the computational core
-of `simesh`. It exists beside the current implementation and does not replace
-or modify it.
+Future project-level analysis-core planning now starts at
+[docs/analysis-core](../docs/analysis-core/README.md), including the paired
+[ghost/prepared-data contract](../docs/analysis-core/prepared-fields.md).
+This tree retains rewrite implementation, scoped contracts and evidence;
+its historical layout and milestone sequence do not select the new architecture.
 
-The isolated core is the first stage of a supported-feature migration. The
-long-term roadmap closes every canonical source feature through rewrite,
-adapter, retention, replacement, retirement, or explicit unsupported status,
-then integrates the validated implementation behind the public `simesh`
-package and performs a controlled cutover.
+An isolated development and validation tree for a functional AMR computational
+core and eventual supported-feature migration into `simesh`.
 
-The rewrite uses small, explicit data transformations to recover and implement
-the semantics of AMR topology, geometry, storage, ghost cells, sampling, and
-scientific operators. Correctness is established incrementally by comparison
-with the current implementation, simple independent references, and focused
-domain invariants.
+The product is native-AMR analysis of large, mostly immutable DAT snapshots:
+selective reads and reuse, efficient ghost data, halo-valid derived quantities,
+and diagnostics/derivatives/integrals along magnetic field lines. Cython CPU is
+the current compute baseline. Explicit semantic, storage, and execution
+boundaries support measured OpenMP and future GPU implementations without
+silently weakening numerical contracts.
 
-The project also treats runtime, peak memory, throughput, and parallel scaling
-as joint design concerns. Data larger than available memory is an intended use
-case, not an afterthought.
+The corrected user priorities are independent magnetic tracing with Q/twist
+and optional retained lines, whole-domain current/gradient analysis followed by slices,
+and full-domain local-response LOS synthesis. Target scale and their minimal
+result contracts are in [THREE-PIPELINE-RESULTS](../docs/analysis-core/pipeline-results.md).
 
-## Read Order
+The [analysis intent catalog](../docs/analysis-core/workflows.md) starts from user results:
+fast local/global reads and halos, magnetic lines, slices, isosurfaces and
+isovolumes, plus explicitly labeled adjacent analysis candidates. It spells out
+fields, spatial access, reuse and acceptance for twelve workflow families.
+Resident throughput and bounded-memory feasibility are both product goals;
+one execution strategy is not a default answer to every request.
 
-1. `CHARTER.md` -- purpose, scope, and design principles.
-2. `AGENTS.md` -- durable instructions for agents working in this directory.
-3. `CURRENT.md` -- the current checkpoint and next ready work.
-4. `CAPABILITIES.md` -- the current dependency-ordered building blocks.
-5. `ROADMAP.md` -- staged support matrix and milestone outcomes.
-6. `WORKFLOW.md` -- how one capability is designed, specified, implemented, composed, and optimized.
-7. `DECOMPOSITION.md` -- the five-question capability gate, decision ownership,
-   and progressive refinement of earlier implementations.
-8. `ANALYSIS_WORKLOADS.md` -- analysis-first workload, algorithm, data-structure,
-   benchmark priorities, and the one-time completed-work reorientation audit.
-9. `FUNCTIONAL_COMPOSITION.md` -- stable boundaries for storage, execution,
-   halo planning, compute kernels, and alternative framework implementations.
-10. `SOURCE_MIGRATION.md` -- feature-parity inventory from current source to
-   final canonical replacement.
-11. `PERFORMANCE.md` -- benchmark levels, baselines, metrics, recording, and
-   regression policy.
+## Start And Resume
 
-Non-trivial design notes are added under `designs/` while alternatives are
-still being explored. Stable capability specifications are added under
-`contracts/` immediately before implementation. Simple capabilities may use a
-single short contract without a separate design note. Keep the control surface
-small and update existing files instead of creating process documents without
-a concrete use.
+Read [AGENTS.md](AGENTS.md) for the task-based authority map. Each development
+cycle starts with [CURRENT.md](CURRENT.md). For spec convergence or selection,
+use [baseline.md](../docs/analysis-core/baseline.md) before [CAPABILITIES.md](CAPABILITIES.md) and the
+selected design/contract. New contributors also read
+[intent.md](../docs/analysis-core/intent.md). Do not reconstruct all historical work on every turn.
+
+The active task is spec convergence, with implementation paused by the user's
+scope. BASELINE now recommends specifying the three mainlines before a bounded
+independent-seed parallel tracing outcome; it supersedes the earlier sampling-phase
+suggestion and activates no implementation.
+Existing M0/M1 completion remains historical evidence; future outcomes and M2
+are not an automatic execution queue. CURRENT is the live checkpoint authority.
+
+## Documentation Map
+
+- [intent.md](../docs/analysis-core/intent.md): product intent, durable engineering constraints, scope.
+- [baseline.md](../docs/analysis-core/baseline.md): current development baseline, asset dispositions,
+  requirement-to-capability/evidence mapping, open decisions and entry conditions.
+- [workflows.md](../docs/analysis-core/workflows.md): representative user requests and
+  scientific/resource acceptance.
+- [technique-candidates.md](../docs/analysis-core/technique-candidates.md): open mapping from usage
+  conditions and required properties to candidate techniques, source evidence
+  and gaps; no combined architecture or implementation selection.
+- [Analysis lifetimes](../docs/analysis-core/lifetime-sketches.md): draft ownership/reuse
+  constraints, three continuous usage sequences, candidate execution sketches
+  and optionality costs; no frozen architecture or implementation.
+- [Three pipeline results](../docs/analysis-core/pipeline-results.md): corrected F/D/L
+  requirements, scientific dependencies, known scale and remaining spec decisions.
+- [FUNCTIONAL_COMPOSITION.md](FUNCTIONAL_COMPOSITION.md): fields/validity,
+  storage, sessions, execution, and compute substitution boundaries.
+- [DECOMPOSITION.md](DECOMPOSITION.md): semantic responsibility and refinement.
+- [WORKFLOW.md](WORKFLOW.md): one design record, exploration, development,
+  optional targeted review, focused validation, and checkpoints.
+- [performance.md](../docs/analysis-core/performance.md): evidence classes, baselines, complete
+  resources, host/device comparisons, and regression/stopping rules.
+- [WENO-REFERENCE.md](WENO-REFERENCE.md): the explicit feature-completion real-data
+  profile, fixed cases, comparator scope and feasibility budgets; not routine tests.
+- [ROADMAP.md](ROADMAP.md): stage outcomes and sequencing.
+- [SOURCE_MIGRATION.md](SOURCE_MIGRATION.md): feature dispositions and cutover.
+- [Designs](designs/README.md): alternatives and pending decisions.
+- [Contracts](contracts/README.md): frozen capability behavior.
+- [Documentation realignment](evidence/DOCUMENTATION-REALIGNMENT.md): requirement
+  preservation and the new planning checkpoint.
+- [M1 horizon](evidence/M1-ARCHITECTURE-HORIZON.md) and
+  [M1 decisions](evidence/M1-ANALYSIS-DECISIONS.md): scoped historical evidence.
+
+Keep rules in their owning documents and use links elsewhere. Simple
+capabilities need no separate design/evidence file. Historical evidence records
+what was demonstrated; it does not override current intent or silently redefine
+an existing contract.
 
 ## Suggested Long-Running Goal Prompt
 
-```text
-Continue the functional AMR rewrite under rewrite/.
+Future opt-in example only. It is not authorization for the current spec-only
+task; implementation requires BASELINE's readiness and a later user instruction.
 
-Follow rewrite/AGENTS.md and the current checkpoint in rewrite/CURRENT.md.
-Use rewrite/ANALYSIS_WORKLOADS.md when selecting algorithms, data structures,
-execution strategies, and benchmark metrics. Complete its one-time
-reorientation audit before resuming new M1 implementation.
-Apply the five-question and decision-ownership gate in rewrite/DECOMPOSITION.md
-before implementing or extending each non-trivial capability. Audit in-progress
-work created under earlier rules before continuing it; preserve valid work and
-refine it incrementally rather than resetting it.
-Before freezing each capability group, record the current approach, one
-structurally different credible alternative, the uncertainty most likely to
-change the choice, and the evidence or consumer that would reopen it. Explore
-only uncertainties that can materially change a boundary, complexity, layout,
-transfer count, or memory model.
-Work through dependency-ready capabilities across M1--M7 toward the complete
-supported-feature migration and final cutover gates in SOURCE_MIGRATION.md.
-Preserve numerical behavior, keep the new implementation isolated until its
-integration stage, and follow PERFORMANCE.md for every hot path and milestone
-workflow. Record enough correctness, performance, memory, I/O, and real-data
-evidence appropriate to each capability's performance class. Material stable
-contract changes use the independent sub-agent review described in
-rewrite/WORKFLOW.md; routine clarifications do not.
-Do not stop merely because one milestone is complete; update the feature
-ledger, select the next dependency-ready capability, and continue until final
-cutover is complete or no capability can make meaningful progress. Make one
-cohesive Git commit after each completed capability group so the branch remains
-an executable sequence of validated checkpoints. Before each commit, run the
-group closing gate and stage only files belonging to the active group and its
-checkpoint. At each milestone close, perform the concise architecture-horizon
-review in WORKFLOW.md and use an independent sub-agent only for a material
-cross-layer choice with credible alternatives or unresolved uncertainty.
+```text
+Continue the functional AMR rewrite under rewrite/ toward the product outcomes
+and supported-feature cutover in CHARTER, ROADMAP, and SOURCE_MIGRATION.
+
+Follow rewrite/AGENTS.md and resume rewrite/CURRENT.md. Use rewrite/BASELINE.md
+for current requirements, asset roles and implementation readiness. Apply the current
+workload acceptance, functional/compute boundaries, and WORKFLOW development
+cycle. Preserve completed contracts and historical evidence. For the selected
+outcome, use existing evidence to select a concrete optimization or missing
+boundary; apply general access/validity requirements through its consumers.
+Do not create a field-specific prerequisite experiment. Continue through
+dependency-ready groups and the queued roadmap.
+
+Use bounded exploration and measured consumer evidence to choose optimizations.
+Use independent review only for a concrete unresolved core question. Keep useful references,
+document intentional differences, and create cohesive validated group
+checkpoints. Do not stop solely because a group or milestone has completed;
+continue within this goal until cutover is complete or no work can make
+meaningful progress.
 ```

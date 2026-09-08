@@ -1,5 +1,10 @@
 # Architecture
 
+This page maps existing implementation layers. The next analysis core's
+project-level requirements live in [analysis-core](analysis-core/README.md);
+existing simesh and rewrite layouts are evidence rather than prescribed future
+architecture. See [prepared fields](analysis-core/prepared-fields.md).
+
 ## Project goal
 
 `simesh` is built to read, write, explore, and manipulate AMRVAC-style adaptive

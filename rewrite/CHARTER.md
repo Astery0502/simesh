@@ -1,153 +1,26 @@
 # Rewrite Charter
 
-## Purpose
+This active specification moved to [intent.md](../docs/analysis-core/intent.md).
+The project-level copy is authoritative for future analysis-core planning.
+This page preserves old navigation only; rewrite code, scoped contracts and
+evidence remain in place and are not automatically the new implementation.
 
-Build a new Cython AMR computational core from first principles in an isolated
-directory. The rewrite should make domain concepts explicit, keep individual
-responsibilities small, compose them efficiently, and remain understandable to
-agents working over a long period.
+## Product Intent
 
-The computational core is the first axis of a complete source migration. The
-long-term outcome is that every supported, user-observable capability currently
-owned under `src/simesh/` has an explicit disposition and the canonical public
-workflows run on the new functional implementation. The isolated `rewrite/`
-tree is a development and validation surface; final integration may place the
-validated modules behind the canonical `simesh` package rather than preserving
-this directory layout forever.
+See [Product Intent](../docs/analysis-core/intent.md#product-intent).
 
-The rewrite is also an investigation. Differences from the current
-implementation should be used to clarify the real semantics of the project,
-not merely copied or suppressed.
+## Durable Engineering Constraints
 
-The primary product is a local analysis toolkit over mostly immutable AMR
-snapshots, especially selected-region field diagnostics and field-line or
-streamline analysis. Simulation-style full-domain updates and global halo
-throughput are secondary unless they are required for supported parity or
-shared measured bottlenecks. `ANALYSIS_WORKLOADS.md` defines the resulting
-algorithm, data-structure, execution, and benchmark priorities.
+See [Durable Engineering Constraints](../docs/analysis-core/intent.md#durable-engineering-constraints).
 
-## Required Outcome
+## Compute Portability
 
-The rewrite must preserve supported numerical behavior. It does not need to
-preserve the current classes, public API, internal algorithms, memory layout,
-or byte-for-byte file output.
+See [Compute Portability](../docs/analysis-core/intent.md#compute-portability).
 
-Migration is feature based, not a mechanical source translation. Each
-canonical behavior must be migrated, replaced by a contract-equivalent
-implementation, deliberately retained behind a functional boundary, or
-explicitly retired/rejected with evidence. Legacy/reference modules are inputs
-to behavior recovery, not automatic porting requirements. Completion requires
-public API, file I/O, dataset, scientific helper, build/runtime, and migration
-evidence in addition to the AMR numerical core.
+## Scope And Migration
 
-Discrete artifacts such as Morton mappings, topology, neighbor classes, field
-ordering, and exact block placement should agree exactly when their contracts
-are exact. Floating-point operators should use an explicit, operation-specific
-comparison appropriate to their numerical meaning.
+See [Scope And Migration](../docs/analysis-core/intent.md#scope-and-migration).
 
-## Functional Core
+## Extension And Evolution
 
-"Functional" means explicit transformations rather than hidden object state:
-
-- every dependency is an explicit input;
-- output buffers and scratch workspaces have explicit ownership;
-- mutation is limited to declared output or workspace buffers;
-- kernels do not depend on an undocumented call history;
-- the same inputs and execution strategy produce deterministic results;
-- each function or capability represents one coherent domain responsibility.
-
-This does not require immutable large arrays. In-place writes and reusable
-buffers are expected where they improve performance and preserve a clear
-contract.
-
-## Composition And Substitution
-
-Functional structure is also the rewrite's portability boundary. Domain
-semantics must be expressible as explicit functions over plain metadata and
-caller-owned buffers so storage, execution, and compute implementations can be
-replaced independently.
-
-- Storage adapters move selected regions between an external representation
-  and the canonical workspace; they do not define topology, halo, sampling, or
-  operator semantics.
-- Execution strategies decide resident versus bounded traversal, caching, and
-  scheduling; they do not change numerical contracts.
-- Compute kernels consume canonical buffers and explicit plans; they do not
-  inspect file handles, memory maps, framework objects, or implicit global
-  state.
-- Alternative implementations are interchangeable only after they pass the
-  same contract and composition tests. A shared function name alone is not a
-  portability guarantee.
-
-Python callables may be injected at block/chunk orchestration boundaries, where
-their state and side effects are explicit. They must not be invoked from cell,
-stencil, or block hot loops in Cython. Framework-specific arrays are converted
-or transferred at an adapter boundary unless a separately validated compute
-backend implements the same kernel contracts directly.
-
-## Design Principles
-
-1. Establish semantics before optimization.
-2. Separate logical fields, physical storage, operator requirements, and execution plans.
-3. Separate topology, geometry, halo requirements, support planning, value rules, and halo storage.
-4. Keep Python orchestration out of Cython hot loops.
-5. Prefer simple typed kernels with explicit buffers over hidden mutable classes.
-6. Keep a clear reference path before introducing fused or parallel variants.
-7. Treat runtime, throughput, peak memory, and scaling as a multi-objective trade-off.
-8. Design field payload processing so the complete dataset need not fit in memory.
-9. Add abstractions only after concrete capabilities demonstrate a shared need.
-10. Keep the development process light; do not add hashes, signatures, authentication, or defensive ceremony.
-11. Build from low-level semantic functions upward, then optimize both individual kernels and their composed execution paths.
-12. Make implementation substitution explicit at coarse orchestration boundaries, not through hidden dispatch inside numerical kernels.
-13. Keep resident, bounded, cached, and future framework-specific execution as strategies over shared contracts rather than separate scientific implementations.
-14. Track migration by supported feature and public workflow; do not use file counts or line-for-line translation as evidence of parity.
-15. Define high performance through reproducible kernel, composition, workflow, memory, I/O, and parallel measurements against explicit baselines.
-16. Decompose by semantic decision ownership: independently variable decisions outside a function's stated meaning become explicit semantic, planning, policy, adapter, or execution boundaries.
-17. Optimize analysis work by avoiding reads and transfers first, reusing
-    explicit metadata/plans second, batching compatible operators third, and
-    tuning arithmetic or parallel kernels after composed profiling.
-18. Treat local-field traversal and streamline traversal as separate execution
-    families over shared topology, geometry, storage, and sampling semantics.
-
-## Performance Outcome
-
-High performance means a useful Pareto result under correctness constraints,
-not one universal fastest number. Resident execution is compared with the best
-current canonical resident path. Bounded execution records the runtime cost of
-its memory reduction. Storage adapters separate I/O, caching, and transfer
-costs from compute. Parallel implementations record speedup and efficiency.
-
-Hot-path completion requires a declared workload, comparator, metrics, and
-material-regression threshold before the final optimization measurement.
-Absolute timings are evidence only on the recorded environment; portable gates
-use same-runner relative comparisons. A slower implementation may be retained
-when deterministic semantics or a measured memory/I/O improvement justifies
-the trade-off explicitly.
-
-## Support Sequence
-
-1. Cartesian 3D, level-1, non-periodic, non-staggered.
-2. Cartesian 3D refined AMR, non-periodic.
-3. Cartesian 2D, including refined AMR and the singleton-z external convention.
-4. Cartesian periodic meshes.
-
-Staggered data and non-Cartesian geometries are outside the current plan. They
-may be recognized and rejected clearly, but should not influence early core
-design beyond avoiding an unnecessary dead end.
-
-## Kernel Extension
-
-New scientific kernels may require rebuilding the Cython extension. Runtime
-callbacks, a dynamic expression language, JIT compilation, and automatic code
-generation are out of scope until several real kernels demonstrate a stable
-common interface.
-
-## Autonomy
-
-Agents may explore implementations and revise development contracts
-autonomously. Material contract changes affecting numerical meaning,
-ownership, consumed representations, or supported public behavior require one
-independent sub-agent review and supporting technical evidence, but do not
-require user approval. Routine clarifications use ordinary focused review. The
-same materiality rule may be used to revise this charter when the rewrite itself
-reveals a better model.
+See [Extension And Evolution](../docs/analysis-core/intent.md#extension-and-evolution).

@@ -19,6 +19,22 @@ and the focused documents under `docs/` for detailed mechanics.
 
 ## Use These References By Task
 
+- `docs/analysis-core/README.md`
+  Start here for project-level future analysis-core intent/spec work. Existing
+  simesh and rewrite implementations are evidence, not the new architecture.
+- `docs/analysis-core/current.md`
+  Read when starting or resuming analysis-core work for the active scope,
+  checkout, evidence and next action. Update stale scope from the latest user
+  instruction rather than requesting authorization already supplied.
+- `docs/analysis-core/development.md`
+  Read before entering a development stage or promoting an exploration. It owns
+  progression, autonomous decisions and review; follow its links to E1--E5 before
+  freezing compute identity or selecting a different reconstruction.
+- `docs/analysis-core/prepared-fields.md`
+  Read before choosing ghost preparation, prepared-block data organization or
+  interpolation/derivative consumption boundaries; prepared primary halos need
+  at least two valid layers under the confirmed baseline.
+
 - `docs/amrvac-dat-format.md`
   Read this before changing AMRVAC `.dat` parsing, metadata layout, or write
   flow.
@@ -65,6 +81,14 @@ and the focused documents under `docs/` for detailed mechanics.
   is explicitly about legacy/reference behavior.
 - When changing canonical behavior, check whether mirrored coverage belongs in
   `tests/amrvac/` or `tests/utils/lib/`.
+
+Use direct source/contract inspection when it settles a change. Tests should
+protect core behavior or answer a concrete performance question; avoid dedicated
+tests for descriptive metadata, incidental call order or straightforward unchanged
+quantity formulas. Follow `docs/analysis-core/performance.md` for check selection.
+Default to one agent. Independent sub-agent review is optional for a specific
+unresolved core issue where another technical perspective would help; it is not
+required merely because a change touches a contract, layout or milestone.
 
 ## Build And Test Cues
 

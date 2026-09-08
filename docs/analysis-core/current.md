@@ -23,6 +23,16 @@ Another independent session owns AIA 171 Å, rebricking feasibility and persiste
 geometry preparation plans; do not duplicate those implementations. Missing
 large-input/physical acceptance was not used to stop independent runtime work.
 
+Latest storage-design follow-up: the user requested reconsidering final-storage
+versus preparation-workspace ownership, reusable preparation facts and bounded
+batch placement against actual applications **before implementation**. Prioritize
+preparing once for repeated use while preserving memory-bounded processing;
+rebricking is outside this follow-up. The
+[application-led review](preparation-reuse-review.md) records scope, existing
+reuse, conditional benefits and a proposed retained B/curl acceptance sequence.
+This review adds no numerical/backend implementation or new performance claim;
+the runtime round and separately owned plan work retain their own records.
+
 | Delivery | Actual status and evidence |
 | --- | --- |
 | P0/P1 | Complete selected design, provider assembly, native interior/two-halo products, stable bounded borrowing and direct consumption; [P1](evidence/p1-native-fields.md) |
