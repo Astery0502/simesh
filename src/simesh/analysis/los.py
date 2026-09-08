@@ -53,7 +53,7 @@ class LOSResult:
 
 
 def _tile(fields,origins,direction,near,far,component,step_fraction,quadrature,max_samples,workers,executor,
-          native_workers=1,dispatch=0):
+          native_workers=1,dispatch=0,touch_coverage=True):
     from simesh.utils.lib.analysis.native import initialize_rays,advance_rays
     n = len(origins)
     mesh = fields.source.mesh if isinstance(fields,PreparedPool) else fields.mesh
@@ -66,29 +66,22 @@ def _tile(fields,origins,direction,near,far,component,step_fraction,quadrature,m
     samples,misses = np.zeros(n,dtype=np.int64),np.zeros(n,dtype=np.int64)
     values[status>=3] = np.nan
     partitions = [p for p in np.array_split(np.arange(n),workers) if len(p)]
-    pool=isinstance(fields,PreparedPool)
-    used=np.zeros((len(partitions)*native_workers,fields.capacity+128),dtype=np.uint8) if pool else np.empty((0,0),dtype=np.uint8)
     def advance(product,part):
-        part_index,part=part
         span = slice(int(part[0]),int(part[-1])+1)
         advance_rays(mesh.lower,mesh.upper,mesh.roots,mesh.children,mesh.node_leaves,
             mesh.node_lower,mesh.node_upper,mesh.bounds,mesh.spacing,product.slot_of_leaf,
             product.values,product.halo,component,origins[span],direction,progress[span],ends[span],
             step_fraction,quadrature,max_samples,values[span],status[span],requested[span],samples[span],misses[span],
-            native_workers,dispatch,
-            used[part_index*native_workers:(part_index+1)*native_workers] if pool else used)
+            native_workers,dispatch)
     while np.any(status==LOSStatus.RUNNING):
-        used.fill(0)
-        context = fields.borrow(fields.resident_leaf_ids,touch=False) if isinstance(fields,PreparedPool) else nullcontext(fields)
+        context = fields.borrow(fields.resident_leaf_ids,touch=touch_coverage) if isinstance(fields,PreparedPool) else nullcontext(fields)
         with context as product:
             if executor is None:
-                advance(product,(0,partitions[0]))
+                advance(product,partitions[0])
             else:
-                futures = [executor.submit(advance,product,p) for p in enumerate(partitions)]
+                futures = [executor.submit(advance,product,p) for p in partitions]
                 for future in futures:
                     future.result()
-        if pool:
-            fields._record_hits(used[:,:fields.capacity].any(axis=0))
         missing = np.unique(requested[(status==0)&(requested>=0)])
         if len(missing):
             if isinstance(fields,PreparedPool):
@@ -164,9 +157,6 @@ def integrate_los_views(fields,planes,directions,*,component=0,near=0.,far=np.in
     nx,ny = plane.shape
     footprint = fields.controlled_bytes if pool else fields.nbytes+fields.mesh.nbytes
     required = footprint+len(planes)*(nx*ny*96+256)+min(tx,nx)*min(ty,ny)*384
-    if pool:
-        lanes=workers*(8 if not native and dispatch and workers>1 else 1)
-        required+=lanes*(fields.capacity+128)+9*fields.capacity
     if required>budget_bytes:
         raise MemoryError(f"LOS needs {required} controlled bytes, budget {budget_bytes}")
     near = np.array(np.broadcast_to(near,plane.shape),dtype=float,order="C",copy=True)
@@ -198,7 +188,8 @@ def integrate_los_views(fields,planes,directions,*,component=0,near=0.,far=np.in
                 np.ascontiguousarray(near[part].ravel()),np.ascontiguousarray(far[part].ravel()),
                 component,step_fraction,int(quadrature=="gauss2"),max_samples,
                 1 if native else workers*(8 if dispatch and workers>1 else 1),
-                executor,workers if native else 1,dispatch)
+                executor,workers if native else 1,dispatch,
+                touch_coverage=len(planes)==1 or view_order=='view')
             for output,row in zip(arrays[view],rows):
                 output[part] = row.reshape(stopx-x,stopy-y)
     directions.flags.writeable = False

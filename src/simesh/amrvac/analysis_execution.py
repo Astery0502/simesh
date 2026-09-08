@@ -82,6 +82,7 @@ def global_curl_file(path,*,field_names=('b1','b2','b3'),field_units=None,
         raise ValueError('task, preparation and support capacities must be positive integers')
     if isinstance(field_names,str) or len(field_names)!=3:
         raise ValueError('parallel curl requires three ordered vector field names')
+    field_names=tuple(field_names)
     path=os.path.abspath(os.fspath(path))
     started=time.perf_counter()
     with open_source(path,field_names=field_names,field_units=field_units,
@@ -90,6 +91,8 @@ def global_curl_file(path,*,field_names=('b1','b2','b3'),field_units=None,
         source.validate_values()
         if len({f.units for f in source.fields})!=1:
             raise ValueError('curl vector components require matching units')
+        # Jobs bind the resolved immutable request, not caller-owned mappings.
+        units={definition.name:definition.units for definition in source.fields}
         mesh=source.mesh
         count=mesh.leaf_count
         task_size=min(task_size,count)
@@ -125,7 +128,7 @@ def global_curl_file(path,*,field_names=('b1','b2','b3'),field_units=None,
                 while cursor<count or pending:
                     while cursor<count and len(pending)<workers:
                         last=min(cursor+task_size,count)
-                        pending.add(executor.submit(_curl_job,path,tuple(field_names),field_units,
+                        pending.add(executor.submit(_curl_job,path,field_names,units,
                             expected,cursor,last,batch_size,support_capacity))
                         cursor=last
                     stamp=time.perf_counter()

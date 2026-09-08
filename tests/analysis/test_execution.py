@@ -18,7 +18,7 @@ class ExecutionTests(unittest.TestCase):
         direction=[.3,.2,1.]
         plane=orthographic_plane(mesh.lower,mesh.upper,direction,(12,12))
         expected=integrate_los(ready,plane,direction,tile_shape=(2,4))
-        pool=PreparedPool(source,[0,1,2],8,fill_batch_size=2)
+        pool=PreparedPool(source,[0,1,2],8)
         try:
             threaded=trace(pool,seeds,workers=4,schedule='dynamic',**opts)
             for name in ('positions','length','steps','termination','samples','twist','trajectories'):

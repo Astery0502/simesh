@@ -16,7 +16,6 @@ def main():
     p.add_argument('--tile',type=int,default=4)
     p.add_argument('--workers',type=int,default=1)
     p.add_argument('--pool',type=int,default=512)
-    p.add_argument('--fill-batch',type=int,default=0)
     p.add_argument('--backend',choices=('threadpool','openmp'),default='threadpool')
     p.add_argument('--repeats',type=int,default=2)
     p.add_argument('--output',required=True)
@@ -27,7 +26,7 @@ def main():
         result['open_seconds']=time.perf_counter()-start
         directions=[[.3,.2,1.],[.31,.2,1.],[.3,.21,1.]]
         planes=[orthographic_plane(source.mesh.lower,source.mesh.upper,d,(32,32)) for d in directions]
-        pool=PreparedPool(source,[0],args.pool,fill_batch_size=args.fill_batch)
+        pool=PreparedPool(source,[0],args.pool)
         result['pool_controlled_bytes']=pool.controlled_bytes
         result['consumer_controlled_upper_bytes']=pool.controlled_bytes+3*(32*32*96+256)+args.tile**2*384
         try:

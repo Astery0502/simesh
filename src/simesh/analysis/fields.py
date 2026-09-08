@@ -142,27 +142,20 @@ class PreparedPool:
     A miss failure invalidates all overwritten candidate slots before publication.
     """
 
-    def __init__(self, source, field_ids, capacity, *, halo=2, budget_bytes=2*1024**3,
-                 fill_batch_size=0):
+    def __init__(self, source, field_ids, capacity, *, halo=2, budget_bytes=2*1024**3):
         _, fields = _request(source, np.empty(0, dtype=np.int64), field_ids, halo)
         if type(capacity) is not int or capacity < 1:
             raise ValueError("capacity must be a positive integer")
         capacity = min(capacity, source.mesh.leaf_count)
-        if type(fill_batch_size) is not int or fill_batch_size<0:
-            raise ValueError("fill_batch_size must be a nonnegative integer")
-        fill_batch_size=min(fill_batch_size,capacity)
         shape, total = _footprint(source, capacity, fields, halo)
-        # Default misses write contiguous final slots; optional staging batches
-        # fragmented destinations. Selector/recency storage is conservative.
+        # Misses write contiguous final slots without another padded copy.
+        # Selector/recency storage is included conservatively.
         total += 64 * (capacity + source.mesh.leaf_count)
-        staging_shape=(fill_batch_size,*shape[1:])
-        total += 8*int(np.prod(staging_shape))
         if total > budget_bytes:
             raise MemoryError(f"pool needs {total} controlled bytes, budget {budget_bytes}")
         self.source, self.field_ids, self.halo = source, frozen_array(fields,np.int64), halo
         self.capacity, self.controlled_bytes = capacity, total
         self._values = np.empty(shape, dtype=np.float64)
-        self._staging = np.empty(staging_shape,dtype=np.float64) if fill_batch_size else None
         self._directory = np.full(source.mesh.leaf_count, -1, dtype=np.int64)
         self._leaves = np.full(capacity, -1, dtype=np.int64)
         self._age = np.zeros(capacity, dtype=np.int64)
@@ -190,18 +183,11 @@ class PreparedPool:
             old = self._leaves[slots]
             self._directory[old[old >= 0]] = -1
             self._leaves[slots] = -1
-            if self._staging is not None:
-                for first in range(0,len(missing),len(self._staging)):
-                    last=min(first+len(self._staging),len(missing))
-                    self.source.fill(missing[first:last],self.field_ids,self.halo,
-                                     self._staging[:last-first])
-                    self._values[slots[first:last]]=self._staging[:last-first]
-            else:
-                starts = np.r_[0, np.flatnonzero(np.diff(slots) != 1)+1, len(slots)]
-                for first, last in zip(starts[:-1], starts[1:]):
-                    run = slots[first:last]
-                    self.source.fill(missing[first:last], self.field_ids, self.halo,
-                                     self._values[run[0]:run[-1]+1])
+            starts = np.r_[0, np.flatnonzero(np.diff(slots) != 1)+1, len(slots)]
+            for first, last in zip(starts[:-1], starts[1:]):
+                run = slots[first:last]
+                self.source.fill(missing[first:last], self.field_ids, self.halo,
+                                 self._values[run[0]:run[-1]+1])
             self._leaves[slots] = missing
             self._directory[missing] = slots
             self.prepared_count += len(missing)
@@ -250,13 +236,6 @@ class PreparedPool:
         self._leaves.fill(-1)
         self._age.fill(0)
 
-    def _record_hits(self, touched):
-        """Coordinator feedback after a coverage lease and all workers return."""
-        if self._closed or self._active:
-            raise RuntimeError("record accesses after returning the active lease")
-        self._clock += 1
-        self._age[touched] = self._clock
-
     @property
     def resident_leaf_ids(self):
         if self._closed:
@@ -267,7 +246,7 @@ class PreparedPool:
         if self._active:
             raise RuntimeError("cannot close a borrowed pool")
         self._closed = True
-        self._values = self._staging = self._directory = self._leaves = self._age = None
+        self._values = self._directory = self._leaves = self._age = None
         self.source = None
 
 

@@ -83,7 +83,6 @@ def main():
     p.add_argument('--backend', choices=('threadpool','openmp'), default='threadpool')
     p.add_argument('--schedule', choices=('static','dynamic'), default='static')
     p.add_argument('--pool', type=int, default=256)
-    p.add_argument('--fill-batch', type=int, default=0)
     p.add_argument('--support', type=int, default=128)
     p.add_argument('--value-cache', type=int, default=0)
     p.add_argument('--batch', type=int, default=32)
@@ -121,7 +120,7 @@ def main():
             step = float(.25*np.min(mesh.spacing[chosen]))
             result['step'] = step
         if args.workload in ('f','l'):
-            pool = PreparedPool(source,range(len(definitions)),args.pool,fill_batch_size=args.fill_batch)
+            pool = PreparedPool(source,range(len(definitions)),args.pool)
             stack.callback(pool.close)
             result['pool_controlled_bytes'] = pool.controlled_bytes
         if args.workload=='l':

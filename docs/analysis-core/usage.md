@@ -169,6 +169,13 @@ ordinary `trace`/`iter_traces` call when points are requested from the start.
 Use `point_counts` to read valid trajectory prefixes. Full output and retained
 prior results count against admission; streaming avoids mandatory concatenation.
 
+For repeated twist requests, construct `with_curl(primary)` or `CurlPool(primary)`
+once and reuse that composition. Passing plain B to `trace(..., twist=True)`
+creates a temporary companion for that call and can recompute curl on the next
+call. The retained resident composition's `.curl` also supplies repeated slices.
+Changing seeds or planes does not require rebuilding compatible B/curl groups;
+each new trajectory and its stage quadrature still has to be computed.
+
 ## LOS Of A Supplied Scalar
 
 ```python
@@ -211,10 +218,11 @@ reserves a current and one normally retained previous slab.
 [Runtime execution](runtime-execution.md) distinguishes numerical reuse,
 scheduling and backend evidence. A `PreparedPool` retains complete two-halo
 blocks, including their ghost values. Size it for the measured working set when
-possible. F/LOS coverage leases no longer count every resident block as a cache
-hit; explicit block requests still update recency. Between such accesses,
-completed preparations provide the insertion-age eviction order. This is not
-sample-level exact LRU.
+possible. F and single-view LOS preserve the original request-priority heuristic.
+Multi-view tile interleaving uses non-touching coverage leases so recently
+completed blocks remain useful to the next nearby view; explicit block requests
+still update recency. This is not sample-level exact LRU. Actual-hit tracking and
+extra padded miss staging were compared and not retained in the selected path.
 
 `open_source(..., value_cache_capacity=2048)` additionally retains up to 2,048
 ordinary-interior blocks behind the provider, deduplicating repeated support
@@ -285,3 +293,37 @@ is shared mutably between workers. A file change aborts publication. Failure may
 leave completed ranges in an explicitly supplied output sink, as in `global_curl`.
 Larger retained outputs require their own admitted budget; this does not establish
 10--20 GB input acceptance.
+
+## Optional Consumer Scheduling
+
+Tracing and LOS accept `backend="threadpool"` (default) or `backend="openmp"`,
+and `schedule="static"` (default) or `schedule="dynamic"`. Thread-pool dynamic
+mode queues smaller row groups to the same bounded worker team; it can be worse
+for small tiles. Static OpenMP did not improve the measured tracing case over
+threads. Dynamic OpenMP is an explicit option for repeated, already-prepared LOS,
+with the complete-cost limits recorded in the runtime evidence.
+
+Build and inspect the **analysis** extension, not just the canonical AMR module:
+
+```sh
+.venv/bin/python build.py --inplace --group analysis --openmp
+OMP_WAIT_POLICY=PASSIVE OMP_DYNAMIC=FALSE .venv/bin/python your_analysis.py
+```
+
+```python
+from simesh.utils.lib.analysis.native import openmp_build_info
+from simesh.analysis import integrate_los
+
+assert openmp_build_info()["enabled"]
+image = integrate_los(resident_scalar, plane, direction, workers=4,
+                      backend="openmp", schedule="dynamic", tile_shape=(64, 64))
+```
+
+The environment settings must be chosen before the OpenMP runtime starts.
+Default builds need no OpenMP runtime. Explicitly requesting the OpenMP backend
+from a default build raises a clear error; it does not silently change engines.
+To restore the default analysis build:
+
+```sh
+SIMESH_OPENMP=0 .venv/bin/python build.py --inplace --group analysis
+```

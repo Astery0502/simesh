@@ -11,14 +11,17 @@ advanced through implementation, comparisons, integration and feasible scale.
 acceptance still require missing inputs. Do not restart completed stages or
 reinterpret the old P2 recommendation as the endpoint.
 
-Execution is **active again: runtime execution efficiency**, explicitly reopened
-by the user on 2026-09-08. Previous backend/cache deferrals are historical
-decisions, not stopping conditions for this round. Follow
-[runtime execution](runtime-execution.md) for the current bounded questions,
-measurements and recovery point. Another independent session owns AIA 171 Å,
-rebricking feasibility and persistent geometry preparation plans; do not duplicate
-those implementations. Missing large-input/physical acceptance does not block
-independent local runtime work.
+The **runtime execution round is locally complete**, following the user's
+2026-09-08 reopening of backends, scheduling and finite numerical reuse. Its
+[selected decisions](runtime-execution.md) and [measured evidence](evidence/runtime-execution.md)
+separate avoided preparation from parallel speedup. Delivered: optional raw-value
+reuse with lifecycle checks, known-view LOS tile retention, independent-process
+global curl, and explicit thread/OpenMP scheduling. Unhelpful access tracking and
+padded miss staging were rolled back. Default paths remain usable.
+
+Another independent session owns AIA 171 Å, rebricking feasibility and persistent
+geometry preparation plans; do not duplicate those implementations. Missing
+large-input/physical acceptance was not used to stop independent runtime work.
 
 | Delivery | Actual status and evidence |
 | --- | --- |
@@ -28,6 +31,7 @@ independent local runtime work.
 | P3-F | Complete selected accepted-segment twist, optional trajectories and explicit selected-ID retracing; [F](evidence/p3-f-twist.md) |
 | P3-L | Scalar/emissivity-field integration core and WENO rho columns complete; **physical response/EOS/units gate open**; [L](evidence/p3-l-scalar-los.md) |
 | P4 | Additive installed source/workflow/build compatibility and actual million-seed/1000^3 output checks complete; **10--20 GB / larger-than-RAM input unverified**; [integration](evidence/p4-integration.md), [scale](evidence/p4-scale.md) |
+| Runtime follow-up | Local comparisons, selected implementation and default/optional build checks complete; [runtime evidence](evidence/runtime-execution.md). Other hardware and real larger-than-RAM input remain unverified. |
 
 ## Checkout And Recoverable Work
 
@@ -35,6 +39,9 @@ independent local runtime work.
 - Source checkpoints: `ee96824` (P1), `f6dc48e` (P2), `6558286` (D),
   `8a80a2f` (twist), `2c00792` (scalar LOS), `a5f1f88` (file/packaging integration).
   Final acceptance/navigation has its own subsequent checkpoint.
+- Runtime experiment checkpoints: `775a0b9` (cache and backend candidates),
+  `ce97fed` (recoverable preparation/scheduling/feedback/staging experiments).
+  The selected-source checkpoint follows with rejected candidates removed.
 - Substantial pre-existing modified/untracked documentation remains preserved.
   Stage only owned work; no blanket reset, staging or source-fixture cleanup.
 - Core: `src/simesh/analysis/`; compiled consumers: `src/simesh/utils/lib/analysis/`;
@@ -45,7 +52,19 @@ independent local runtime work.
 
 ## Latest Verification And Resource Profile
 
-- Safe `make clean` and complete `make test PYTHON=.venv/bin/python` passed;
+- Runtime round: 23 composed native checks passed with OpenMP and with the
+  default build. Full `make test` and 92 canonical checks passed (two opt-in heavy
+  cases excluded). A fresh 9,367,791-byte wheel passed isolated `python -S`
+  file/value-cache, detached, spawned-process curl and multi-view LOS execution.
+  Default non-OpenMP build is restored and explicitly checked.
+- Full curl plus two slices: serial ~31--35 s, two processes ~17.5 s, four
+  processes ~13 s, identical complete output. Controlled bounds ~584 / 735 /
+  917 MB fit the same 1 GiB envelope; process CPU/RSS costs are reported separately.
+- Three nearby LOS views: ~37 s to ~18 s in the matched early profile, with
+  ~28,500 to 13,768 preparations and identical images. Later wall times varied
+  with host load. Final 64-view OpenMP comparison and default-version regression
+  are in the runtime evidence; they do not imply universal backend gains.
+- Prior P4 validation: safe `make clean` and complete `make test` passed;
   virtualenv NumPy remained intact. Provider suite: 1232 passed. Public/AMR/helper
   checks: 92 passed, two opt-in heavy cases excluded. New-core composed checks:
   17 passed. OpenMP build plus 23 AMR checks passed; default non-OpenMP restored.
@@ -61,10 +80,13 @@ independent local runtime work.
 - Host: 8 GiB RAM / eight logical CPUs. Run limits: <=4 compute workers,
   <=2 GiB controlled live arrays per case, <=2 GiB task-created disk scratch,
   >=2 GiB free disk. No time/token limit was supplied. Bounds do not promise
-  process RSS or OS page-cache limits. Historical probes are closed with outcomes;
-  the new runtime round reopens selected candidates explicitly.
+  process RSS or OS page-cache limits. The reopened runtime probes now have
+  measured adopt/defer/rollback outcomes; preserve their recorded scope.
 
 ## Inputs Still Required
+
+These are overall acceptance gates, not blockers for the completed local runtime
+round. The separately owned physical/geometry work has its own continuation.
 
 1. **P3-L physical definition and data:** an asynchronous question remains pending
    for epsilon(rho,T), EOS/normalization/units/instrument response or explicit

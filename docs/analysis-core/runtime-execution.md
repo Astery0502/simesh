@@ -1,6 +1,6 @@
 # Runtime Execution Round
 
-Status: active, 2026-09-08. The latest user instruction reopens execution backends,
+Status: locally complete, 2026-09-08. The user instruction reopened execution backends,
 parallel scheduling and finite numerical reuse under the existing native layout.
 Read [current](current.md), [development](development.md),
 [prepared fields](prepared-fields.md) and [performance](performance.md).
@@ -59,13 +59,14 @@ and cross-machine runs remain unverified when unavailable.
 
 ## Recovery Point
 
-Checkpoint `775a0b9` contains finite value reuse, file-lifecycle guards and optional
-native OpenMP dispatch; 20 composed checks passed with OpenMP enabled. R1 has
-initial matched F/D/L data, R2 backend timings are pending, R3 process/thread
-preparation and R4 nearby-view scheduling are under comparison. Keep default
-paths while selecting outcomes. No fixtures or previous evidence products should
-be deleted. Current native extension is OpenMP-enabled for R2; restore the default
-build and verify the explicit unavailable-backend branch before final delivery.
+Checkpoint `ce97fed` preserves all feedback/staging experiments before their
+selective rollback; `775a0b9` preserves the initial cache/OpenMP candidates.
+The selected source keeps process preparation, optional raw-value caching and
+multi-view tile retention. Actual-hit tracking and padded miss staging were
+removed after comparison. Final range dispatch, backend controls, default-build
+checks and isolated-wheel execution passed. Default non-OpenMP is restored.
+See [runtime evidence](evidence/runtime-execution.md) for compared cases and
+limits. No fixtures or previous evidence products should be deleted.
 
 ## Probe R1: Finite Numerical Reuse (Selected)
 
@@ -219,3 +220,45 @@ fragmented preparation from eviction quality. Do not promote precise-access
 feedback merely because it sounds more accurate; preserve the cheaper existing
 F heuristic if complete-work evidence favors it. Candidate source remains
 recoverable before rollback.
+
+## Selected Cache Outcome
+
+Checkpoint `ce97fed` preserves actual-hit feedback and staging candidates, with
+24 composed checks passing. They are **not promoted**. Precise per-advance hit
+feedback still prepares 836--838 warm F owners (original 659) and fragments cache
+slots into ~750 fill calls; staging reduces calls to 54 but not the excess owner
+work. Nearby LOS gains only ~2% fewer preparations than the simpler insertion-age
+variant (13,527--13,542 versus 13,768), with extra tracking/staging. Late wall times
+are load-affected, so the decision also uses unchanged work counts and added
+storage/complexity. Both candidates were removed from the selected source.
+
+Preserve the original request-priority heuristic for F and single-view LOS.
+Only multi-view tile-interleaving uses non-touching coverage leases, retaining
+recent completed blocks between nearby views. Explicit direct borrows still
+update recency. There is no universal claim that one eviction policy is best.
+No actual-hit bitmap or extra padded staging is allocated in the selected path.
+
+## Final Local Disposition
+
+- Adopt explicit raw-interior reuse for I/O-constrained cases, default disabled;
+  compare its bytes with retaining complete prepared blocks. File value/context
+  changes reject even cached preparations. Geometry is never a value epoch.
+- Retain the existing sparse-F/single-view behavior. Use affordable complete-block
+  retention and existing seed-ID/spatial grouping/batch controls where measured.
+- Adopt known multi-view tile scheduling with insertion-age coverage leases;
+  it does not predict arbitrary future interactive views or cache whole images.
+- Adopt independent-process dense preparation as an explicit file entrypoint;
+  two workers/tasks of 512 are conservative defaults, with measured four-worker
+  scaling. Keep serial and independent-thread comparators.
+- Keep thread-pool consumers as default. Dynamic OpenMP is optional for retained
+  repeated LOS; static OpenMP is not a tracing replacement. The final range
+  dispatcher preserves one serial chunk loop and private parallel ranges.
+- Roll back per-advance hit maps and generic padded staging. Do not add automatic
+  shared-memory storage, device engines or preparation/compute overlap without
+  a new bottleneck. Persistent plan ownership stays with the other session.
+
+All selected source changes have behavior and local efficiency evidence. Final
+checks cover both build modes, the pre-round default query, complete file/process
+products and a fresh installed wheel. There is no outstanding local runtime task
+in this round. Overall thermal/large-input acceptance, other hardware, and the
+separately scoped storage-ownership follow-up are not marked complete here.
