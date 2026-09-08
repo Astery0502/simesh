@@ -13,8 +13,8 @@ VTK 和 2D singleton-z 流程随其必要依赖一起进入独立安装包。
 兼容层包含 9 个 AMRVAC Python 文件、3 个 AMR 扩展及其头文件、少量包初始化
 和运行状态函数。`simesh.tools.potential_field_green` 与
 `simesh.utils.configurations` 作为独立数组工具保留。来源清单与改动见
-[ASSETS.md](../../../analysis-core/ASSETS.md)，用户选择入口、旧分析调用迁移、
-布局和限制见 [MIGRATION.md](../../../analysis-core/MIGRATION.md)。
+[ASSETS.md](../../../../../analysis-core/ASSETS.md)，用户选择入口、旧分析调用迁移、
+布局和限制见 [MIGRATION.md](../../../../../analysis-core/MIGRATION.md)。
 
 这不是把旧 AMRMesh 重新放回新数据模型。只导入 `simesh` 并执行原生 Source/
 Fields/科学消费者时，不加载 `simesh.amrvac` 或 `simesh.utils`；兼容模块在

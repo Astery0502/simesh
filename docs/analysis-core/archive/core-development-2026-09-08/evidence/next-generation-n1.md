@@ -28,7 +28,7 @@ coordinate-phase 重构或 N3 的完整 twist/LOS 接入。
 - 新包未引入 AMRMesh、旧 Dataset 或运行时 `simesh_rewrite`。来源读取包含
   已采用的全域批量解码资产；N1 不宣称全域准备或旧用户工作流已经迁完。
 
-资产来源见 [ASSETS.md](../../../analysis-core/ASSETS.md)。54 个原语/格式
+资产来源见 [ASSETS.md](../../../../../analysis-core/ASSETS.md)。54 个原语/格式
 文件核对为仅命名空间替换；选中的定位、插值和 RK 数值代码保持原文。
 导数 kernel 新增整数偏移参数，浮点表达式和求和次序保持不变。新来源、字段、
 准备和直接消费者的组织代码单独实现，不把文件改名计作算法优化。
@@ -149,7 +149,7 @@ make test
 `benchmark-n1.log`、`benchmark-startup-n1.log`、`build-n1-*.log`、
 `package-n1-final.log`，原始 JSON/完整数组在对应 `benchmark-results/` 子目录。
 
-N1 可用入口见[新包 README](../../../analysis-core/README.md)。下一步是 N2：
+N1 可用入口见[新包 README](../../../../../analysis-core/README.md)。下一步是 N2：
 全域 coordinate-phase 准备与最终值/工作区所有权拆分，同时保留快速读取和
 最新局部线程池阶段。当前粗层准备编排、E5 计划执行、twist/LOS、有界追踪、
 旧 Dataset/写回/2D 支持尚未全部迁入；E1 重分块仍是探索资产。真实大输入、

@@ -69,7 +69,7 @@ flowchart LR
 **Provisional judgment:** A1 is a useful low-retention comparison; A2 needs
 actual overlap/repetition; A3 is credible when the complete footprint fits and
 enough queries follow. No universal selection follows from file size alone.
-The existing [thin-query evidence](../../rewrite/evidence/M1-WENO-ASSESSMENT.md) warns that
+The existing [thin-query evidence](../../../../rewrite/evidence/M1-WENO-ASSESSMENT.md) warns that
 small outputs can still require amplified support. Canonical field-axis changes
 can copy/rebuild mesh storage, so "add one displayed field" is not assumed cheap.
 
@@ -115,7 +115,7 @@ flowchart LR
 
 **Provisional judgment:** B2 has a useful existing foothold; it is not evidence
 that every trajectory workload favors completed-halo caching. The
-[WENO comparison](../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md) shows a cache
+[WENO comparison](../../../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md) shows a cache
 capacity knee and much cheaper resident warm sampling, with different preparation
 costs. Its short traces do not establish long-path or many-seed behavior.
 Diagnostic preparation must not evict active B inputs; budgets for B, diagnostic

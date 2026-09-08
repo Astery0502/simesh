@@ -14,14 +14,12 @@ Read these when you want to use `simesh` from Python.
 
 ## Maintainer docs
 
-Project-level future analysis-core specifications have their own
-[entry point](analysis-core/README.md), independent of the rewrite's historical
-implementation tree. Start with [prepared fields](analysis-core/prepared-fields.md)
-for the paired ghost-preparation and data-consumption requirements.
-For ongoing analysis-core development, read the
-[active checkpoint](analysis-core/current.md) and
-[development progression](analysis-core/development.md); follow their links for
-the selected design, exploration and acceptance evidence.
+The independent N4 core is fixed. Start with its [current state](analysis-core/current.md),
+[core boundaries](analysis-core/next-generation-design.md) and
+[application development guide](analysis-core/application-development.md).
+Earlier specifications, comparisons and heavy development procedures are in the
+[archive](analysis-core/archive/README.md), available when a specific question
+requires historical evidence.
 
 Read these when you are changing implementation behavior.
 

@@ -266,12 +266,12 @@ an external example or an old helper name.
 
 | Source | Observable use and its implication for the catalog |
 | --- | --- |
-| [Project README](../../README.md), [public API map](../python-api-map.md), [user guide](../user-guide.md) | Native block access, regular sampling, derived fields, selected fields, mutation/write-back and format interoperability: U01/U04/U11/U12 |
-| [Canonical derived fields](../../src/simesh/amrvac/derived_fields.py), [AMR kernels](../../src/simesh/utils/lib/amr/mesh.pyx) | Shared derivative computation and remaining valid halo layers: U02 and derived consumers |
-| [Legacy analysis helpers](../../src/simesh/legacy/meshes/amr_mesh.py) | `calculate_current`, `calculate_divv`, `export_uniform_current`: current/compression and displayable fields; legacy names/formulas are evidence to verify, not new scientific definitions |
-| [Potential-field tools](../potential-field-tools.md), [magnetic configurations](../../src/simesh/utils/configurations.py) | Boundary-driven reference fields, dipole/bipolar/fan/flux-rope models and comparison workflows: U12 |
-| [Capability ledger](../../rewrite/CAPABILITIES.md), [migration ledger](../../rewrite/SOURCE_MIGRATION.md) | Existing internal refined sampling/curl/tracing versus unfinished public composition and compatibility obligations |
-| [WENO full comparison](../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md), [thin-region assessment](../../rewrite/evidence/M1-WENO-ASSESSMENT.md) | Measured resident/bounded and support-amplification limitations; grounds for changed acceptance, not a blanket rejection of the rewrite |
+| [Project README](../../../../README.md), [public API map](../../../python-api-map.md), [user guide](../../../user-guide.md) | Native block access, regular sampling, derived fields, selected fields, mutation/write-back and format interoperability: U01/U04/U11/U12 |
+| [Canonical derived fields](../../../../src/simesh/amrvac/derived_fields.py), [AMR kernels](../../../../src/simesh/utils/lib/amr/mesh.pyx) | Shared derivative computation and remaining valid halo layers: U02 and derived consumers |
+| [Legacy analysis helpers](../../../../src/simesh/legacy/meshes/amr_mesh.py) | `calculate_current`, `calculate_divv`, `export_uniform_current`: current/compression and displayable fields; legacy names/formulas are evidence to verify, not new scientific definitions |
+| [Potential-field tools](../../../potential-field-tools.md), [magnetic configurations](../../../../src/simesh/utils/configurations.py) | Boundary-driven reference fields, dipole/bipolar/fan/flux-rope models and comparison workflows: U12 |
+| [Capability ledger](../../../../rewrite/CAPABILITIES.md), [migration ledger](../../../../rewrite/SOURCE_MIGRATION.md) | Existing internal refined sampling/curl/tracing versus unfinished public composition and compatibility obligations |
+| [WENO full comparison](../../../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md), [thin-region assessment](../../../../rewrite/evidence/M1-WENO-ASSESSMENT.md) | Measured resident/bounded and support-amplification limitations; grounds for changed acceptance, not a blanket rejection of the rewrite |
 
 The following external primary documentation was recorded as consulted on
 2026-09-07. It supports terminology and product distinctions, not workload
@@ -303,14 +303,14 @@ preserved investigation references, not new measurements:
 
 ### Retained Rewrite Records
 
-[M1 strategy records](../../rewrite/evidence/M1-ANALYSIS-DECISIONS.md) retain
+[M1 strategy records](../../../../rewrite/evidence/M1-ANALYSIS-DECISIONS.md) retain
 original choices and reopen triggers. The
-[M1 horizon](../../rewrite/evidence/M1-ARCHITECTURE-HORIZON.md) records its qualified
+[M1 horizon](../../../../rewrite/evidence/M1-ARCHITECTURE-HORIZON.md) records its qualified
 fixture pass and support/cache trade-offs; the
-[earlier reorientation audit](../../rewrite/evidence/ANALYSIS-PRIORITY-REAUDIT.md)
+[earlier reorientation audit](../../../../rewrite/evidence/ANALYSIS-PRIORITY-REAUDIT.md)
 is historical. They are evidence, not recurring audit commands or stage order.
 
-The explicit [WENO profile](../../rewrite/WENO-REFERENCE.md) is a complex real-data
+The explicit [WENO profile](../../../../rewrite/WENO-REFERENCE.md) is a complex real-data
 assessment, not a routine test or a substitute for independent manufactured
 accuracy cases. Apply [performance policy](performance.md#weno-reference-comparisons)
 when a selected claim needs it.

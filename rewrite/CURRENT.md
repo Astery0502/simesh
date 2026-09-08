@@ -17,7 +17,7 @@ unchanged. The old M0/M1/M2 history below is not the new core's execution state.
   This file retains rewrite history; it does not select the new architecture.
 - Baseline updated from the corrected side handoff: independent F tracing/Q/twist,
   D whole-domain derivatives/slices and L full-domain LOS synthesis. The
-  [result-contract draft](../docs/analysis-core/pipeline-results.md) records known scale,
+  [result-contract draft](../docs/analysis-core/archive/core-development-2026-09-08/pipeline-results.md) records known scale,
   R1--R10 responsibility/evidence gaps and revised first-outcome entry conditions. No
   numerical/performance suite or experiment was run; code and contracts unchanged.
   Independent review included the latest clarification: prioritize seed-parallel
@@ -41,13 +41,13 @@ unchanged. The old M0/M1/M2 history below is not the new core's execution state.
   resident/bounded trade-offs and prioritize planning/check orchestration review.
 - Intent clarification: documented and independently reviewed, 2026-09-07,
   user-requested. The expanded
-  [analysis catalog](../docs/analysis-core/workflows.md) defines requested results, minimum
+  [analysis catalog](../docs/analysis-core/archive/core-development-2026-09-08/workflows.md) defines requested results, minimum
   data needs, reuse, resident/bounded trade-offs and acceptance. It adds no
   numerical implementation or completion claim. Documentation checks cover
   requirement preservation, local links/anchors, status consistency and diff;
   no numerical or performance suite was rerun for this prose-only change.
 - Workflow-to-technique mapping: initial open inventory documented, 2026-09-07.
-  [WORKFLOW_TECHNIQUES](../docs/analysis-core/technique-candidates.md) relates twelve workflow families
+  [WORKFLOW_TECHNIQUES](../docs/analysis-core/archive/core-development-2026-09-08/technique-candidates.md) relates twelve workflow families
   and their usage variants to eighteen candidate technique records, with
   source/evidence status, limits and unresolved questions. This is a
   documentation checkpoint; it selects no combined architecture or implementation.
@@ -55,14 +55,14 @@ unchanged. The old M0/M1/M2 history below is not the new core's execution state.
   no numerical/performance suite was run for this inventory.
 - Lifetime/execution exploration: draft documented and independently reviewed,
   2026-09-07. The
-  [shared design](../docs/analysis-core/lifetime-sketches.md) describes ownership, invalidation
+  [shared design](../docs/analysis-core/archive/core-development-2026-09-08/lifetime-sketches.md) describes ownership, invalidation
   and release, three continuous usage sequences, alternative execution sketches
   and costs of optional mechanisms. No final architecture or implementation is
   selected; numerical contracts and capability statuses are unchanged.
   Documentation links, scenario coverage and diff checks passed; no numerical
   or performance suite was run for the draft.
 - For new spec work, follow the project checkpoint and
-  [prepared-field requirements](../docs/analysis-core/prepared-fields.md).
+  [prepared-field requirements](../docs/analysis-core/archive/core-development-2026-09-08/prepared-fields.md).
   No new pipeline implementation, code deletion or historical milestone
   progression is authorized. Existing WENO commands below remain opt-in evidence.
 - Original M0/M1 completion remains unchanged, including Native Refined Field

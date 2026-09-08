@@ -39,7 +39,7 @@ Measure the operation the user needs when the change affects performance.
 Isolated kernel timing is useful only when it explains that cost or helps choose
 an implementation. Cold metadata or simple configuration work may be settled by
 reading. No performance class or benchmark is required for every helper; use the
-[verification policy](../docs/analysis-core/performance.md#choose-the-smallest-useful-check).
+[verification policy](../docs/analysis-core/archive/core-development-2026-09-08/performance.md#choose-the-smallest-useful-check).
 
 ### 5. Are Semantic Meaning And Policy/Execution Separate?
 
@@ -81,7 +81,7 @@ test every constituent as a stand-alone API before writing a useful fused kernel
 Refine code for an actual consumer, a concrete bug or a demonstrated cost.
 Start by reading the relevant implementation/contract and existing evidence.
 Make the smallest useful structural change and verify the affected behavior
-using the [smallest useful check](../docs/analysis-core/performance.md#choose-the-smallest-useful-check).
+using the [smallest useful check](../docs/analysis-core/archive/core-development-2026-09-08/performance.md#choose-the-smallest-useful-check).
 Measure only relevant performance/resource claims and reuse adequate prior runs.
 
 Preserve public behavior or state an intentional scoped change. Update the active

@@ -2,7 +2,7 @@
 
 Status: this runtime round is locally complete, 2026-09-08. Scope and decisions are in
 [runtime execution](../runtime-execution.md); the live checkpoint is
-[current](../current.md). Source checkpoints: `775a0b9` (initial cache/backend
+[current](../current-before-freeze.md). Source checkpoints: `775a0b9` (initial cache/backend
 candidates), `ce97fed` (recoverable scheduling/feedback/staging experiments).
 Validated selected implementation: `6172bbb`.
 

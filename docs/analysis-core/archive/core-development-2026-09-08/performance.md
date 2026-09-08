@@ -76,7 +76,7 @@ do not require a separate scientific test or independent review.
 
 ## Turn "Fast" Into A Reviewable Result
 
-The single [design record](README.md#how-a-decision-advances) states:
+The single [design record](historical-index.md#how-a-decision-advances) states:
 
 ```text
 Fixture, AMR pattern, storage and machine:
@@ -197,7 +197,7 @@ integrated evidence summary instead of relying only on microbenchmarks.
 
 ## WENO Reference Comparisons
 
-Use [WENO-REFERENCE.md](../../rewrite/WENO-REFERENCE.md) for the explicit feature-completion
+Use [WENO-REFERENCE.md](../../../../rewrite/WENO-REFERENCE.md) for the explicit feature-completion
 real-data profile. Compare original canonical simesh, fixed original M1, the
 previous retained version and a candidate where each has matching operations.
 Label each comparison as equivalent, restricted-common-domain, different-work,
@@ -320,7 +320,7 @@ by the question/variant limit recorded in the design. An unimplemented idea is
 not itself a blocker: record its reason for deferral and concrete reopen
 evidence. Do not keep trying variants solely to prove that none can improve.
 
-Use proportional validation under the [decision workflow](README.md#how-a-decision-advances).
+Use proportional validation under the [decision workflow](historical-index.md#how-a-decision-advances).
 Use the affected consumer's measurements and any useful kernel attribution;
 composition-only work shares its consumer's evidence. User-facing completion needs
 applicable real-data and resource/scaling evidence with fixture limitations stated. Public

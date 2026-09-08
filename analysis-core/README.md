@@ -7,6 +7,8 @@ RK4 magnetic tracing with twist, scalar/thermal LOS, reusable geometry plans and
 explicit bounded or streamed workflows.
 It also bundles the stateful AMRVAC and array-tool compatibility workflows;
 see [MIGRATION.md](MIGRATION.md) for their separate data and execution boundaries.
+The N4 core design is fixed. New work can focus on applications consuming these
+interfaces; use the [application guide](../docs/analysis-core/application-development.md).
 
 The package imports as `simesh`. Install it in its own environment: the existing
 package in the parent repository uses the same import name. Runtime code and
@@ -277,11 +279,8 @@ See [migration and examples](MIGRATION.md) for layouts, memory costs, periodic/C
 file limits and the preserved VTK coordinate convention. New 2D/periodic/CT/GPU analysis,
 Q, exact footpoints and real 10–20 GB input acceptance are not claimed.
 
-[ASSETS.md](ASSETS.md) records the fixed implementation provenance. The
-[development design](../docs/analysis-core/next-generation-design.md),
-[scope](../docs/analysis-core/next-generation.md) and
-[N1 evidence](../docs/analysis-core/evidence/next-generation-n1.md) and
-[N2 evidence](../docs/analysis-core/evidence/next-generation-n2.md) and
-[N3 evidence](../docs/analysis-core/evidence/next-generation-n3.md) and
-[N4 evidence](../docs/analysis-core/evidence/next-generation-n4.md) contain
-collaboration records and the remaining scientific scope.
+[ASSETS.md](ASSETS.md) records implementation provenance. The
+[fixed core design](../docs/analysis-core/next-generation-design.md) and
+[application guide](../docs/analysis-core/application-development.md) are the active
+development references. Earlier specifications, experiments and N1–N4 acceptance
+records are preserved in the [archive](../docs/analysis-core/archive/README.md).

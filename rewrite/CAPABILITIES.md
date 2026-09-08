@@ -3,7 +3,7 @@
 This is the lightweight dependency ledger for the rewrite. Add detail only when
 a capability becomes active.
 
-[baseline.md](../docs/analysis-core/baseline.md) now owns the current requirement-to-capability/evidence
+[baseline.md](../docs/analysis-core/archive/core-development-2026-09-08/baseline.md) now owns the current requirement-to-capability/evidence
 map and recommended first-outcome readiness. The statuses below retain their
 original historical scope; `complete` does not mean preferred for new workloads,
 publicly integrated, or a mandate to follow the old milestone order. The proposed
@@ -12,7 +12,7 @@ F tracing/Q/twist, independent D global derivatives/slices and L full-domain LOS
 have no newly selected implementation group or capability IDs; define only
 demonstrated missing responsibilities after the selected outcome's entry gate.
 
-The 2026-09-07 [intent catalog](../docs/analysis-core/workflows.md) expands user outcomes and
+The 2026-09-07 [intent catalog](../docs/analysis-core/archive/core-development-2026-09-08/workflows.md) expands user outcomes and
 resident/bounded acceptance. Catalog entries are not capability IDs or completed
 features. Slice, surface and volume products need future consumer-specific
 contracts; existing M0/M1 and optimization statuses retain their original scope.

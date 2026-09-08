@@ -155,10 +155,10 @@ state these orders. For nonlinear LOS response, evaluating a response on interpo
 inputs need not equal interpolating precomputed response values. Consumer meaning
 determines support, not the other way around.
 
-Existing [SAM-005](../../rewrite/contracts/SAM-005.md),
-[RST-001](../../rewrite/contracts/RST-001.md),
-[PRL-001](../../rewrite/contracts/PRL-001.md) and
-[canonical mesh notes](../amr-forest-mesh.md) supply scoped examples. In particular,
+Existing [SAM-005](../../../../rewrite/contracts/SAM-005.md),
+[RST-001](../../../../rewrite/contracts/RST-001.md),
+[PRL-001](../../../../rewrite/contracts/PRL-001.md) and
+[canonical mesh notes](../../../amr-forest-mesh.md) supply scoped examples. In particular,
 one-layer CHS remains unchanged evidence and needs adaptation to meet this
 preparation baseline. These references do not select a universal transfer rule.
 

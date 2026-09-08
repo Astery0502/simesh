@@ -13,7 +13,7 @@ and batch transfer execution**. Full leaf blocks and temporary rectangular windo
 use the same patch description. Applications keep their own traversal state.
 
 Actual adoption and executable departures from this proposal are recorded in
-[native-core-design.md](native-core-design.md) and [current.md](current.md).
+[native-core-design.md](native-core-design.md) and [current.md](current-before-freeze.md).
 The later [application-led preparation/storage review](preparation-reuse-review.md)
 maps workspace ownership, planning reuse and batch placement to actual repeated
 and bounded workloads. It prioritizes retained fields, keeps rebricking outside
@@ -31,7 +31,7 @@ The repository fixture and reports use `data/weno509_sub_0000.dat`, not a file
 named weno511: 1,045,232,320 bytes, 22,614 leaves, levels 3--6, and 8^3 cells per
 leaf. The existing profile uses ordinary B fields from a non-staggered bridge;
 the original record includes staggered tails. See the
-[fixture contract](../../rewrite/WENO-REFERENCE.md#fixture-contract).
+[fixture contract](../../../../rewrite/WENO-REFERENCE.md#fixture-contract).
 
 The source inspection below concerns canonical `src/simesh`, not legacy, and the
 current rewrite mechanisms described by the reports. No numerical experiment or
@@ -50,13 +50,13 @@ numerical comparisons, revisions, setup costs and applicability limits.
 | Repeated consumption | Direct access to resident prepared arrays | CHS avoids reads/fills on a hit, but still validates, locates, groups and plans cache access; misses complete one owner and copy its result into cache | Ready-data consumption should use direct compiled views; preparation should write into its final owned destination where feasible |
 | Derived fields | Field-axis extension concatenates arrays and rebuilds/copies mesh storage | Local operators are explicit, but LFE output/delivery is narrow | Allocate derived field groups independently and publish their actual remaining validity |
 
-Relevant source: [mesh allocation and bulk kernels](../../src/simesh/utils/lib/amr/mesh.pyx),
-[forest tables](../../src/simesh/utils/lib/amr/forest.pxd),
-[field-axis rebuilding](../../src/simesh/amrvac/amrvac_dataset.py),
-[derived materialization](../../src/simesh/amrvac/derived_fields.py),
-[RHE preparation/application](../../rewrite/src/simesh_rewrite/refined_halo.py),
-[CHS allocation/hits/misses](../../rewrite/src/simesh_rewrite/completed_halo_sampling.py)
-and [SLE stage orchestration](../../rewrite/src/simesh_rewrite/field_lines.py).
+Relevant source: [mesh allocation and bulk kernels](../../../../src/simesh/utils/lib/amr/mesh.pyx),
+[forest tables](../../../../src/simesh/utils/lib/amr/forest.pxd),
+[field-axis rebuilding](../../../../src/simesh/amrvac/amrvac_dataset.py),
+[derived materialization](../../../../src/simesh/amrvac/derived_fields.py),
+[RHE preparation/application](../../../../rewrite/src/simesh_rewrite/refined_halo.py),
+[CHS allocation/hits/misses](../../../../rewrite/src/simesh_rewrite/completed_halo_sampling.py)
+and [SLE stage orchestration](../../../../rewrite/src/simesh_rewrite/field_lines.py).
 Canonical public block views transpose its internal layout; they should not be
 mistaken for a separate mandatory resident copy of every interior field.
 
@@ -69,8 +69,8 @@ The following measurements are quoted only to ground the design inference:
 | Thin ROI: 2.996 MB selected values, 116.048 MB reads at 57 slots | Represent actual output windows and support separately; full-block/all-direction work can amplify small requests | Required mathematics, file granularity and repeated loads all contribute; no claimed new saving factor |
 | Eight-seed/eight-step warm trace: four CHS slots 694.62 ms, eight slots 3.757 ms | Working-set organization and retention can dominate the stepper | Narrow historical CPU-time control; no long-path or parallel scaling proof |
 
-Sources: [full comparison](../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md)
-and [thin-query assessment](../../rewrite/evidence/M1-WENO-ASSESSMENT.md).
+Sources: [full comparison](../../../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md)
+and [thin-query assessment](../../../../rewrite/evidence/M1-WENO-ASSESSMENT.md).
 The comparison runner had no OpenMP; application-warm does not mean controlled
 cold disk. New architecture decisions can follow from these findings without
 pretending that its speed or scientific acceptance has already been established.
@@ -364,14 +364,14 @@ affects the selected result.
 
 | Need | Existing component | Boundary or limitation |
 | --- | --- | --- |
-| AMRVAC v5 index and file-order forest | `read_amrvac_v5_index` and `bind_amrvac_v5_forest` in [rewrite amrvac_dat.py](../../rewrite/src/simesh_rewrite/amrvac_dat.py) | Reuse metadata/flat forest and stable source leaf IDs; do not adopt an old executor just to obtain geometry |
-| Selected native file reads | `make_amrvac_v5_block_reader` in [amrvac_dat_reader.py](../../rewrite/src/simesh_rewrite/amrvac_dat_reader.py) | Existing supported non-staggered v5 records; borrowed file descriptor; canonical field-first destination |
-| Resident or memmap block input/output | `array_block_reader`, `array_block_writer`, `read_blocks_into`, `write_blocks_from` in [blockio.py](../../rewrite/src/simesh_rewrite/blockio.py) | Batch gather/scatter into explicitly owned backing; a block writer does not itself create an AMRVAC file |
-| Original-file resident bootstrap | `get_metadata` and `read_blocks_sequential` in [canonical datio.py](../../src/simesh/amrvac/datio.py) | Can supply the recorded WENO ordinary fields; reads all leaves for selected fields, so count full input storage and startup |
-| Complete supported AMRVAC output | `write_datfile_from_sfc` in [canonical datio.py](../../src/simesh/amrvac/datio.py) | Requires compatible SFC interiors and matching header/forest/tree; writes zero-ghost ordinary records, not arbitrary streamed analysis patches |
+| AMRVAC v5 index and file-order forest | `read_amrvac_v5_index` and `bind_amrvac_v5_forest` in [rewrite amrvac_dat.py](../../../../rewrite/src/simesh_rewrite/amrvac_dat.py) | Reuse metadata/flat forest and stable source leaf IDs; do not adopt an old executor just to obtain geometry |
+| Selected native file reads | `make_amrvac_v5_block_reader` in [amrvac_dat_reader.py](../../../../rewrite/src/simesh_rewrite/amrvac_dat_reader.py) | Existing supported non-staggered v5 records; borrowed file descriptor; canonical field-first destination |
+| Resident or memmap block input/output | `array_block_reader`, `array_block_writer`, `read_blocks_into`, `write_blocks_from` in [blockio.py](../../../../rewrite/src/simesh_rewrite/blockio.py) | Batch gather/scatter into explicitly owned backing; a block writer does not itself create an AMRVAC file |
+| Original-file resident bootstrap | `get_metadata` and `read_blocks_sequential` in [canonical datio.py](../../../../src/simesh/amrvac/datio.py) | Can supply the recorded WENO ordinary fields; reads all leaves for selected fields, so count full input storage and startup |
+| Complete supported AMRVAC output | `write_datfile_from_sfc` in [canonical datio.py](../../../../src/simesh/amrvac/datio.py) | Requires compatible SFC interiors and matching header/forest/tree; writes zero-ghost ordinary records, not arbitrary streamed analysis patches |
 | Existing numerical rules | Standalone restriction/prolongation and other scoped rewrite kernels/references | Reuse compatible arithmetic without inheriting RHE/CHS orchestration; layout or support differences need an explicit adapter |
 
-The [STO-003 contract](../../rewrite/contracts/STO-003.md) already expresses the
+The [STO-003 contract](../../../../rewrite/contracts/STO-003.md) already expresses the
 small block-transfer boundary. Its generic `BlockWriter` and the array/memmap
 implementation are available; a native selective AMRVAC file writer is not
 established by that descriptor. A new incremental file writer is a separate

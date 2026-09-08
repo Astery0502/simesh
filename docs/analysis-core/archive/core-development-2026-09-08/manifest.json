@@ -1,0 +1,237 @@
+[
+  {
+    "original": "docs/analysis-core/prototype-upgrade-review.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/prototype-upgrade-review.md",
+    "original_sha256": "49359287c2423826a038ce87421f8941f948932d28e7d988b9ac3c5705f7ac19"
+  },
+  {
+    "original": "docs/analysis-core/workflows.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/workflows.md",
+    "original_sha256": "817e3d20c4a6a17fa8c60e52348a201f9a771da2572fe16ec9b9e280b298f42e"
+  },
+  {
+    "original": "docs/analysis-core/algorithmic-directions.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/algorithmic-directions.md",
+    "original_sha256": "79f89476a06390f1ef41f9d9400232ffe2ec4efd06833f3c81bfbfc867eba3ff"
+  },
+  {
+    "original": "docs/analysis-core/native-core-design.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/native-core-design.md",
+    "original_sha256": "55aee83755048c9aaae09580a96e89573adb0cfca703a7f1ed8637863b5ee413"
+  },
+  {
+    "original": "docs/analysis-core/next-generation.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/next-generation.md",
+    "original_sha256": "26980bc6a0ff8f8862d3648c072aaa4940b2c142d96db412c2a167540d708122"
+  },
+  {
+    "original": "docs/analysis-core/usage.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/usage.md",
+    "original_sha256": "24b711611f081df6c1885e4d14d6500d38a8b553d600f58f66957b5a7f858430"
+  },
+  {
+    "original": "docs/analysis-core/preparation-reuse-review.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/preparation-reuse-review.md",
+    "original_sha256": "bdc02409502beb46ce9572980c13aed02de6ddd7aa7211f4ece169378a8d5b39"
+  },
+  {
+    "original": "docs/analysis-core/performance.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/performance.md",
+    "original_sha256": "d3f57f1621cc66629ba2799352375940fb0100dba60719c97f2650b6411f233b"
+  },
+  {
+    "original": "docs/analysis-core/reorganization.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/reorganization.md",
+    "original_sha256": "993caa48559fc96152433737f255f3ce3d54de7712c2a7d4a825f571cea41036"
+  },
+  {
+    "original": "docs/analysis-core/README.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/historical-index.md",
+    "original_sha256": "0724dde6fd49d55737c2497248ea59b4d27ad22aa150427cbf42fc0c2c29a691"
+  },
+  {
+    "original": "docs/analysis-core/efficiency-consolidation.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/efficiency-consolidation.md",
+    "original_sha256": "bf58ca1042833044a682d5007283385d9abda91ef7979a51776d8a48c7fd2e12"
+  },
+  {
+    "original": "docs/analysis-core/pipeline-results.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/pipeline-results.md",
+    "original_sha256": "66da5433a45688ad55d8f370bdceafa7db8cf44d72846b6731cace06ab45b90e"
+  },
+  {
+    "original": "docs/analysis-core/baseline.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/baseline.md",
+    "original_sha256": "51cf43d51c96f133e153e2fb2661c9c55d36ab7c6ea43b0d8200cd778447748a"
+  },
+  {
+    "original": "docs/analysis-core/intent.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/intent.md",
+    "original_sha256": "5073f51eda2d88010448f3c5b3888410bfa4f0124644ada40d79ac5b1aa0fec4"
+  },
+  {
+    "original": "docs/analysis-core/runtime-execution.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/runtime-execution.md",
+    "original_sha256": "c4020f8d7f71b4b32de5c25dc006a2065bb028037c36a0b64d7833972c24c04c"
+  },
+  {
+    "original": "docs/analysis-core/current.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/current-before-freeze.md",
+    "original_sha256": "2bfe6e8ed53045b3935d243db56db28a832da9014be7d5c11e7086de76d960c7"
+  },
+  {
+    "original": "docs/analysis-core/next-generation-design.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/next-generation-design.md",
+    "original_sha256": "e806dca2e3ee9e5e5578ce8c2cd7c563f572cc678b7ccbdeeca56d23469d2b5e"
+  },
+  {
+    "original": "docs/analysis-core/lifetime-sketches.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/lifetime-sketches.md",
+    "original_sha256": "e4080fe50b5b839572416346812d6af6f284707d71f27b936c7577bc41fd72e9"
+  },
+  {
+    "original": "docs/analysis-core/development.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/development.md",
+    "original_sha256": "6b6859984ef692994e169adf2942f91a159ec34ee15adad6ec8d1baed9d8330c"
+  },
+  {
+    "original": "docs/analysis-core/data-organization.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/data-organization.md",
+    "original_sha256": "a5ea5f76b27ec43806deaab5934dafb215f8756023e7a94ae493c182066132a9"
+  },
+  {
+    "original": "docs/analysis-core/technique-candidates.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/technique-candidates.md",
+    "original_sha256": "05065d891bbc4726bc120f6cd36cbc5b6fad203c67df8cd85ecf843aa057917c"
+  },
+  {
+    "original": "docs/analysis-core/prepared-fields.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/prepared-fields.md",
+    "original_sha256": "ba629075d3a19a841b0d331380ffdebdafd9d00c0d6cf8e87d91906c16e5a833"
+  },
+  {
+    "original": "docs/analysis-core/evidence/rebricking.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/rebricking.md",
+    "original_sha256": "82376cafe614a0fca2de49ef8f5588207a59b026b36316bd674f8694c7d14e3d"
+  },
+  {
+    "original": "docs/analysis-core/evidence/pipeline.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/pipeline.md",
+    "original_sha256": "415873fec5f5f6061848a173828a3695132f2b8a5ebc8f60d81836efd81c442b"
+  },
+  {
+    "original": "docs/analysis-core/evidence/p2-field-lines.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/p2-field-lines.md",
+    "original_sha256": "7f411812f5b3704f4d753eac6a1e307b404442ecc5ec9fe483c9b4aa38f8f6f4"
+  },
+  {
+    "original": "docs/analysis-core/evidence/sampling-paired-vector.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/sampling-paired-vector.md",
+    "original_sha256": "95220da52bff40c0a46101e0a1d6fb229fdbe617f2580c2b3c8d328590015e84"
+  },
+  {
+    "original": "docs/analysis-core/evidence/stages.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/stages.md",
+    "original_sha256": "40b9f7ca42176fe13733aa1908c8beb4c81811a8c4f62ee630697fc751fa7093"
+  },
+  {
+    "original": "docs/analysis-core/evidence/next-generation-n1.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/next-generation-n1.md",
+    "original_sha256": "7baa04bcb04f25dfe068ff93bc86df43f807b67baede988d571c1c72a727a9e4"
+  },
+  {
+    "original": "docs/analysis-core/evidence/geometry-plans.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/geometry-plans.md",
+    "original_sha256": "eb95fcdad9c39214ef7ee67c322ca82178b4a7ddec05c1c7a561453da399d45a"
+  },
+  {
+    "original": "docs/analysis-core/evidence/thermal-rays.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/thermal-rays.md",
+    "original_sha256": "f287a929a117172c76e3d0f6fded9747fae6da42f3ee55fdf0535f3ebab51531"
+  },
+  {
+    "original": "docs/analysis-core/evidence/p3-l-thermal.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/p3-l-thermal.md",
+    "original_sha256": "42a60139554ea0c487ba7e11ae38647e55237c68309eda46994cc65f617eb21a"
+  },
+  {
+    "original": "docs/analysis-core/evidence/p4-scale.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/p4-scale.md",
+    "original_sha256": "10ef9dd97b11870d7a52a09228bd66d2fc317c73cca50a03990ab10f52886152"
+  },
+  {
+    "original": "docs/analysis-core/evidence/next-generation-n4.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/next-generation-n4.md",
+    "original_sha256": "65d55f481db9a4cc6ace18adf0dbb98fdc817c1cc17bd36d263d03a7a9ce23c0"
+  },
+  {
+    "original": "docs/analysis-core/evidence/p1-native-fields.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/p1-native-fields.md",
+    "original_sha256": "a21452bdf6a07255af8d959b48fd275bea6f5d50e5693de407d59b21ec94ddac"
+  },
+  {
+    "original": "docs/analysis-core/evidence/next-generation-n3.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/next-generation-n3.md",
+    "original_sha256": "ba765f98f5647026f36545477634403712370d3b61b6ef57885cf2763584bc04"
+  },
+  {
+    "original": "docs/analysis-core/evidence/p4-integration.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/p4-integration.md",
+    "original_sha256": "77c8fa1ec8ca0254c03f4c101b30fe52d17b7d5f611ae84b152f299c9b815593"
+  },
+  {
+    "original": "docs/analysis-core/evidence/p3-f-twist.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/p3-f-twist.md",
+    "original_sha256": "53ba321d208682a4403615cba407bd8354c53509db1333228464a8ce3f7341a9"
+  },
+  {
+    "original": "docs/analysis-core/evidence/next-generation-n2.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/next-generation-n2.md",
+    "original_sha256": "dbdff4cfd7d196d94c732b90a3006321d1ceef1c7b5073bd2e56b8de9333a52c"
+  },
+  {
+    "original": "docs/analysis-core/evidence/sampling-thermal-nodes.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/sampling-thermal-nodes.md",
+    "original_sha256": "935da4c80d9cca11533cd9ea580384891f4afed0981bffe51f21b6729593888f"
+  },
+  {
+    "original": "docs/analysis-core/evidence/runtime-execution.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/runtime-execution.md",
+    "original_sha256": "2cf12c38fa15e480b2c40fc92ddf739f85f11872a778c7d190b44068a728f38d"
+  },
+  {
+    "original": "docs/analysis-core/evidence/p3-d-global-slices.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/p3-d-global-slices.md",
+    "original_sha256": "c1b8b582895bfd74e4939b9a6845eedbede0a4be59cc9da7993ca79831db9dcf"
+  },
+  {
+    "original": "docs/analysis-core/evidence/p3-l-scalar-los.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/p3-l-scalar-los.md",
+    "original_sha256": "9613ec057525a44b1782c92da464ea07f359ab9c33fea5b9ef3c583ea941b507"
+  },
+  {
+    "original": "docs/analysis-core/evidence/sampling-reuse-review.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/sampling-reuse-review.md",
+    "original_sha256": "7a471902058eed83762de1ed9f656d04840cb17e6f840f99d0be776cc06bacdf"
+  },
+  {
+    "original": "docs/analysis-core/evidence/direct-preparation.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/evidence/direct-preparation.md",
+    "original_sha256": "4f139becc23a4e802bcc199939658e927dcc5ec3b5c9dc1ac9b4f89e2ff20f27"
+  },
+  {
+    "original": "docs/analysis-core/explorations/sampling-reuse.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/explorations/sampling-reuse.md",
+    "original_sha256": "93cd8553fe7cd8f3ca492c22e900b0a6ffd4c94d9bb1436a559ef50ce57f208d"
+  },
+  {
+    "original": "docs/analysis-core/explorations/paired-vector.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/explorations/paired-vector.md",
+    "original_sha256": "6f2f3874b536b4c5be62d81badcc7fe693001d83f17c3b936c7f188d9abc7f84"
+  },
+  {
+    "original": "docs/analysis-core/explorations/thermal-nodes.md",
+    "archived": "docs/analysis-core/archive/core-development-2026-09-08/explorations/thermal-nodes.md",
+    "original_sha256": "ab6abb08b9ec5c863cc4834ca83d1017673663e202c0bf8c2db3cfe4283b0c92"
+  }
+]

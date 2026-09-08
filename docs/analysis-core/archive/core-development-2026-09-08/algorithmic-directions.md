@@ -4,7 +4,7 @@ Status: preserved research directions, 2026-09-07. The user requested keeping
 these possibilities available to the next development cycle. Inclusion records
 interest and design relevance, not adoption, implementation or simesh performance.
 [Development](development.md) owns when a route is considered and promoted;
-[current](current.md) records any active selection. T01--T18 in
+[current](current-before-freeze.md) records any active selection. T01--T18 in
 [technique candidates](technique-candidates.md) retain their existing scope.
 
 The input remains native block-structured AMR. The routes below exploit its

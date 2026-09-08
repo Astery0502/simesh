@@ -66,9 +66,9 @@ Detailed product distinctions remain in [U08--U12](workflows.md#concrete-workflo
 
 **Evidence:** Present in canonical `get_metadata` and Dataset's separate
 metadata/data loading, and in rewrite's DAT index/forest binding.
-[Canonical I/O](../../src/simesh/amrvac/datio.py),
-[Dataset](../../src/simesh/amrvac/amrvac_dataset.py),
-[rewrite index](../../rewrite/src/simesh_rewrite/amrvac_dat.py).
+[Canonical I/O](../../../../src/simesh/amrvac/datio.py),
+[Dataset](../../../../src/simesh/amrvac/amrvac_dataset.py),
+[rewrite index](../../../../rewrite/src/simesh_rewrite/amrvac_dat.py).
 
 **Conditional judgment:** metadata-first access serves inspection and selective
 requests without obligating field loading. Retaining a compatible index can
@@ -89,9 +89,9 @@ allocate a result for all leaves and selected fields; Dataset currently calls
 the buffered version. Present rewrite DAT-003 uses position-independent reads,
 deduplicated selectors, consecutive field runs for eligible full interiors,
 and per-field byte envelopes for other boxes.
-[Canonical readers](../../src/simesh/amrvac/datio.py),
-[rewrite reader](../../rewrite/src/simesh_rewrite/amrvac_dat_reader.py),
-[scoped read evidence](../../rewrite/evidence/NATIVE-SELECTIVE-AMRVAC-READ.md).
+[Canonical readers](../../../../src/simesh/amrvac/datio.py),
+[rewrite reader](../../../../rewrite/src/simesh_rewrite/amrvac_dat_reader.py),
+[scoped read evidence](../../../../rewrite/evidence/NATIVE-SELECTIVE-AMRVAC-READ.md).
 
 **Conditional judgment:** exact selective reads can save unrelated bytes;
 larger/coalesced reads can save calls at the expense of extra bytes. Mapped
@@ -112,9 +112,9 @@ on the actual storage, not whether `mmap` or `pread` is universally better.
 AMRMesh retains field/geometry/coarse-work storage for bulk ghost and sampling
 operations. Measured WENO resident refresh is much faster than bounded RHC for
 the recorded full-domain request, with different I/O/output work included.
-[Forest](../../src/simesh/utils/lib/amr/forest.pyx),
-[mesh](../../src/simesh/utils/lib/amr/mesh.pyx),
-[comparison](../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md#full-domain-same-width-control).
+[Forest](../../../../src/simesh/utils/lib/amr/forest.pyx),
+[mesh](../../../../src/simesh/utils/lib/amr/mesh.pyx),
+[comparison](../../../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md#full-domain-same-width-control).
 
 **Conditional judgment:** when the selected fields and support fit and many
 dense operations follow, retaining prepared data and relations can amortize
@@ -133,9 +133,9 @@ interchangeable under strict existing contracts.
 **Evidence:** Present rewrite WSP/STO/RHE/RHC mechanisms account for slots, close
 support, reuse workspace and synchronously consume completed primaries. Measured
 local/native workflows demonstrate bounded workspace and capacity trade-offs.
-[Workspace](../../rewrite/src/simesh_rewrite/workspace.py),
-[refined execution](../../rewrite/src/simesh_rewrite/refined_halo.py),
-[local evidence](../../rewrite/evidence/M1-WENO-ASSESSMENT.md).
+[Workspace](../../../../rewrite/src/simesh_rewrite/workspace.py),
+[refined execution](../../../../rewrite/src/simesh_rewrite/refined_halo.py),
+[local evidence](../../../../rewrite/evidence/M1-WENO-ASSESSMENT.md).
 
 **Conditional judgment:** when the active field payload exceeds affordable
 residency, process a useful primary group with its support and consume results
@@ -156,10 +156,10 @@ selected curl windows in full selected-block allocations. Access/valid-region co
 closure already exist. Measured thin-region read amplification shows remaining
 cost. General fine-grained requested-direction/support-only storage improvements
 are Candidate, not delivered by the existence of ROI windows.
-[ROI](../../rewrite/src/simesh_rewrite/region_selection.py),
-[curl consumer](../../rewrite/src/simesh_rewrite/local_field.py),
-[validity boundaries](../../rewrite/FUNCTIONAL_COMPOSITION.md#field-validity-and-halo-composition),
-[thin-query evidence](../../rewrite/evidence/M1-WENO-ASSESSMENT.md).
+[ROI](../../../../rewrite/src/simesh_rewrite/region_selection.py),
+[curl consumer](../../../../rewrite/src/simesh_rewrite/local_field.py),
+[validity boundaries](../../../../rewrite/FUNCTIONAL_COMPOSITION.md#field-validity-and-halo-composition),
+[thin-query evidence](../../../../rewrite/evidence/M1-WENO-ASSESSMENT.md).
 
 **Conditional judgment:** a thin cut or local derived result needs only its
 actual inputs and dependency support; smaller output should avoid unnecessary
@@ -178,10 +178,10 @@ file/block granularity, or avoidable execution, before choosing finer storage.
 descent; point execution groups samples by owner. Cached/bounded sampling has
 scoped measured evidence. Exact adjacency walking and optional spatial indexes
 remain Candidate alternatives.
-[Hints](../../rewrite/src/simesh_rewrite/hinted_location.py),
-[point location](../../rewrite/src/simesh_rewrite/point_location.py),
-[batch sampling](../../rewrite/src/simesh_rewrite/repeated_sampling.py),
-[strategy evidence](../../rewrite/evidence/M1-ANALYSIS-DECISIONS.md).
+[Hints](../../../../rewrite/src/simesh_rewrite/hinted_location.py),
+[point location](../../../../rewrite/src/simesh_rewrite/point_location.py),
+[batch sampling](../../../../rewrite/src/simesh_rewrite/repeated_sampling.py),
+[strategy evidence](../../../../rewrite/evidence/M1-ANALYSIS-DECISIONS.md).
 
 **Conditional judgment:** coherent paths can avoid repeated tree descent;
 many points sharing owners can share preparation. An oblique plane also offers
@@ -200,9 +200,9 @@ after field preparation has been accounted for.
 **Evidence:** Measured CHS retains three-field completed owner halos under a
 byte-budgeted LRU and uses hinted sampling; CQP improves access planning for
 some larger warm batches. WENO records both useful warm reuse and thrashing.
-[Session](../../rewrite/src/simesh_rewrite/completed_halo_sampling.py),
-[cache evidence](../../rewrite/evidence/CACHED-REFINED-VECTOR-SAMPLING.md),
-[WENO cache/trajectory comparisons](../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md).
+[Session](../../../../rewrite/src/simesh_rewrite/completed_halo_sampling.py),
+[cache evidence](../../../../rewrite/evidence/CACHED-REFINED-VECTOR-SAMPLING.md),
+[WENO cache/trajectory comparisons](../../../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md).
 
 **Conditional judgment:** if the snapshot/field/boundary meaning is unchanged
 and reused owners fit, a hit can avoid reading and completing those halos.
@@ -221,9 +221,9 @@ avoided work and retained bytes, not hit rate alone.
 tracks original/derived columns and drops/reloads derived results. CHS is the
 more specialized retained halo example in T07. A general bounded raw-support
 or derived-result cache for rewrite analysis is Candidate.
-[Field lifecycle](../../src/simesh/amrvac/derived_fields.py),
-[columns and reload](../../src/simesh/amrvac/amrvac_dataset.py),
-[reuse boundary](../../rewrite/FUNCTIONAL_COMPOSITION.md#explicit-reuse-and-sessions).
+[Field lifecycle](../../../../src/simesh/amrvac/derived_fields.py),
+[columns and reload](../../../../src/simesh/amrvac/amrvac_dataset.py),
+[reuse boundary](../../../../rewrite/FUNCTIONAL_COMPOSITION.md#explicit-reuse-and-sessions).
 
 **Conditional judgment:** raw support retention could help neighboring owners
 whose completed outputs differ but whose inputs overlap. Derived retention
@@ -243,10 +243,10 @@ work per retained byte for the specific query sequence.
 while preserving per-action geometry checks; CQP adds indexed planning for
 selected cache query shapes. WENO still exposes substantial action-preflight
 and warm dynamic-check costs.
-[Owned preflight](../../rewrite/src/simesh_rewrite/refined_halo.py),
-[query planning](../../rewrite/src/simesh_rewrite/completed_halo_sampling.py),
-[optimization evidence](../../rewrite/evidence/M1-OPTIMIZATION-ROUND.md),
-[remaining costs](../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md).
+[Owned preflight](../../../../rewrite/src/simesh_rewrite/refined_halo.py),
+[query planning](../../../../rewrite/src/simesh_rewrite/completed_halo_sampling.py),
+[optimization evidence](../../../../rewrite/evidence/M1-OPTIMIZATION-ROUND.md),
+[remaining costs](../../../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md).
 
 **Conditional judgment:** many small actions on privately owned or immutable
 state can share established facts rather than repeatedly crossing full checked
@@ -267,9 +267,9 @@ terms into a Cython batch, with retained valid-layer metadata. It still loops
 over derivative terms and appends/rebuilds field storage; it is not universal
 common-subexpression elimination. Rewrite has a concrete fused curl consumer
 and primitive operations.
-[Derived implementation](../../src/simesh/amrvac/derived_fields.py),
-[compiled derivatives](../../src/simesh/utils/lib/amr/mesh.pyx),
-[selected curl](../../rewrite/src/simesh_rewrite/local_field.py).
+[Derived implementation](../../../../src/simesh/amrvac/derived_fields.py),
+[compiled derivatives](../../../../src/simesh/utils/lib/amr/mesh.pyx),
+[selected curl](../../../../rewrite/src/simesh_rewrite/local_field.py).
 
 **Conditional judgment:** compatible operators can share source/halo preparation;
 a concrete fused operation can avoid intermediate arrays and dispatch. Known
@@ -294,9 +294,9 @@ The sum is one unweighted component.
 SLE currently requires
 caller trajectory/integral arrays. General accumulator-only LFE, segmented
 curves, image tiles and streamed surface output are Candidate extensions.
-[Reductions](../../rewrite/src/simesh_rewrite/reductions.py),
-[local outputs](../../rewrite/src/simesh_rewrite/local_field.py),
-[trajectory outputs](../../rewrite/src/simesh_rewrite/field_lines.py).
+[Reductions](../../../../rewrite/src/simesh_rewrite/reductions.py),
+[local outputs](../../../../rewrite/src/simesh_rewrite/local_field.py),
+[trajectory outputs](../../../../rewrite/src/simesh_rewrite/field_lines.py).
 
 **Conditional judgment:** a requested statistic can discard intermediate field
 values, and a large result can be delivered in pieces when the consumer accepts
@@ -315,9 +315,9 @@ remain questions for each product, not one universal streaming interface.
 trajectory coordinates; canonical uniform sampling accepts requested geometry.
 Persistent slice/ray intersection maps and reusable extracted surface geometry
 are Candidate uses, not established public features.
-[Location](../../rewrite/src/simesh_rewrite/point_location.py),
-[sampling](../../rewrite/src/simesh_rewrite/refined_sampling.py),
-[field lines](../../rewrite/src/simesh_rewrite/field_lines.py).
+[Location](../../../../rewrite/src/simesh_rewrite/point_location.py),
+[sampling](../../../../rewrite/src/simesh_rewrite/refined_sampling.py),
+[field lines](../../../../rewrite/src/simesh_rewrite/field_lines.py).
 
 **Conditional judgment:** when positions or extracted geometry stay fixed,
 changing the attribute can reuse geometry/location and fetch just the new
@@ -337,7 +337,7 @@ ROI selection is geometric, not a field-value index. The [workflow catalog](work
 external threshold/contour uses; no implemented native range-summary mechanism
 is established by the inspected canonical/rewrite paths.
 [Desired products](workflows.md#u06-threshold-regions-and-isovolumes),
-[existing geometric selector](../../rewrite/src/simesh_rewrite/region_selection.py).
+[existing geometric selector](../../../../rewrite/src/simesh_rewrite/region_selection.py).
 
 **Conditional judgment:** evaluate the defining/predicate field before unrelated
 attributes; repeated level sweeps might reuse conservative block/subtree ranges
@@ -382,9 +382,9 @@ localization, general diagnostics and endpoint-only output are Candidate.
 The [F contract](pipeline-results.md#f-magnetic-lines-and-along-line-diagnostics)
 owns Q/twist dependencies and coupled-state requirements; existing position/integral
 state does not complete those consumers.
-[Executor](../../rewrite/src/simesh_rewrite/field_lines.py),
-[termination](../../rewrite/src/simesh_rewrite/field_line_termination.py),
-[field-line evidence](../../rewrite/evidence/NATIVE-REFINED-FIELD-LINES.md).
+[Executor](../../../../rewrite/src/simesh_rewrite/field_lines.py),
+[termination](../../../../rewrite/src/simesh_rewrite/field_line_termination.py),
+[field-line evidence](../../../../rewrite/evidence/NATIVE-REFINED-FIELD-LINES.md).
 
 **Conditional judgment:** cheap fixed stepping may serve a known sampling scale;
 adaptive stepping might reduce work for a given trajectory error in a varying
@@ -408,10 +408,10 @@ compiled numerical kernels and batched point/stage execution, while independent
 seed parallelism is now a confirmed delivery target, not yet provided by the
 current serial rewrite session. Its scheduling/cache mechanisms remain open;
 a GPU analysis backend remains Candidate.
-[Canonical kernels](../../src/simesh/utils/lib/amr/mesh.pyx),
-[runtime](../../src/simesh/utils/runtime.py),
-[build documentation](../cython-build.md),
-[rewrite stages](../../rewrite/src/simesh_rewrite/field_lines.py).
+[Canonical kernels](../../../../src/simesh/utils/lib/amr/mesh.pyx),
+[runtime](../../../../src/simesh/utils/runtime.py),
+[build documentation](../../../cython-build.md),
+[rewrite stages](../../../../rewrite/src/simesh_rewrite/field_lines.py).
 
 **Conditional judgment:** compilation can reduce hot-loop/dispatch cost;
 independent blocks, seeds or snapshots may provide parallel work. Batching is
@@ -429,10 +429,10 @@ large enough after preparation costs is still a workload question.
 **Evidence:** Present canonical APIs provide native blocks, exact level-1
 placement, refined uniform sampling, uniform construction, layouts and DAT/VTK
 output. Rewrite provides storage adapters and native/array reference paths.
-[API map](../python-api-map.md),
-[layouts](../../src/simesh/amrvac/layouts.py),
-[uniform operations](../../src/simesh/amrvac/amrvac_uniform.py),
-[rewrite storage](../../rewrite/src/simesh_rewrite/storage.py).
+[API map](../../../python-api-map.md),
+[layouts](../../../../src/simesh/amrvac/layouts.py),
+[uniform operations](../../../../src/simesh/amrvac/amrvac_uniform.py),
+[rewrite storage](../../../../rewrite/src/simesh_rewrite/storage.py).
 
 **Conditional judgment:** deliver native data when the consumer accepts it;
 explicitly resample a bounded patch/resolution when its next operation requires
@@ -452,10 +452,10 @@ choosing persistent transformed storage.
 convolution for the same discrete Green-kernel model; tests compare the paths.
 Existing magnetic configuration helpers evaluate dipole/bipolar/flux-rope
 models and uniform curl. No fresh speed or accuracy run is claimed here.
-[Potential field](../../src/simesh/tools/potential_field.py),
-[tests](../../tests/tools/test_potential_field.py),
-[model definitions](../potential-field-tools.md),
-[configurations](../../src/simesh/utils/configurations.py).
+[Potential field](../../../../src/simesh/tools/potential_field.py),
+[tests](../../../../tests/tools/test_potential_field.py),
+[model definitions](../../../potential-field-tools.md),
+[configurations](../../../../src/simesh/utils/configurations.py).
 
 **Conditional judgment:** a specific operator can have a useful algorithmic
 alternative beyond storage/caching choices. Shared geometry or bottom-field
@@ -481,6 +481,6 @@ combining selected mechanisms could help.
 
 This inventory preserves evidence and conditional alternatives. Narrow the
 consumer and the uncertainty that can change a choice before applying the
-[decision workflow](README.md#how-a-decision-advances) and
+[decision workflow](historical-index.md#how-a-decision-advances) and
 [measurement policy](performance.md). No universal cache stack, dispatcher or
 new completion claim follows from these records.

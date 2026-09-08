@@ -37,6 +37,16 @@ selected fields fit. Reuse unchanged reads, geometry, support and computed field
 when it saves actual work. Uniform materialization is an optional output.
 Selectivity, chunking, caching and parallelism are strategies to evaluate.
 
+## Current Optimization Priority
+
+The 2026-09-08 consolidation prioritizes complete elapsed time for substantial
+preparation and long-running analyses, including single-node parallel kernels.
+The ordinary workflow selects fields and coverage, prepares once, and consumes
+shared immutable fields repeatedly. Keep inexpensive geometry and orchestration
+simple and convenient. Optimize them only when their aggregate cost becomes
+material in a real workload; do not add policies for isolated tiny timings.
+Bounded access remains available, but does not dictate the resident workflow.
+
 ## Operating Envelope
 
 - Typical snapshots are 10--20 GB on personal PCs with RAM in the teens to
@@ -96,6 +106,19 @@ such costs under [performance.md](performance.md#cpu-and-device-comparisons).
 
 ## Scope And Migration
 
+The confirmed next-generation direction is to build an independent simesh under
+the repository-root `analysis-core/` directory. Derive its architecture and public
+interfaces from this intent, the shared and consumer specifications, and the
+existing cost assessments. Include the latest accepted worktree implementations
+and the analysis-core exploration assets, preserving their evidence and adoption
+status. Existing package boundaries do not prescribe the new structure.
+See the [development scope and pinned sources](next-generation.md).
+
+This supersedes the earlier implementation scope restricted to extending the
+existing `simesh.analysis` package. Preserve existing implementations as assets
+and comparators while the independent generation is developed. Research inclusion
+does not automatically promote every candidate to a production default.
+
 The computational core delivers scientific arrays, samples, curves, geometry
 and reductions to Python and visualization consumers. GUI/rendering, HD/MHD
 time evolution, arbitrary unstructured input meshes and a universal scientific
@@ -113,7 +136,7 @@ a separate, unselected adapter extension; the current bridge does not provide it
 
 Every supported observable source feature needs an explicit rewrite, adapter,
 retain, replace, retire or unsupported disposition under the
-[migration ledger](../../rewrite/SOURCE_MIGRATION.md). Existing code is evidence,
+[migration ledger](../../../../rewrite/SOURCE_MIGRATION.md). Existing code is evidence,
 not a file-by-file port list. Before changing a public workflow, identify which
 signatures, defaults, layouts, output bytes and failures are preserved or
 intentionally changed, with compatibility evidence.
@@ -125,6 +148,6 @@ a dynamic expression language, JIT and code generation remain out of scope until
 several real kernels establish a shared need. Existing coarse-grained storage
 and consumer callbacks retain their own scope.
 
-Use the [decision workflow](README.md#how-a-decision-advances) for incremental,
+Use the [decision workflow](historical-index.md#how-a-decision-advances) for incremental,
 recoverable work and material review. Current spec work does not initiate an
 automatic implementation loop or alter historical completion claims.

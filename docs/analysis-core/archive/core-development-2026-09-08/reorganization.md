@@ -24,7 +24,7 @@ Physical field dependencies and exact operator reach remain part of each contrac
 
 | Previous content | Current primary location | Editorial action |
 | --- | --- | --- |
-| README organizing model, repeated checkpoint summaries and ownership list | [README](README.md) | Replace discussion chronology with the reading path, shared geometric model and status vocabulary |
+| README organizing model, repeated checkpoint summaries and ownership list | [README](historical-index.md) | Replace discussion chronology with the reading path, shared geometric model and status vocabulary |
 | Intent goals, baseline status prose and workflow priority/scale repetitions | [Intent](intent.md) | Consolidate priorities, operating envelope, engineering constraints and scope; retain compatibility/portability obligations |
 | Prepared-fields model; baseline common contract; workflow field dependencies, checks, local derivation, memory/reuse rules; lifetime draft constraints | [Shared spec](prepared-fields.md) | Merge into request/geometry, field meaning, block views, reach, preparation, lifetime, reuse and parallel requirements |
 | F/D/L result draft plus U03/U04/U07 and along-field numerical details | [Consumer spec](pipeline-results.md) | Organize by geometric access then scientific result/acceptance; keep stand-alone slice geometry in U04 |

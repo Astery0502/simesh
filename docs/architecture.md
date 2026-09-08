@@ -1,9 +1,9 @@
 # Architecture
 
-This page maps existing implementation layers. The next analysis core's
-project-level requirements live in [analysis-core](analysis-core/README.md);
-existing simesh and rewrite layouts are evidence rather than prescribed future
-architecture. See [prepared fields](analysis-core/prepared-fields.md).
+This page maps the parent package's implementation layers. The independent N4
+core has a [fixed design](analysis-core/next-generation-design.md); new application
+work starts with its [application guide](analysis-core/application-development.md).
+Earlier architecture investigations remain in the [archive](analysis-core/archive/README.md).
 
 ## Project goal
 

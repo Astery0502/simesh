@@ -4,7 +4,7 @@ Requirement/evidence baseline, updated 2026-09-07. [Intent](intent.md) owns
 confirmed goals; [prepared fields](prepared-fields.md) owns shared semantics;
 [consumer results](pipeline-results.md) owns F/D/L obligations. This page records
 what is still undecided and what existing work can support. Confirmation does
-not mean implementation. [Current](current.md) owns active scope/state and
+not mean implementation. [Current](current-before-freeze.md) owns active scope/state and
 [development](development.md) owns progression. The latest user instruction
 governs authorization; this baseline is not a competing execution checkpoint.
 
@@ -17,7 +17,7 @@ governs authorization; this baseline is not a competing execution checkpoint.
 | Required F/D/L results and scientific acceptance | [Consumer spec](pipeline-results.md) |
 | Open numerical/representation/resource choices | [Decision table below](#open-decisions) |
 | Candidate mechanisms and compositions | [Techniques](technique-candidates.md), [algorithmic routes](algorithmic-directions.md), [usage sequences](lifetime-sketches.md) |
-| Delivered historical behavior and migration closure | [Capabilities](../../rewrite/CAPABILITIES.md), [contracts](../../rewrite/contracts/README.md), [migration](../../rewrite/SOURCE_MIGRATION.md) |
+| Delivered historical behavior and migration closure | [Capabilities](../../../../rewrite/CAPABILITIES.md), [contracts](../../../../rewrite/contracts/README.md), [migration](../../../../rewrite/SOURCE_MIGRATION.md) |
 
 Supported-feature integration, geometry products, full diagnostic compositions
 and actual parallel execution remain delivery work. They are not all prerequisites
@@ -52,12 +52,12 @@ records stay in [T01--T18](technique-candidates.md#candidate-technique-records).
 
 | Evidence | Established finding | Design implication and limit |
 | --- | --- | --- |
-| [WENO full-domain control](../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md#full-domain-same-width-control) | All 22,614 leaves, three fields, two layers: resident canonical refresh median 0.309 s; bounded RHC 38.202 s including reads/copies; separate action preflight 23.345 s | Preserve the resident comparison and investigate preparation overhead. Different I/O/output envelopes and a first-sample outlier prevent an isolated kernel-speedup claim; nested times are not additive |
-| [Thin query](../../rewrite/evidence/M1-WENO-ASSESSMENT.md) | 2.996 MB selected values required 116.048 MB reads at capacity 57; HPR gives little benefit in that all-SAME case | Separate mathematical support from block/read amplification; a small result does not imply small work |
-| [Sampling/cache controls](../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md#sampling-and-cache-feasibility) | Fitting completed-neighborhood caches avoid warm reads/fills; smaller capacities thrash; resident warm sampling remains cheaper in its own prepared state | Retained artifact and working-set fit matter. Include initial preparation and cache copies, not hit rate alone |
-| [Short trajectories](../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md#trajectory-costs) | Eight seeds/eight steps show a strong cache-capacity effect; warm dynamic checks/sampling boundaries outweigh RK arithmetic | Useful control for organization costs, not long-path, million-seed or parallel proof |
-| [HPR/CQP round](../../rewrite/evidence/M1-OPTIMIZATION-ROUND.md) | Owned preflight and query planning improve selected compositions while preserving existing numerical rules | Reuse proven facts within their owned lifetime; gains are workload-dependent |
-| [Native selective reads](../../rewrite/evidence/NATIVE-SELECTIVE-AMRVAC-READ.md) | Supported exact selectors and native source access | Useful adapter evidence; outer regional-product and non-leaf selection contracts still need composition |
+| [WENO full-domain control](../../../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md#full-domain-same-width-control) | All 22,614 leaves, three fields, two layers: resident canonical refresh median 0.309 s; bounded RHC 38.202 s including reads/copies; separate action preflight 23.345 s | Preserve the resident comparison and investigate preparation overhead. Different I/O/output envelopes and a first-sample outlier prevent an isolated kernel-speedup claim; nested times are not additive |
+| [Thin query](../../../../rewrite/evidence/M1-WENO-ASSESSMENT.md) | 2.996 MB selected values required 116.048 MB reads at capacity 57; HPR gives little benefit in that all-SAME case | Separate mathematical support from block/read amplification; a small result does not imply small work |
+| [Sampling/cache controls](../../../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md#sampling-and-cache-feasibility) | Fitting completed-neighborhood caches avoid warm reads/fills; smaller capacities thrash; resident warm sampling remains cheaper in its own prepared state | Retained artifact and working-set fit matter. Include initial preparation and cache copies, not hit rate alone |
+| [Short trajectories](../../../../rewrite/evidence/M1-WENO-REFERENCE-COMPARISON.md#trajectory-costs) | Eight seeds/eight steps show a strong cache-capacity effect; warm dynamic checks/sampling boundaries outweigh RK arithmetic | Useful control for organization costs, not long-path, million-seed or parallel proof |
+| [HPR/CQP round](../../../../rewrite/evidence/M1-OPTIMIZATION-ROUND.md) | Owned preflight and query planning improve selected compositions while preserving existing numerical rules | Reuse proven facts within their owned lifetime; gains are workload-dependent |
+| [Native selective reads](../../../../rewrite/evidence/NATIVE-SELECTIVE-AMRVAC-READ.md) | Supported exact selectors and native source access | Useful adapter evidence; outer regional-product and non-leaf selection contracts still need composition |
 
 The WENO comparison uses a bridge of ordinary fields from records with staggered
 tails and reports its construction cost. Application-cleared/warm state is not
@@ -99,7 +99,7 @@ Each selected design names which affected rows it delivers, protects or defers.
 ## Open Decisions
 
 The rows below are the decision inventory. Active resolutions and remaining
-gaps are in [native-core-design.md](native-core-design.md) and [current.md](current.md);
+gaps are in [native-core-design.md](native-core-design.md) and [current.md](current-before-freeze.md);
 the initial structural S1--S5 selections and first F profile now have executable
 evidence. Listing a later technique does not promote it. Application rows own
 their numerical questions; S rows own the shared boundary.
@@ -146,7 +146,7 @@ This is a recommendation, not an activated implementation group.
 
 Before implementation, resolve the applicable F1/S6 details, serial reference,
 parallel preparation/ownership and evidence/resource plan through the
-[decision workflow](README.md#how-a-decision-advances). D/L boundary needs must
+[decision workflow](historical-index.md#how-a-decision-advances). D/L boundary needs must
 be protected; their full implementations need not precede an isolated F result.
 Use practical initial seed sizes and suitable resources for later scale claims.
 

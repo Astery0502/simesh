@@ -4,9 +4,9 @@
 
 This document records boundaries for the existing rewrite implementation.
 The new project-level shared boundary is in
-[prepared fields](../docs/analysis-core/prepared-fields.md); old representations
+[prepared fields](../docs/analysis-core/archive/core-development-2026-09-08/prepared-fields.md); old representations
 remain scoped reference contracts. Product goals are in
-[intent.md](../docs/analysis-core/intent.md); concrete signatures and guarantees remain in contracts.
+[intent.md](../docs/analysis-core/archive/core-development-2026-09-08/intent.md); concrete signatures and guarantees remain in contracts.
 
 | Boundary | Responsibility | Examples |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ synthesis. Observation-defined ray/image accumulation need not use the magnetic
 trajectory executor. Q/twist are magnetic-line consumers: request derivative
 fields and coupled auxiliary state as their method needs, without making the
 independent whole-domain current pipeline a prerequisite. Detailed result needs
-are in [THREE-PIPELINE-RESULTS](../docs/analysis-core/pipeline-results.md).
+are in [THREE-PIPELINE-RESULTS](../docs/analysis-core/archive/core-development-2026-09-08/pipeline-results.md).
 
 ## Semantics, Buffer Protocols, And Strategies
 

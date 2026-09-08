@@ -1,10 +1,9 @@
 # Functional AMR Rewrite
 
-Future project-level analysis-core planning now starts at
-[docs/analysis-core](../docs/analysis-core/README.md), including the paired
-[ghost/prepared-data contract](../docs/analysis-core/prepared-fields.md).
-This tree retains rewrite implementation, scoped contracts and evidence;
-its historical layout and milestone sequence do not select the new architecture.
+The independent N4 core is fixed; application development starts at
+[docs/analysis-core](../docs/analysis-core/README.md). This tree retains the older
+rewrite implementation, contracts and evidence. Its historical plans and the
+archived project procedures below are not the active application-development workflow.
 
 An isolated development and validation tree for a functional AMR computational
 core and eventual supported-feature migration into `simesh`.
@@ -19,9 +18,9 @@ silently weakening numerical contracts.
 The corrected user priorities are independent magnetic tracing with Q/twist
 and optional retained lines, whole-domain current/gradient analysis followed by slices,
 and full-domain local-response LOS synthesis. Target scale and their minimal
-result contracts are in [THREE-PIPELINE-RESULTS](../docs/analysis-core/pipeline-results.md).
+result contracts are in [THREE-PIPELINE-RESULTS](../docs/analysis-core/archive/core-development-2026-09-08/pipeline-results.md).
 
-The [analysis intent catalog](../docs/analysis-core/workflows.md) starts from user results:
+The [analysis intent catalog](../docs/analysis-core/archive/core-development-2026-09-08/workflows.md) starts from user results:
 fast local/global reads and halos, magnetic lines, slices, isosurfaces and
 isovolumes, plus explicitly labeled adjacent analysis candidates. It spells out
 fields, spatial access, reuse and acceptance for twelve workflow families.
@@ -32,9 +31,9 @@ one execution strategy is not a default answer to every request.
 
 Read [AGENTS.md](AGENTS.md) for the task-based authority map. Each development
 cycle starts with [CURRENT.md](CURRENT.md). For spec convergence or selection,
-use [baseline.md](../docs/analysis-core/baseline.md) before [CAPABILITIES.md](CAPABILITIES.md) and the
+use [baseline.md](../docs/analysis-core/archive/core-development-2026-09-08/baseline.md) before [CAPABILITIES.md](CAPABILITIES.md) and the
 selected design/contract. New contributors also read
-[intent.md](../docs/analysis-core/intent.md). Do not reconstruct all historical work on every turn.
+[intent.md](../docs/analysis-core/archive/core-development-2026-09-08/intent.md). Do not reconstruct all historical work on every turn.
 
 The active task is spec convergence, with implementation paused by the user's
 scope. BASELINE now recommends specifying the three mainlines before a bounded
@@ -45,25 +44,25 @@ are not an automatic execution queue. CURRENT is the live checkpoint authority.
 
 ## Documentation Map
 
-- [intent.md](../docs/analysis-core/intent.md): product intent, durable engineering constraints, scope.
-- [baseline.md](../docs/analysis-core/baseline.md): current development baseline, asset dispositions,
+- [intent.md](../docs/analysis-core/archive/core-development-2026-09-08/intent.md): product intent, durable engineering constraints, scope.
+- [baseline.md](../docs/analysis-core/archive/core-development-2026-09-08/baseline.md): current development baseline, asset dispositions,
   requirement-to-capability/evidence mapping, open decisions and entry conditions.
-- [workflows.md](../docs/analysis-core/workflows.md): representative user requests and
+- [workflows.md](../docs/analysis-core/archive/core-development-2026-09-08/workflows.md): representative user requests and
   scientific/resource acceptance.
-- [technique-candidates.md](../docs/analysis-core/technique-candidates.md): open mapping from usage
+- [technique-candidates.md](../docs/analysis-core/archive/core-development-2026-09-08/technique-candidates.md): open mapping from usage
   conditions and required properties to candidate techniques, source evidence
   and gaps; no combined architecture or implementation selection.
-- [Analysis lifetimes](../docs/analysis-core/lifetime-sketches.md): draft ownership/reuse
+- [Analysis lifetimes](../docs/analysis-core/archive/core-development-2026-09-08/lifetime-sketches.md): draft ownership/reuse
   constraints, three continuous usage sequences, candidate execution sketches
   and optionality costs; no frozen architecture or implementation.
-- [Three pipeline results](../docs/analysis-core/pipeline-results.md): corrected F/D/L
+- [Three pipeline results](../docs/analysis-core/archive/core-development-2026-09-08/pipeline-results.md): corrected F/D/L
   requirements, scientific dependencies, known scale and remaining spec decisions.
 - [FUNCTIONAL_COMPOSITION.md](FUNCTIONAL_COMPOSITION.md): fields/validity,
   storage, sessions, execution, and compute substitution boundaries.
 - [DECOMPOSITION.md](DECOMPOSITION.md): semantic responsibility and refinement.
 - [WORKFLOW.md](WORKFLOW.md): one design record, exploration, development,
   optional targeted review, focused validation, and checkpoints.
-- [performance.md](../docs/analysis-core/performance.md): evidence classes, baselines, complete
+- [performance.md](../docs/analysis-core/archive/core-development-2026-09-08/performance.md): evidence classes, baselines, complete
   resources, host/device comparisons, and regression/stopping rules.
 - [WENO-REFERENCE.md](WENO-REFERENCE.md): the explicit feature-completion real-data
   profile, fixed cases, comparator scope and feasibility budgets; not routine tests.

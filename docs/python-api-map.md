@@ -157,8 +157,9 @@ The additive `simesh.analysis` namespace provides `open_source`, `open_prepared`
 `integrate_los`/`integrate_los_views`/`orthographic_plane`, `iter_uniform`,
 `global_curl_file`, `build_fill_plan`/`FillPlan`, and the explicit `AIA171` thermal
 workflow (`thermal_fields`, `emissivity_fields`, `integrate_thermal_los`). These do not redirect
-canonical Dataset or file-level APIs. See [usage](analysis-core/usage.md) and
-[current acceptance](analysis-core/current.md) before choosing them.
+canonical Dataset or file-level APIs. See [usage](analysis-core/archive/core-development-2026-09-08/usage.md) and
+[historical acceptance](analysis-core/archive/core-development-2026-09-08/current-before-freeze.md)
+before choosing those parent-package interfaces.
 
 File convenience functions are implemented in `amrvac/analysis_io.py` and lazily
 load the explicitly bundled `simesh_rewrite` provider. They support nonperiodic

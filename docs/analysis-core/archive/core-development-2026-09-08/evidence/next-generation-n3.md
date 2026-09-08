@@ -23,8 +23,8 @@ N3 已完成以下既有科学与执行能力的独立接入：
 
 N2 的 coordinate-phase v2 边界修正和 Source/准备、存储偏移/有效支撑分离继续
 保留。N3 没有另选重构或重启 E1 重分块、历史已回退缓存方案。实际来源和适配
-列在新包 [ASSETS.md](../../../analysis-core/ASSETS.md)，公开调用见
-[README](../../../analysis-core/README.md)。
+列在新包 [ASSETS.md](../../../../../analysis-core/ASSETS.md)，公开调用见
+[README](../../../../../analysis-core/README.md)。
 
 ## 核心行为和独立构建
 

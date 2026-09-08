@@ -3,7 +3,7 @@
 This page owns how the next analysis core advances from design to useful software,
 how research enters that work, and how decisions survive long runs and handoffs.
 It implements the user's preference for design-led development with less routine
-supervision. [Current](current.md) owns the actual active scope and next action.
+supervision. [Current](current-before-freeze.md) owns the actual active scope and next action.
 This process document is not itself a request to launch an implementation or a
 background job; later user instructions can activate and extend that scope.
 
@@ -24,7 +24,7 @@ specified first.
 
 ## Start And Resume
 
-At the beginning of analysis-core work, read [current.md](current.md), inspect the
+At the beginning of analysis-core work, read [current.md](current-before-freeze.md), inspect the
 actual checkout/diff and follow the active decision's links. Read this workflow
 when starting a stage or changing its scope. Consult intent/shared requirements
 and the affected consumer, design or research record; do not reconstruct the whole
@@ -105,7 +105,7 @@ is credible; an unrestricted implementation shootout is not the default design
 method. Small F/D/L consumers validate the selected boundary and its promises;
 complete implementations of all three are not prerequisites for P1.
 
-The selected stage uses the existing [single design record](README.md#how-a-decision-advances).
+The selected stage uses the existing [single design record](historical-index.md#how-a-decision-advances).
 Keep detailed arrays and function contracts with that design; current.md stores
 the active choice, links and completion state. Before numerical implementation,
 name the reference arithmetic/transfer strategy and physical boundary interpretation.
@@ -198,7 +198,7 @@ or loses its intended trade-off, fix it, revert only its owned changes, or defer
 it with a concrete reopen condition. Preserve the comparison and reason so a
 later task does not repeat the same failed direction. Record the result, cause,
 retain/fix/redesign/defer decision and next action in the existing design/evidence
-and [current.md](current.md), without another approval packet. After rollback,
+and [current.md](current-before-freeze.md), without another approval packet. After rollback,
 align active implementation/status with the restored version; keep undelivered
 revised requirements explicitly open. Continue within the authorized endpoint
 once the actual issue is resolved; optional independent
@@ -219,7 +219,7 @@ not as three suites to run for every change:
 | Declared target-scale/resource cases | The actual input/output/worker envelope being claimed | Scientific accuracy without the corresponding numerical references |
 
 The verified local specimen is `data/weno509_sub_0000.dat`, whose
-[profile](../../rewrite/WENO-REFERENCE.md#fixture-contract) records 22,614 leaves
+[profile](../../../../rewrite/WENO-REFERENCE.md#fixture-contract) records 22,614 leaves
 and levels 3--6. The spoken names "vino/weno-511" have not identified another
 local fixture; do not silently rename this file or transfer its measurements to
 a different snapshot. A later identified file gets its own recorded profile.

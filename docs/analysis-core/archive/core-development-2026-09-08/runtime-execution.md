@@ -2,7 +2,7 @@
 
 Status: locally complete, 2026-09-08. The user instruction reopened execution backends,
 parallel scheduling and finite numerical reuse under the existing native layout.
-Read [current](current.md), [development](development.md),
+Read [current](current-before-freeze.md), [development](development.md),
 [prepared fields](prepared-fields.md) and [performance](performance.md).
 
 ## Scope And Evidence Separation
@@ -18,7 +18,7 @@ same-budget backend comparisons.
 This round measured sparse F, dense whole-domain curl plus slices, and repeated
 scalar LOS with unchanged numerical requirements and output. AIA response,
 rebricking and persistent geometry plans were developed independently and are
-now integrated in the same checkout; see [current](current.md). Their evidence
+now integrated in the same checkout; see [current](current-before-freeze.md). Their evidence
 remains separate from these runtime measurements. Planned preparation can use
 the retained raw-value cache and the same source-lifetime checks; it does not
 automatically replace pool miss scheduling or thermal ray dispatch.

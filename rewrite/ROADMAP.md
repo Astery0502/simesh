@@ -8,8 +8,8 @@ This document owns stage outcomes and sequencing. CAPABILITIES owns exact member
 status; CURRENT owns the active group. Each stage must have a useful composed
 result and the scientific/resource acceptance in ANALYSIS_WORKLOADS.
 
-Current selection authority is [baseline.md](../docs/analysis-core/baseline.md): spec convergence only,
-with [three pipeline result contracts](../docs/analysis-core/pipeline-results.md) to close
+Current selection authority is [baseline.md](../docs/analysis-core/archive/core-development-2026-09-08/baseline.md): spec convergence only,
+with [three pipeline result contracts](../docs/analysis-core/archive/core-development-2026-09-08/pipeline-results.md) to close
 before a proposed independent-seed parallel tracing outcome, not an active group. The old
 repeated-sampling phase suggestion is superseded. F tracing/Q/twist and D global
 current/gradient-to-slice have similar priority, F slightly preferred; L full-domain
@@ -20,7 +20,7 @@ milestone families remain history and a dependency/compatibility horizon, not an
 automatic execution queue. No implementation starts under the current task.
 
 The 2026-09-07 intent clarification precedes selecting another implementation.
-Use the [workflow catalog](../docs/analysis-core/workflows.md) to name the result and matching
+Use the [workflow catalog](../docs/analysis-core/archive/core-development-2026-09-08/workflows.md) to name the result and matching
 baseline first. Fast dense/resident analysis, slices, isosurfaces and isovolumes
 join the explicit product outcomes; adjacent candidates remain unscheduled.
 This is an intent checkpoint, not a new execution plan or a change to completed

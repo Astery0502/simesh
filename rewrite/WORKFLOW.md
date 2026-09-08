@@ -2,7 +2,7 @@
 
 These detailed rules describe development of existing rewrite capabilities.
 New project-level analysis-core planning uses the
-[project decision workflow](../docs/analysis-core/README.md#how-a-decision-advances);
+[historical project decision workflow](../docs/analysis-core/archive/core-development-2026-09-08/historical-index.md#how-a-decision-advances);
 it does not automatically inherit this tree's groups or milestone sequence.
 
 This document owns the development cycle, exploration record, review, and
@@ -11,7 +11,7 @@ DECOMPOSITION owns boundary analysis; PERFORMANCE owns measurement policy.
 
 ## Select And Resume Work
 
-For a new outcome, use [baseline.md](../docs/analysis-core/baseline.md) to select by confirmed user
+For a new outcome, use [baseline.md](../docs/analysis-core/archive/core-development-2026-09-08/baseline.md) to select by confirmed user
 requirements and current gaps, then map the selected design to its affected R
 rows. State delivered/protected/deferred scope and the matching evidence there;
 reuse this single record rather than add a reporting layer. A historical
@@ -44,7 +44,7 @@ Use [DECOMPOSITION](DECOMPOSITION.md) as optional design questions when ownershi
 or coupling is unclear. There is no mandatory five-question audit, split rule,
 independent-review gate or requirement to invent a competing implementation.
 Choose checks through the project
-[verification policy](../docs/analysis-core/performance.md#choose-the-smallest-useful-check).
+[verification policy](../docs/analysis-core/archive/core-development-2026-09-08/performance.md#choose-the-smallest-useful-check).
 Direct inspection is enough when it resolves the question. Measure a real
 consumer when performance is at issue; do not create a benchmark merely to
 complete a form.
@@ -76,7 +76,7 @@ Prefer an existing focused consumer check. Add a test only for a meaningful
 uncovered core case; metadata descriptions, incidental helper-call order and
 simple unchanged quantity formulas normally need direct reading only. Multiple
 helpers can be protected by one representative composition. Follow the project
-[smallest-useful-check rule](../docs/analysis-core/performance.md#choose-the-smallest-useful-check).
+[smallest-useful-check rule](../docs/analysis-core/archive/core-development-2026-09-08/performance.md#choose-the-smallest-useful-check).
 
 Update CURRENT and continue once the relevant evidence is adequate. Reuse passing
 checks; broaden only for new changes, failures, cross-consumer impact or unresolved
@@ -100,7 +100,7 @@ not stylistic purity. Historical tests and measurements keep their original scop
 Default to one agent and direct source/contract/diff inspection. Use an independent
 sub-agent review only for a specific unresolved core question where another
 technical perspective is useful, following the project
-[review rule](../docs/analysis-core/development.md#autonomous-decisions-and-user-judgments).
+[review rule](../docs/analysis-core/archive/core-development-2026-09-08/development.md#autonomous-decisions-and-user-judgments).
 Contract, layout or milestone changes do not automatically require review.
 
 State the question and resolve real findings. Review does not substitute for

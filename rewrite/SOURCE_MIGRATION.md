@@ -2,7 +2,7 @@
 
 The 2026-09-08 analysis-core integration is additive. Its actual source-family
 dispositions and compatibility evidence are recorded in
-[P4 integration](../docs/analysis-core/evidence/p4-integration.md). Canonical
+[P4 integration](../docs/analysis-core/archive/core-development-2026-09-08/evidence/p4-integration.md). Canonical
 defaults remain available; that delivery does not claim this ledger's final
 cutover or retroactively complete historical M2--M7 milestones.
 
@@ -14,7 +14,7 @@ production integration decision. The new functional implementation must carry
 the declared supported behavior before the current computational path is
 retired.
 
-[baseline.md](../docs/analysis-core/baseline.md) separately assesses what to retain, adapt, reconsider
+[baseline.md](../docs/analysis-core/archive/core-development-2026-09-08/baseline.md) separately assesses what to retain, adapt, reconsider
 or use as reference on the new path. Those roles are not migration closure:
 all rows and public compatibility obligations here keep their existing status.
 Milestone labels below identify dependency/closure families, not current priority.

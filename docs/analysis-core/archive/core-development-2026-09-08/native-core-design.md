@@ -5,12 +5,61 @@ and [pipeline-results](pipeline-results.md). This is the implementation decision
 record. Selection is not a completion claim.
 
 The runtime and thermal/geometry branches are now integrated in one checkout.
-[Current status](current.md) owns recovery and remaining acceptance;
+[Current status](current-before-freeze.md) owns recovery and remaining acceptance;
 [runtime execution](runtime-execution.md) owns the retained cache/backend choices.
 Later sections preserve their original experimental scope. Optional geometric
 plans coexist with source value validation and raw-value caching; nonlinear
 thermal rays retain their resident dispatch and share the native inline sampler.
 No production rebricking or automatic persistent plan policy is selected.
+
+## Direct Prepared Workflow Update
+
+The subsequent pipeline round adopts contiguous full-record reads for the owned
+full-domain `open_prepared` path. Record headers/lengths and source identity are
+checked; uniform stored shapes use strided batch views, and mixed shapes use
+per-record decoding within the same read buffer. Integer-bit transfers preserve
+native float64 payloads, including endian conversion and nonfinite bit patterns.
+This changes file transfer granularity without changing halo or consumer math.
+
+The existing AMRMesh/forest owner and MeshIndex remain retained. Measured
+connectivity arrays are about 10.7 MB and consumer geometry about 4.9 MB in WENO;
+forest/connectivity construction is about 20 ms. Those costs do not justify
+another geometry cache or an API rewrite. Full pipeline estimates and acceptance
+are in [pipeline evidence](evidence/pipeline.md). Additional storage policies and
+microsecond-level interface optimization remain outside this round.
+
+The 2026-09-08 follow-up prioritizes preparation and computation efficiency over
+additional storage policies. Full-domain `open_prepared` retains canonical bulk
+preparation. Its optional physical `bounds`, and `prepare_region` on a source,
+prepare complete intersecting leaves once with original-mesh two-halo support.
+The detached group supplies repeated consumers. It has no automatic growth,
+and its block-expanded coverage is distinct from a physical cut boundary.
+
+The analysis provider now owns a direct batch loop around the retained transfer
+primitives. Source construction validates immutable forest geometry, all-touch
+2:1 balance and even block extents of at least four. Each fill validates selected
+fields/leaves, destination layout and nonoverlap, and source lifetime. It binds
+each support batch once, retains active slot guards and checked source reads,
+then applies the same exact-phase/minmod transfers into private storage.
+It no longer invokes the standalone RHC all-request preflight/consumer protocol.
+`prepare` publishes only after all batches succeed; pool misses still invalidate
+overwritten slots before filling and publish new keys only after success.
+This changes orchestration, not the old rewrite entrypoints or their guarantees.
+
+`global_curl` traverses fixed preparation batches directly without LRU/borrow
+state. Its caller-output partial-failure behavior and independent derived result
+remain unchanged. Resident users can call `curl` on their existing prepared B.
+
+Tracing retains a per-seed leaf-node hint inside the compiled advance. Exact
+half-open node bounds admit subsequent RK samples without a new tree traversal;
+crossings fall back to the original locator. The final RK proposal only checks
+the physical domain; field ownership is resolved when its next sample needs it.
+There is no change to RK arithmetic, interpolation, accepted-prefix semantics,
+twist quadrature, retained trajectories or missing-coverage behavior.
+
+Read [current](current-before-freeze.md) for validation and measurements. Coarse-workspace
+release, geometry-owner consolidation and additional storage policies are deferred.
+Older sections below preserve their historical implementation/evidence scope.
 
 ## P0 Decisions
 
@@ -47,7 +96,7 @@ keep private RK/ray state and write disjoint outputs. Parallel misses return to
 the coordinator at defined continuation boundaries. Do not share serial CHS.
 Resident work bypasses cache maintenance.
 
-S6: limits and fixture are in [current](current.md). Initial acceptance uses exact
+S6: limits and fixture are in [current](current-before-freeze.md). Initial acceptance uses exact
 selection/slot conformance plus independent affine/constant/mixed-interface
 examples. WENO finite comparisons retain `rtol=atol=1e-10` from the established
 comparison profile; report nonfinite classifications separately. This is an

@@ -54,7 +54,7 @@ and divergent seeds are useful controls against assumed locality.
 
 ### An Existing Reuse Opportunity At The Call Boundary
 
-[Tracing](../../src/simesh/analysis/field_lines.py) creates a temporary curl
+[Tracing](../../../../src/simesh/analysis/field_lines.py) creates a temporary curl
 companion when `trace(B, ..., twist=True)` receives plain prepared B or a plain
 primary pool. Repeating that convenience call retains B but can recompute curl.
 For repeated diagnostics, retain `with_curl(B)` or one `CurlPool(primary)` and
@@ -71,10 +71,10 @@ trajectory/image outputs still count toward the whole sequence's memory budget.
 **Judgment: an application-level ownership boundary, with a concrete resident
 adapter limitation. Prioritize A and resident D.**
 
-[The resident adapter](../../src/simesh/amrvac/analysis.py) exposes the canonical
+[The resident adapter](../../../../src/simesh/amrvac/analysis.py) exposes the canonical
 padded C buffer without repacking and anchors the whole `AMRMesh` owner in its
 NumPy backing. That owner retains the coarse workspace along with values.
-[AMRMesh](../../src/simesh/utils/lib/amr/mesh.pyx) frees both allocations on
+[AMRMesh](../../../../src/simesh/utils/lib/amr/mesh.pyx) frees both allocations on
 destruction. This is safe ownership but retains preparation-only storage during
 later readonly consumption. The independent raw input can already be released
 after `open_prepared`; do not count it as a mandatory permanent duplicate.

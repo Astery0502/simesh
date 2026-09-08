@@ -1,6 +1,6 @@
 # Experimental Native Analysis Usage
 
-Use [current](current.md) for the exact delivered stage and unresolved gates.
+Use [current](current-before-freeze.md) for the exact delivered stage and unresolved gates.
 Canonical `simesh.amrvac` APIs remain available. The new numerical kernels build
 with the standard setuptools discovery under `src/simesh/utils/lib/analysis`:
 
@@ -18,18 +18,53 @@ including validated staggered tails. The original DAT-003 factory still rejects
 staggered files. Source arrays/file descriptors remain immutable/alive during
 preparation; CT/staggered computation is not enabled.
 
+Start with one prepared field group, then reuse it for successive analyses:
+
 ```python
-from simesh.analysis import open_source, open_prepared, PreparedPool, trace
+from simesh.analysis import open_prepared, trace, with_curl
 
-with open_source("snapshot.dat", field_names=["b1", "b2", "b3"]) as source:
-    pool = PreparedPool(source, [0, 1, 2], capacity=256)
-    try:
-        lines = trace(pool, seeds, step=0.001, max_steps=1000, workers=4)
-    finally:
-        pool.close()
-
-resident = open_prepared("snapshot.dat", field_names=["b1", "b2", "b3"])
+magnetic = open_prepared("snapshot.dat", field_names=["b1", "b2", "b3"])
+lines = trace(magnetic, seeds, step=0.001, max_steps=1000, workers=4)
+more_lines = trace(magnetic, more_seeds, step=0.001, max_steps=1000, workers=4)
+diagnostics = with_curl(magnetic)
+twisted = trace(diagnostics, seeds, step=0.001, max_steps=1000, twist=True)
 ```
+
+Reading and halo preparation finish before these queries; the file is already
+closed. The default full-domain path retains canonical bulk preparation. To read
+and prepare only a region, pass `bounds=(lower, upper)` to `open_prepared`.
+This selects every leaf whose physical box intersects the half-open bounds and
+expands the result to those complete leaves. It reads their necessary support
+from the original mesh, including outside the selection. It does not introduce
+a new physical boundary or resample onto a uniform grid.
+
+Full-domain loading reads contiguous batches of complete file records, then
+extracts the selected ordinary fields into an owned array. It validates saved
+ghost extents, record lengths, byte order and staggered tails. Reading some
+unselected bytes reduces small I/O operations; no additional user setting is
+needed. Regional and bounded sources retain selective reads. The prepared result
+keeps its AMRMesh owner, connectivity and consumer geometry for subsequent queries.
+
+Regional preparation uses the existing exact-phase/minmod arithmetic, whereas
+full-domain bulk preparation uses the named canonical coordinate-phase strategy.
+Their comparison tolerance remains explicit; selecting a box does not promise
+bitwise equality to the different canonical strategy. Inspect `leaf_ids` and
+`mesh.bounds[leaf_ids]` for the actual prepared coverage. Outside it, samples are
+invalid and tracing reports `MISSING_COVERAGE`; enlarge the region in the calling
+workflow when needed. A regional LOS is not automatically a complete full-domain
+image. Geometry metadata remains global while field values are selected.
+
+For an existing source, `prepare_region(source, (lower, upper), field_ids)`
+provides the same one-time regional preparation. It differs from
+`mesh.select_box`, which selects cell-center windows and can omit a very thin
+box that still intersects native leaves.
+
+`open_source` and `PreparedPool` remain available for explicitly selected bounded
+workflows; most retained exploration does not need a cache. New source adapters
+validate immutable geometry once and bind each preparation batch once. Checked
+reads, request/output validation and active source-slot guards remain; detached
+products are published only after the complete preparation succeeds. Standalone
+rewrite executors retain their original all-request preflight behavior.
 
 The source context closes its owned file; detached products remain usable.
 `field_indices` alternatively selects original file positions. Selected fields
@@ -118,7 +153,8 @@ first = sample_plane(current_like, plane)
 second = sample_plane(current_like, moved_plane)
 ```
 
-This calculates curl(B) on every physical leaf plus one remaining valid halo
+This traverses fixed leaf batches directly, without a prepared-block cache or
+eviction policy. It calculates curl(B) on every physical leaf plus one remaining valid halo
 before any slice. It does not infer current normalization. The global output is
 independent of temporary primary slots; subsequent slices use that retained
 result without recomputing curl. Pass a writable contiguous float64 array or
@@ -196,7 +232,7 @@ not area averages. The returned units are scalar units times coordinate length.
 
 This interface does not infer epsilon(rho,T), EOS, temperature or instrument
 response. The recorded WENO rho-column image is a scalar diagnostic; the thermal
-response gate remains open in the current checkpoint.
+workflow below supplies the separate historical AIA171 model with explicit inputs.
 
 ## Bounded Uniform Output
 

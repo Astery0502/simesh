@@ -12,11 +12,11 @@ separate design note and use one concise contract.
 
 ## User-Requested Cross-Workflow Exploration
 
-[Analysis lifetimes and execution sketches](../../docs/analysis-core/lifetime-sketches.md) compares
+[Analysis lifetimes and execution sketches](../../docs/analysis-core/archive/core-development-2026-09-08/lifetime-sketches.md) compares
 ownership, retained state and optionality costs across three usage sequences.
 It records exploratory combinations requested before choosing a capability;
 it is not a contract or an active implementation group.
 
-[Three pipeline result contracts](../../docs/analysis-core/pipeline-results.md) incorporates the
+[Three pipeline result contracts](../../docs/analysis-core/archive/core-development-2026-09-08/pipeline-results.md) incorporates the
 corrected F/D/L priorities and operating scale. It supersedes the earlier
 repeated-sampling phase suggestion, with open numerical and delivery decisions.
