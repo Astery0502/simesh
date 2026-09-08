@@ -120,6 +120,11 @@ class ThermalTests(unittest.TestCase):
             integrate_thermal_los(state,plane,[1,0,0],length_unit_cm=1e8,implementation='reference',workers=2)
         with self.assertRaises(MemoryError):
             integrate_thermal_los(state,plane,[1,0,0],length_unit_cm=1e8,budget_bytes=1)
+        # Reject malformed backing before the unchecked sampler writes a pair.
+        for malformed in (replace(state,values=np.zeros((*state.values.shape[:-1],3))),
+                          replace(state,slot_of_leaf=np.full_like(state.slot_of_leaf,len(state.values)))):
+            with self.assertRaises(ValueError):
+                integrate_thermal_los(malformed,plane,[1,0,0],length_unit_cm=1e8)
 
 
 if __name__ == "__main__": unittest.main()

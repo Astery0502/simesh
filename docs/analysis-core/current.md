@@ -2,39 +2,54 @@
 
 Updated: 2026-09-08. Resume through this file and [development](development.md).
 
-## Active Follow-up: Thermal Ray Traversal And Parallelism
+## Completed Follow-up: Thermal Ray Traversal And Parallelism
 
-The latest user instruction explicitly authorizes online ray-tracing research,
-profiling, bounded optimization and tests, including parallel thermal LOS. This
-supersedes the previous no-new-500x500-test request for this follow-up. Continue
-in the same clean isolated worktree, based on `a61a0ac`, preserving the completed
-round below. Scope is the resident thermal ray consumer; the main session still
-owns broader backend, preparation and numerical cache work. Do not merge its
-concurrent changes or duplicate its OpenMP/runtime policy work.
+The user-authorized ray-tracing research, optimization and parallel tests are
+**complete**. The same isolated worktree preserves the preceding delivery and
+all independent main-session changes. Implementation checkpoint `9f423e9` adds
+compiled thermal traversal and conformance controls; the final follow-up commit
+adds input/failure guards, measured evidence and recovery notes.
 
-Endpoint: source-backed algorithm/library disposition, actual hotspot evidence,
-a numerically conforming accelerated thermal consumer with 1/2/4 worker results,
-and measured representative image scaling. Keep the Python implementation as
-an explicit scientific/reference comparator. Limits remain four workers, 2 GiB
-controlled arrays, 2 GiB scratch and at least 2 GiB free disk. One active probe:
-existing all-leaf/Python path versus reused AMR-tree compiled ray traversal,
-then identical row work shared across existing-style GIL-free thread calls.
-Allowance: 30 minutes of comparative execution, no new external dependency or
-hardware unless current evidence makes it necessary. Do not infer instrument
-accuracy or generic library superiority from this implementation comparison.
+- Adopt native AMR-tree interval traversal, shared inline interpolation, compiled
+  response/accumulation and explicit 1/2/4-worker execution. The Python reference
+  remains available; default workers remains one. No external dependency, GPU,
+  OpenMP policy, preparation or numerical slot-cache change was made.
+- Three 64x64 views match the reference to <=2.73e-12 DN/s/pixel absolute error;
+  actual 500x500 images complete with exact one/two/four-worker identity.
+- 500x500 query medians (1 / 2 / 4 workers): axis **23.00 / 8.40 / 18.27 s**;
+  20-degree oblique **29.41 / 15.59 / 9.22 s**; diagonal **17.86 / 12.09 / 6.41 s**.
+  These are 250,000 actual rays/image, /4 nonlinear thermodynamic quadrature.
+  Source-to-thermal preparation was separately 19.72 s in this run.
+- Desktop memory pressure caused broad ranges (axis serial 12.46--81.04 s) and
+  major faults. Do not claim isolated scaling, a universal four-worker optimum,
+  or multiply an old 64-ray extrapolation into a measured speedup. Full ranges,
+  CPU/fault records, source review and dispositions are in
+  [thermal ray evidence](evidence/thermal-rays.md).
+- All 23 analysis tests passed after moving the unchanged interpolation body to
+  native.pxd; the four focused thermal checks passed after final input hardening.
+  Rebuild both analysis extensions together. The old benchmark_thermal driver now
+  explicitly selects the reference implementation to preserve its comparison.
+- Final benchmark data/model: actual WENO rho and AMR geometry, manufactured
+  0.45--1.65 MK temperature, explicit demonstration units. Real thermal snapshot
+  and current calibration validation remain open as before.
 
-Status: compiled tree traversal and shared inline interpolation implemented;
-all 23 analysis checks passed after inline relocation. The first C-API
-candidate's partial 64x64 comparisons are preserved in `capi-probe/`. Generated-C
-inspection established avoidable per-point descriptor passing; shared inline
-arithmetic is unchanged. Final timing is paused until main-session process
-`probe_paired_backends.py` exits, using a kernel process-exit notification rather
-than repeated polling. Do not interrupt or edit that independent work.
+Artifacts under ignored `benchmark-results/analysis-core/`: `thermal-rays.json`,
+`thermal-rays.log`, `thermal-500-images.npz` (three quantitative arrays and input
+provenance), and `thermal-500-projections.png` (visually checked, labelled log-color
+projection). The partial C-API candidate remains in `capi-probe/`; it was stopped
+before the inline refinement. A kernel process-exit event avoided overlapping the
+final run with the main session's active paired-backend benchmark; other desktop
+load and OS cache were uncontrolled. Peak final RSS was 858,161,152 B; initial
+controlled coexistence remains 1,518,339,216 B. Result files total about 5.8 MB; build scratch is small relative to the 2 GiB cap.
+The initial ~3 GiB free disk later fell to ~1.95 GiB due changing host conditions;
+the initial 2 GiB reserve was not continuously maintained. No unrelated cleanup,
+process termination or shared-environment install was performed.
 
-Next: verify the completed check log, then run benchmark_thermal_rays when the
-main benchmark has exited; record 64x64 parity and true 500x500 1/2/4-worker timings,
-render the labelled manufactured-temperature images, close evidence and commit.
-Later checkpoints below remain historical until updated.
+Next action: integrate the separate commits when the main session is ready,
+rebuilding native/thermal extensions together. No ready work remains in this
+follow-up. A quiet-host worker-scaling study, a supported external renderer/device
+adapter, or a measured adaptive-quadrature need can reopen those specific routes;
+they are not pending mandatory tasks. [Usage](usage.md) records the callable API.
 
 ## Completed Round: Thermal Response, Organization And Geometry Plans
 

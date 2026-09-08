@@ -298,7 +298,10 @@ can differ from the reference, which admits a whole leaf's quadrature first.
 Native response supports the built-in AIA171 model; custom response subclasses
 must use the explicit reference path until given a compiled implementation.
 See [thermal ray evidence](evidence/thermal-rays.md) for source comparisons,
-acceptance, measured image sizes and parallel scaling.
+acceptance, actual 500x500 images and 1/2/4-worker timings. Desktop memory pressure
+made four workers slower than two in the axis case, so this is an explicit caller
+choice, not an automatic maximum-worker setting. Rebuild both analysis extensions
+after updating the shared native.pxd interpolation definition.
 
 ## Optional Retained Geometric Fill Plan
 

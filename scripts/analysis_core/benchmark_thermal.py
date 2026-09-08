@@ -49,7 +49,7 @@ def main():
         rows = []
         for order,n in (("emissivity-first",1),("thermodynamics-first",1),("thermodynamics-first",4),("thermodynamics-first",16),("thermodynamics-first",64)):
             t = time.perf_counter()
-            image = integrate_thermal_los(state,plane,direction,length_unit_cm=1e8,order=order,subdivisions=n)
+            image = integrate_thermal_los(state,plane,direction,length_unit_cm=1e8,order=order,subdivisions=n,implementation='reference')
             elapsed = time.perf_counter()-t
             if not image.complete:
                 raise AssertionError(np.unique(image.status,return_counts=True))
@@ -63,7 +63,7 @@ def main():
             row.update(relative_l2_to_subdivision64=float(np.linalg.norm(error)/norm),max_absolute_difference=float(np.max(np.abs(error))))
         result["runs"].append({"direction":direction,"variants":rows,"image_range":[float(reference.min()),float(reference.max())],
             "retained_emissivity_los_repeat":measure(lambda:integrate_los(retained_emissivity,plane,direction),3),
-            "thermodynamics_subdivision4_repeat":measure(lambda:integrate_thermal_los(state,plane,direction,length_unit_cm=1e8,subdivisions=4),3)})
+            "thermodynamics_subdivision4_repeat":measure(lambda:integrate_thermal_los(state,plane,direction,length_unit_cm=1e8,subdivisions=4,implementation='reference'),3)})
     result["peak_rss_bytes"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     Path('benchmark-results/analysis-core/thermal.json').write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result,indent=2))

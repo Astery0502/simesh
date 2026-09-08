@@ -562,3 +562,16 @@ refinement within the same numerical strategy, not another reconstruction.
 Rebuild and rerun affected checks, then complete the frozen comparison. Record
 wall/CPU and major faults because initial timings show host-state sensitivity;
 no claim of an external-library comparison or hard RSS/disk-cache isolation.
+
+
+Thermal follow-up outcome: adopt compiled tree traversal and optional GIL-free
+ray workers, retaining the Python reference and default one worker. Three 64x64
+views conform (max image difference 2.73e-12 DN/s/pixel); three actual 500x500
+views complete with exact 1/2/4-worker equality. Large-image medians span 17.9--29.4 s
+serial, 8.4--15.6 s with two workers and 6.4--18.3 s with four. Desktop memory
+pressure causes large dispersion (axis serial up to 81 s); do not promote four
+workers or a fixed scaling factor as universal. Input guards protect the compiled
+two-component sampler and invalid geometry remains NaN. Full source/library
+selection, ranges, setup, faults, memory and labelled images are in
+[thermal ray evidence](evidence/thermal-rays.md). No external dependency, hardware,
+main-session runtime cache or default OpenMP policy was added.

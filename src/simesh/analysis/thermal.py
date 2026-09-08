@@ -188,10 +188,17 @@ def emissivity_fields(thermodynamics, *, model=AIA171(), budget_bytes=2*1024**3)
 
 
 def _check_thermal(fields, model):
-    if (not isinstance(fields, PreparedFields) or len(fields.fields) != 2 or fields.halo < 1 or
+    if (not isinstance(fields, PreparedFields) or len(fields.fields) != 2 or
+            type(fields.halo) is not int or fields.halo < 1 or
             tuple(f.units for f in fields.fields) != ("cm^-3", "K") or
             not isinstance(fields.source, tuple) or fields.source[1] != model.identity):
         raise ValueError("thermal fields and response model must have matching physical identity")
+    if (not isinstance(fields.values,np.ndarray) or fields.values.dtype != np.float64 or
+            fields.values.ndim != 5 or fields.values.shape[-1] != 2 or
+            fields.values.shape[1:4] != tuple(n+2*fields.halo for n in fields.mesh.block_shape) or
+            fields.slot_of_leaf.shape != (fields.mesh.leaf_count,) or
+            np.any(fields.slot_of_leaf < -1) or np.any(fields.slot_of_leaf >= len(fields.values))):
+        raise ValueError("thermal backing and slot directory must match the declared mesh and two components")
 
 
 def ray_segments(mesh, origin, direction, near, far):
@@ -344,6 +351,7 @@ def _native_los(fields,plane,direction,near,far,subdivisions,max_samples,
     initialize_rays(mesh.lower,mesh.upper,origins,direction,
         np.ascontiguousarray(near.ravel()),np.ascontiguousarray(far.ravel()),starts,ends,flags)
     output,counts = values.ravel(),samples.ravel()
+    output[flags >= LOSStatus.MISSING_COVERAGE] = np.nan
     def run(span):
         integrate_ready(mesh.roots,mesh.children,mesh.node_leaves,mesh.node_lower,mesh.node_upper,
             mesh.bounds,mesh.spacing,fields.slot_of_leaf,fields.values,fields.halo,
