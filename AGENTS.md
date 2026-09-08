@@ -19,6 +19,16 @@ and the focused documents under `docs/` for detailed mechanics.
 
 ## Use These References By Task
 
+- `docs/analysis-core/next-generation.md`
+  Read for the confirmed independent next-generation simesh under root
+  `analysis-core/`, pinned worktree assets and exploration dispositions. Existing
+  canonical editing boundaries below apply to the current implementation, not
+  as a prescribed layout for the new generation.
+- `docs/analysis-core/next-generation-design.md`
+  Read before implementing the independent generation. It owns the new module
+  and source/preparation boundaries, explicit numerical schemes, isolated build
+  design, asset mapping and N1--N4 delivery checkpoints.
+
 - `docs/analysis-core/README.md`
   Start here for project-level future analysis-core intent/spec work. Existing
   simesh and rewrite implementations are evidence, not the new architecture.

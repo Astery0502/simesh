@@ -1,0 +1,4 @@
+include ASSETS.md
+include MIGRATION.md
+recursive-include tests *.py
+recursive-include scripts *.py

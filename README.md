@@ -1,5 +1,11 @@
 # simesh
 
+The independent next-generation implementation is developed under
+[`analysis-core/`](analysis-core/README.md). Its experimental native-field,
+magnetic tracing, LOS and bounded-output workflows are available in a separate
+environment, with [bundled AMRVAC compatibility](analysis-core/MIGRATION.md).
+The parent package and workflows described below remain available independently.
+
 `simesh` is a Python/Cython toolkit for AMRVAC-style adaptive mesh refinement
 (AMR) data. It operates on AMRVAC `.dat` snapshots and NumPy arrays, and its
 main idea is to keep the native AMR block structure available while also

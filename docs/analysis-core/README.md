@@ -73,6 +73,22 @@ implementations and claims. New goals do not retroactively change them.
 
 ## Current Checkpoint
 
+The confirmed next-generation scope is independent development under the
+repository-root `analysis-core/`, incorporating the latest accepted worktree
+implementations and the exploration assets. The
+[scope and pinned source inventory](next-generation.md) records this direction;
+earlier limits to extending `simesh.analysis` describe the previous delivery.
+The [next-generation design](next-generation-design.md) maps module boundaries,
+candidate interfaces, asset reuse and the first implementation checkpoints.
+The independent N1–N4 runtime profiles are delivered: explicit sources,
+regional and whole-domain preparation, detached ownership, scientific consumers,
+optional geometry plans and bounded or streamed output.
+See [package usage](../../analysis-core/README.md), [N1 evidence](evidence/next-generation-n1.md)
+[N2 evidence](evidence/next-generation-n2.md), [N3 evidence](evidence/next-generation-n3.md)
+and [N4 evidence](evidence/next-generation-n4.md). Stateful Dataset, ordinary
+writing, export and array-tool continuity are bundled in a separate compatibility
+layer; see the [migration guide](../../analysis-core/MIGRATION.md).
+
 The actual scope, completion state and next action have one owner:
 [current.md](current.md). The delivered P0--P4 baseline and subsequent authorized rounds share this record. Its
 [selected design](native-core-design.md) records provider assembly, E1--E5
