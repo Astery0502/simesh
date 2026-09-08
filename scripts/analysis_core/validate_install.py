@@ -47,7 +47,8 @@ sys.path.append(dependencies)
 import numpy as np
 import simesh, simesh_rewrite
 from simesh.analysis import (open_source, PreparedPool, trace, open_prepared, sample,
-                            global_curl_file, integrate_los_views, Plane)
+                            global_curl_file, integrate_los_views, Plane,
+                            build_fill_plan, thermal_fields, integrate_thermal_los)
 from simesh.amrvac import write_datfile_from_uniform, read_blocks
 assert str(simesh.__file__).startswith(wheel)
 assert str(simesh_rewrite.__file__).startswith(wheel)
@@ -60,6 +61,8 @@ with tempfile.TemporaryDirectory() as directory:
         result=trace(pool,np.array([[.2,.4,.5]]),step=.05,max_steps=3)
         np.testing.assert_allclose(result.positions,[[.35,.4,.5]],atol=1e-14)
         pool.close()
+        plan=build_fill_plan(source,np.arange(source.mesh.leaf_count))
+        planned=plan.prepare(source,[0])
     fields=open_prepared(path,field_names=["b1","b2","b3"])
     np.testing.assert_array_equal(sample(fields,np.array([[.2,.4,.5]]))[0],[[1.,0.,0.]])
     assert read_blocks(path).shape == (8,3,4,4,4)
@@ -69,6 +72,13 @@ with tempfile.TemporaryDirectory() as directory:
     images=integrate_los_views(fields,[plane,plane],[[0.,0.,1.],[0.,0.,1.]])
     for image in images:
         np.testing.assert_array_equal(image.values,1.)
+    state=thermal_fields(planned,1.e6,density_unit_g_cm3=2.341670693166e-15,
+                         temperature_label="isolated wheel manufactured isothermal input")
+    thermal=integrate_thermal_los(state,plane,[0.,0.,1.],length_unit_cm=1.e8,workers=2)
+    reference=integrate_thermal_los(state,plane,[0.,0.,1.],length_unit_cm=1.e8,
+                                   implementation="reference")
+    assert thermal.complete and reference.complete
+    np.testing.assert_allclose(thermal.values,reference.values,rtol=1.e-13)
 print(json.dumps({"simesh":simesh.__file__,"provider":simesh_rewrite.__file__,"result":result.positions.tolist()}))
 '''
     environment=dict(os.environ)

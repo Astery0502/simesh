@@ -13,8 +13,9 @@ does not replace [shared validity/lifetime requirements](prepared-fields.md) or
 inspection and existing evidence. No new performance experiment was run, and no
 new numerical strategy, allocator or preparation backend is selected here.
 Independent runtime work and its accepted/removed candidates remain owned by
-[runtime execution](runtime-execution.md). Do not duplicate its experiments or
-the separately owned persistent geometry-plan implementation.
+[runtime execution](runtime-execution.md). The optional persistent geometry-plan implementation is now integrated; see
+[plan evidence](evidence/geometry-plans.md). Reuse those implementations and
+their retained outcomes when considering the application sequences below.
 
 ## The Product To Preserve
 
@@ -136,7 +137,7 @@ optional cache is a comparator, not a universal layer to enable. Feeding support
 from already prepared interiors is also a provider-boundary candidate, not a
 delivered promise of zero duplicate reads in the current RHE adapter.
 
-Use the existing independent plan effort for implementation. This review defines
+Use the integrated `build_fill_plan` / `FillPlan.prepare` implementation. This review defines
 its application requirement: improve actual missing preparations under bounded
 storage without burdening the resident ready path or changing preflight/failure
 and numerical contracts.

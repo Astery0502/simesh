@@ -184,6 +184,16 @@ units as references for response/image integration. The solver's runtime and MPI
 organization are not adopted. Absorption, full radiative transfer, spectral-line
 physics and instrument effects remain unselected extensions.
 
+The first selected physical response is now the historical MPI-AMRVAC AIA 171
+model with explicit cgs density/length conversion, fully ionized H/He EOS and
+external K temperature input. The default electron emission-measure convention
+and optional upstream hydrogen proxy are distinguished in
+[thermal evidence](evidence/p3-l-thermal.md). Thermodynamics-first response and
+prepared-node emissivity are separately named reconstructions with independent
+quadrature/error evidence. This resolves the delegated first-model choice;
+actual snapshot thermodynamics and current-instrument calibration remain
+unverified. The existing scalar and parallel geometry profile retains its scope.
+
 Acceptance needs analytic constant-response/path-length cases, differing view
 angles and per-pixel depths, mixed AMR levels/interfaces, full coverage and no
 double counting. Independently check physical response and units. Validate the

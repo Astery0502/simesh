@@ -327,3 +327,132 @@ To restore the default analysis build:
 ```sh
 SIMESH_OPENMP=0 .venv/bin/python build.py --inplace --group analysis
 ```
+## Historical AIA 171 Thermal Synthesis
+
+The first explicit optically thin model is `AIA171`. Its source table is pinned
+MPI-AMRVAC data; its original calibration/abundance generation settings are
+undocumented. It is a reproducible historical model, not a current observing-date
+calibration. `CoronalComposition` uses fully ionized H/He with n_He/n_H=0.1.
+The default emissivity is n_e^2 R(T); `AIA171("amrvac-hydrogen")` explicitly uses
+the upstream default hydrogen-density normalization. See the thermal evidence
+for the resulting 1.44 brightness factor and physical validation limits.
+
+```python
+from simesh.analysis import (
+    open_prepared, thermal_fields, integrate_thermal_los, orthographic_plane,
+)
+
+rho = open_prepared("snapshot.dat", field_names="rho")
+# Explicit demonstration units and external isothermal input. These values
+# must be replaced by the simulation's documented normalization for real use.
+state = thermal_fields(
+    rho, 1.0e6,
+    density_unit_g_cm3=2.341670693166e-15,
+    temperature_label="isothermal demonstration: 1 MK; not measured snapshot T",
+)
+plane = orthographic_plane(state.mesh.lower, state.mesh.upper, [0, 0, 1], (64, 64))
+image = integrate_thermal_los(state, plane, [0, 0, 1], length_unit_cm=1.0e8)
+assert image.complete
+print(image.scalar_units, image.temperature_label)  # DN s^-1 pixel^-1, explicit input label
+```
+
+`density_unit_g_cm3` multiplies stored rho; `length_unit_cm` multiplies every LOS
+path element, not pixel width or area. `image.depth` remains in source coordinates;
+`image.depth_cm` exposes physical depth. `ThermalLOSResult` retains model identity,
+input label and both normalizations. DN are detector counts, not erg; no extra
+4*pi, observer-distance factor, exposure time, PSF or pixel-area averaging is
+applied. Samples report native AIA-pixel-normalized brightness at the requested
+ray centers, irrespective of the numerical raster's spacing.
+
+For an external nonuniform temperature, prepare a `PreparedFields` scalar with
+units `K`, the identical `MeshIndex` and coverage of all requested density leaves.
+Pass that product as `temperature`; independently permuted packed leaf order is
+supported. Native external arrays can use `prepare_resident(mesh, mesh.roots.shape,
+mesh.node_leaves >= 0, temperature_interiors, (FieldDefinition("T", "K"),))`, where
+`temperature_interiors` is float64 `(nleaf, 1, bx, by, bz)` in the density mesh's
+source leaf order. This performs the same two-halo preparation, and does not
+infer physical registration from array shape. A combined rho/T source can also
+prepare separate groups on the same mesh. For thermal pressure input,
+`CoronalComposition.temperature(rho_cgs, p_thermal_cgs)` implements the explicit
+ideal gas EOS; total energy requires the caller's actual kinetic/magnetic/
+background-field model before thermal pressure can be supplied. Missing T raises
+an error; density alone never selects temperature.
+
+The default order is `thermodynamics-first`: interpolate number density and T,
+then evaluate the nonlinear response. `subdivisions=4` applies composite Gauss2
+after splitting at thermodynamic interpolation knots; it is an approximation.
+Check refinement for a scientific request, especially at response-table knots.
+`order="emissivity-first"` evaluates the response at every prepared primary node,
+then integrates that scalar interpolant. This differs from preparing halos of
+interior emissivity, since nonlinear response and AMR transfer do not commute.
+
+For repeated views of the node-emissivity model, call `emissivity_fields(state)`
+once, retain that product and use `integrate_los` repeatedly, multiplying its
+values by the explicit cm-per-coordinate multiplier. The scalar consumer returns
+its usual scalar-times-coordinate units; retain the thermal input provenance
+alongside that lower-level result. Node-emissivity scalar Gauss2 exactness does
+not establish accuracy with respect to nonlinear thermodynamic reconstruction.
+Both options are currently resident. The default nonlinear implementation now
+uses compiled AMR-tree traversal; `workers=1`, `2` or `4` selects independent
+GIL-free ray workers. `implementation="reference"` keeps the earlier Python
+all-leaf implementation and requires one worker. These have the same response,
+reconstruction and subdivision count, with tolerance-level agreement and exact
+native serial/parallel equality. Numerical caches and the scalar/tracing OpenMP
+backends remain available through their explicit APIs above; nonlinear thermal
+LOS uses its own resident thread-pool dispatch. A bounded response provider is
+still open.
+
+```python
+image = integrate_thermal_los(
+    state, plane, [0.3, 0.2, 1.0], length_unit_cm=1.0e8,
+    subdivisions=4, workers=4,
+)
+reference = integrate_thermal_los(
+    state, plane, [0.3, 0.2, 1.0], length_unit_cm=1.0e8,
+    subdivisions=4, implementation="reference",
+)
+```
+
+The Python thread-pool startup is included in each call. Small images may not
+benefit from more workers; choose using the actual request's measured cost.
+The native kernel advances complete ray intervals and counts samples actually
+computed. A limit failure always invalidates the pixel; partial counter values
+can differ from the reference, which admits a whole leaf's quadrature first.
+Native response supports the built-in AIA171 model; custom response subclasses
+must use the explicit reference path until given a compiled implementation.
+See [thermal ray evidence](evidence/thermal-rays.md) for source comparisons,
+acceptance, actual 500x500 images and 1/2/4-worker timings. Desktop memory pressure
+made four workers slower than two in the axis case, so this is an explicit caller
+choice, not an automatic maximum-worker setting. Rebuild both analysis extensions
+after updating the shared native.pxd interpolation definition.
+
+## Optional Retained Geometric Fill Plan
+
+```python
+import numpy as np
+from simesh.analysis import open_source, build_fill_plan
+
+with open_source("snapshot.dat", field_names=["b1", "b2", "b3"], support_capacity=256) as source:
+    selected = np.arange(min(256, source.mesh.leaf_count), dtype=np.int64)
+    plan = build_fill_plan(source, selected, capacity=256)
+    b = plan.prepare(source, [0, 1, 2])
+    b1 = plan.prepare(source, [0])  # geometry reused; fresh reads and values
+```
+
+The plan retains geometry only and makes no runtime cache-retention decision.
+Its chunk-local support ordinals bind to private execution arrays, never external
+cache slots. Values, minmod slopes and physical numerical results are recomputed.
+Successful products are detached; failure returns no product and cannot poison
+another execution. A different mesh object, source-cell order, geometry, halo
+width, boundary/transfer strategy, selected leaf set or partition needs a new
+plan. Field count/order or a new immutable value lifecycle on the identical mesh
+can reuse geometry. Plan construction and retained bytes must amortize over the
+actual repeated request; one-shot callers retain the ordinary `prepare` path.
+The initial plan supports only the source provider's existing two-layer,
+continuous, exact-phase strategy. It is not a generic sparse linear matrix:
+limited prolongation is nonlinear. A source opened with `value_cache_capacity`
+can also serve plan reads from its raw-value cache. Field reordering invalidates
+that value binding; file modification or closure still aborts preparation.
+`read_value_bytes` counts underlying value reads, while `requested_value_bytes`
+also counts cache hits. Plans do not automatically enter `PreparedPool` miss
+scheduling; explicit `plan.prepare` produces detached fields.

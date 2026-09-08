@@ -154,7 +154,9 @@ For now, it is safest to think of the public API in three layers:
 The additive `simesh.analysis` namespace provides `open_source`, `open_prepared`,
 `prepare`, `PreparedPool`, `sample`, `derivative`/`curl`, `trace`/`iter_traces`,
 `with_curl`/`CurlPool`, `retrace`, `global_curl`, `Plane`/`sample_plane`,
-`integrate_los`/`orthographic_plane`, and `iter_uniform`. These do not redirect
+`integrate_los`/`integrate_los_views`/`orthographic_plane`, `iter_uniform`,
+`global_curl_file`, `build_fill_plan`/`FillPlan`, and the explicit `AIA171` thermal
+workflow (`thermal_fields`, `emissivity_fields`, `integrate_thermal_los`). These do not redirect
 canonical Dataset or file-level APIs. See [usage](analysis-core/usage.md) and
 [current acceptance](analysis-core/current.md) before choosing them.
 
@@ -205,3 +207,12 @@ When adding new user-facing functions:
 - keep `README.md` as a short entry point with only high-level examples
 - document it here if it changes the intended Python API surface
 - document implementation details in one of the technical notes under `docs/`
+
+The native namespace combines retained runtime reuse and optional geometric fill
+plans. File `value_cache_capacity` defaults to zero; planned preparation uses the
+same source-lifetime validation and distinguishes actual from requested value
+reads. Thermal LOS requires explicit density/length units and external or
+isothermal temperature; its historical AIA171 model does not infer snapshot
+thermodynamics. Nonlinear thermal rays use a resident compiled 1--4-worker path
+with a Python reference, while scalar LOS/tracing retain their explicit
+thread-pool/OpenMP choices. See the usage guide for the distinct reconstructions.

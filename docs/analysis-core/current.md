@@ -1,134 +1,126 @@
-# Analysis-Core Checkpoint
+# Analysis-core 当前进度
 
-Updated: 2026-09-08. Resume through this file and [development](development.md).
+更新：2026-09-08。继续开发前参阅本页和 [开发流程](development.md)。
 
-## Authorized Scope And Actual State
+## 本轮范围与统一状态
 
-The user explicitly authorized autonomous **P0 through P4**, including P3-D,
-P3-L and P3-F; P2 was an intermediate checkpoint. All currently ready work has
-advanced through implementation, comparisons, integration and feasible scale.
-**The whole scope is not marked complete:** physical P3-L and actual large-input
-acceptance still require missing inputs. Do not restart completed stages or
-reinterpret the old P2 recommendation as the endpoint.
+用户要求将辐射与优化探索 worktree 的实现统一回主工作目录，更新工作流记录，
+然后移除该 worktree。本轮负责整合与兼容性验证，不扩展新的数值策略或性能探索。
 
-The **runtime execution round is locally complete**, following the user's
-2026-09-08 reopening of backends, scheduling and finite numerical reuse. Its
-[selected decisions](runtime-execution.md) and [measured evidence](evidence/runtime-execution.md)
-separate avoided preparation from parallel speedup. Delivered: optional raw-value
-reuse with lifecycle checks, known-view LOS tile retention, independent-process
-global curl, and explicit thread/OpenMP scheduling. Unhelpful access tracking and
-padded miss staging were rolled back. Default paths remain usable.
+统一目标为 `/Users/astery/science/simesh`，分支
+`codex/analysis-core-p0-p4`。两条工作线互补：主分支保留数值缓存、调度、
+多视角标量 LOS 和独立进程全域 curl；`codex/analysis-core-euv-geometry`
+提供 AIA171 热辐射、编译射线遍历、可选几何准备计划与重分块可行性证据。
+之后以本页作为唯一恢复入口，不再将这些实现分配给另一个独立会话。
 
-Another independent session owns AIA 171 Å, rebricking feasibility and persistent
-geometry preparation plans; do not duplicate those implementations. Missing
-large-input/physical acceptance was not used to stop independent runtime work.
+主目录原有未提交文档已保存为 `9fa1bc3`，其中包括
+[准备与存储设计评估](preparation-reuse-review.md)。保留该评估的范围：优先准备一次、
+反复使用，同时支持有限内存处理；最终存储与准备工作区的独立生命周期仍是后续提案，
+本次整合不将它标为已实现，也不重新启动重分块探索。
 
-Latest storage-design follow-up: the user requested reconsidering final-storage
-versus preparation-workspace ownership, reusable preparation facts and bounded
-batch placement against actual applications **before implementation**. Prioritize
-preparing once for repeated use while preserving memory-bounded processing;
-rebricking is outside this follow-up. The
-[application-led review](preparation-reuse-review.md) records scope, existing
-reuse, conditional benefits and a proposed retained B/curl acceptance sequence.
-This review adds no numerical/backend implementation or new performance claim;
-the runtime round and separately owned plan work retain their own records.
+## 已交付功能与证据
 
-| Delivery | Actual status and evidence |
+| 工作线 | 实际状态 |
 | --- | --- |
-| P0/P1 | Complete selected design, provider assembly, native interior/two-halo products, stable bounded borrowing and direct consumption; [P1](evidence/p1-native-fields.md) |
-| P2 | Complete declared accepted-prefix parallel F, terminal/length results and cache comparisons; [P2](evidence/p2-field-lines.md) |
-| P3-D | Complete whole-domain curl(B), independent retained groups and axis/oblique slices; [D](evidence/p3-d-global-slices.md) |
-| P3-F | Complete selected accepted-segment twist, optional trajectories and explicit selected-ID retracing; [F](evidence/p3-f-twist.md) |
-| P3-L | Scalar/emissivity-field integration core and WENO rho columns complete; **physical response/EOS/units gate open**; [L](evidence/p3-l-scalar-los.md) |
-| P4 | Additive installed source/workflow/build compatibility and actual million-seed/1000^3 output checks complete; **10--20 GB / larger-than-RAM input unverified**; [integration](evidence/p4-integration.md), [scale](evidence/p4-scale.md) |
-| Runtime follow-up | Local comparisons, selected implementation and default/optional build checks complete; [runtime evidence](evidence/runtime-execution.md). Other hardware and real larger-than-RAM input remain unverified. |
+| P0/P1 | 原生字段、两层主场 halo、稳定有限容量借用与直接消费已交付；[P1 证据](evidence/p1-native-fields.md) |
+| P2 | 接受步前缀语义、并行磁力线、终止信息和有限缓存比较已交付；[P2 证据](evidence/p2-field-lines.md) |
+| P3-D | 全域 curl(B)、独立保留的派生场与轴向/斜切片已交付；[D 证据](evidence/p3-d-global-slices.md) |
+| P3-F | 所选接受段 twist、可选轨迹与显式重追踪已交付；[F 证据](evidence/p3-f-twist.md) |
+| P3-L 标量 | 全域标量积分、WENO 密度柱与多视角调度已交付；[标量证据](evidence/p3-l-scalar-los.md) |
+| P3-L 热辐射 | 首个模型已获委托并落实：历史 AIA171 表、显式 H/He EOS、密度/长度单位、外部 K 温度或等温输入，以及两种重构顺序；[热辐射证据](evidence/p3-l-thermal.md) |
+| 热射线优化 | AMR 树区间遍历、共享内联插值、编译响应与 1/2/4 工作者已交付；保留 Python 参考路径，默认一个工作者；[射线证据](evidence/thermal-rays.md) |
+| E5 几何计划 | 可选 `build_fill_plan` / `FillPlan.prepare` 已采用；几何可复用，数值和限制器每次重新计算；[计划证据](evidence/geometry-plans.md) |
+| E1 重分块 | 几何与映射原型已完成，暂不替换生产叶块布局：稀疏请求会扩大准备范围；[重分块证据](evidence/rebricking.md) |
+| 运行时优化 | 可选原始值缓存、相近视角分块复用、独立进程全域 curl 与显式线程/OpenMP 调度已交付；未采用的命中追踪与额外 halo 暂存保持回退状态；[运行时决策](runtime-execution.md)、[证据](evidence/runtime-execution.md) |
+| P4 | 安装、兼容性、百万种子和实际 1000³ 输出检查已完成；真实 10–20 GB / 超内存输入仍未验证；[集成](evidence/p4-integration.md)、[规模](evidence/p4-scale.md) |
 
-## Checkout And Recoverable Work
+## 整合边界与验证
 
-- Checkout: `/Users/astery/science/simesh`, branch `codex/analysis-core-p0-p4`.
-- Source checkpoints: `ee96824` (P1), `f6dc48e` (P2), `6558286` (D),
-  `8a80a2f` (twist), `2c00792` (scalar LOS), `a5f1f88` (file/packaging integration).
-  Final acceptance/navigation has its own subsequent checkpoint.
-- Runtime experiment checkpoints: `775a0b9` (cache and backend candidates),
-  `ce97fed` (recoverable preparation/scheduling/feedback/staging experiments).
-  Validated selected source: `6172bbb`, with rejected candidates removed.
-- Substantial pre-existing modified/untracked documentation remains preserved.
-  Stage only owned work; no blanket reset, staging or source-fixture cleanup.
-- Core: `src/simesh/analysis/`; compiled consumers: `src/simesh/utils/lib/analysis/`;
-  file adapters: `src/simesh/amrvac/analysis*.py`. Existing rewrite is an explicit
-  bundled provider with its original numerical directives and contracts.
-- Design/route decisions: [native-core-design](native-core-design.md).
-  Runnable examples and restrictions: [usage](usage.md).
+- `FieldSource` 同时保留 `validate_values` 和 `plan_builder`；计划读数使用
+  同一个可选原始值缓存，数据源关闭或改变后不得绕过生命周期检查。
+- 计划统计中 `read_value_bytes` 表示底层实际读取，`requested_value_bytes`
+  包含缓存命中；加入文件计划、重复读取、字段选择及失效检查的组合回归。
+- 编译热射线与原生消费者共享 `native.pxd` 插值实现，必须一起重建。
+  保留当前原生模块的 OpenMP 功能；热射线仍使用自身的驻留字段线程池调度。
+- `FillPlan.prepare` 显式生成独立字段，不自动接管 `PreparedPool` 缺失调度。
+  几何计划不保存缓存槽、字段值、代际或 minmod 结果。
+- 默认构建完整 analysis 测试：30 项通过；新增测试覆盖几何计划与原始值缓存
+  共存、字段重绑定、文件修改/关闭拒绝和脱离源后的结果读取。
+- `make test PYTHON=.venv/bin/python` 通过；仓库默认未启用的重型用例保持跳过。
+- 干净源码构建的 wheel 为 9,609,216 字节；通过 `python -S` 隔离检查，
+  验证缓存文件源、追踪、进程 curl、多视角 LOS、几何计划和并行热射线/参考一致性。
+- OpenMP 构建下 `test_execution` 与 `test_thermal` 共 5 项通过，
+  包括静态/动态调度以及 1/2/4 工作者的一致性。
+- 已恢复默认非 OpenMP 构建，并明确检查 `enabled=False`；恢复后相同 5 项检查通过。
+- 已通过 `git worktree remove` 移除 `/Users/astery/science/simesh-euv-geometry`；
+  仅保留主工作目录。原分支指针继续保留，提交历史和迁回的原始产物可追溯。
 
-## Latest Verification And Resource Profile
+本轮命令记录：
 
-- Runtime round: 23 composed native checks passed with OpenMP and with the
-  default build. Full `make test` and 92 canonical checks passed (two opt-in heavy
-  cases excluded). A fresh 9,367,791-byte wheel passed isolated `python -S`
-  file/value-cache, detached, spawned-process curl and multi-view LOS execution.
-  Default non-OpenMP build is restored and explicitly checked.
-- Full curl plus two slices: serial ~31--35 s, two processes ~17.5 s, four
-  processes ~13 s, identical complete output. Controlled bounds ~584 / 735 /
-  917 MB fit the same 1 GiB envelope; process CPU/RSS costs are reported separately.
-- Three nearby LOS views: ~37 s to ~18 s in the matched early profile, with
-  ~28,500 to 13,768 preparations and identical images. Later wall times varied
-  with host load. Final 64-view OpenMP comparison and default-version regression
-  are in the runtime evidence; they do not imply universal backend gains.
-- Prior P4 validation: safe `make clean` and complete `make test` passed;
-  virtualenv NumPy remained intact. Provider suite: 1232 passed. Public/AMR/helper
-  checks: 92 passed, two opt-in heavy cases excluded. New-core composed checks:
-  17 passed. OpenMP build plus 23 AMR checks passed; default non-OpenMP restored.
-- Fresh-source wheel (~9.35 MB) built and passed isolated `python -S` imports and
-  file-to-result execution without editable checkout hooks.
-- Actual one million seeds (maximum 32 steps): one/four workers agree; trace
-  8.176 / 2.274 s; 17,273,160 accepted steps; last-accepted endpoint semantics.
-- Actual 1000^3 output stream: every billion point valid, 24 GB cumulative values,
-  81.283 s, maximum 33 MB slab. Peak run RSS 1,438,449,664 bytes.
-- Direct original-file WENO short trace: 0.129 s and ~3 MB reads versus 5.118 s
-  eager-source comparison, identical results. Dense checked B reading improved
-  to ~5.01 s through record-order I/O, retaining full callback checks.
-- Host: 8 GiB RAM / eight logical CPUs. Run limits: <=4 compute workers,
-  <=2 GiB controlled live arrays per case, <=2 GiB task-created disk scratch,
-  >=2 GiB free disk. No time/token limit was supplied. Bounds do not promise
-  process RSS or OS page-cache limits. The reopened runtime probes now have
-  measured adopt/defer/rollback outcomes; preserve their recorded scope.
+```sh
+make build PYTHON=.venv/bin/python
+PYTHONPATH=src:rewrite/src:scripts:tests/analysis:rewrite/benchmarks .venv/bin/python -m unittest discover -s tests/analysis -v
+PYTHONPATH=src:rewrite/src:scripts .venv/bin/python -m analysis_core.validate_install
+make test PYTHON=.venv/bin/python
+.venv/bin/python build.py --inplace --group analysis --openmp
+OMP_WAIT_POLICY=PASSIVE OMP_DYNAMIC=FALSE PYTHONPATH=src:rewrite/src:scripts:tests/analysis:rewrite/benchmarks .venv/bin/python -m unittest test_execution test_thermal -v
+SIMESH_OPENMP=0 .venv/bin/python build.py --inplace --group analysis
+PYTHONPATH=src:rewrite/src:scripts:tests/analysis:rewrite/benchmarks .venv/bin/python -m unittest test_execution test_thermal -v
+```
 
-## Inputs Still Required
+日志位于 `benchmark-results/analysis-core/integration-*.log`；隔离源码、wheel 和
+运行目录为 `benchmark-results/analysis-core/source-build-1uugwyhx/`（约 177 MiB）。
+本轮未重新运行大型性能矩阵，没有新增性能加速声明。
 
-These are overall acceptance gates, not blockers for the completed local runtime
-round. The separately owned physical/geometry work has its own continuation.
+历史测量继续保留其原范围，不将它们宣称为本次重新测量：
 
-1. **P3-L physical definition and data:** an asynchronous question remains pending
-   for epsilon(rho,T), EOS/normalization/units/instrument response or explicit
-   delegation of a first model. WENO and tdm have no energy/temperature. Do not
-   relabel stored-rho columns as a thermal image. Additional temperature/physical
-   inputs must match the selected response before its independent verification.
-2. **Large Cartesian input fixture:** an asynchronous question requests a readable
-   path to an existing 10--20 GB file, including an external drive if available.
-   Repository inventory found WENO (~1 GB), tdm (~1.5 MB) and spherical bw
-   (~3.6 MB). The spherical reference is outside the selected geometry. Neither
-   million-seed output nor a sparse/fake large file substitutes for this input gate.
+- 热射线：三个 64×64 视角与 Python 参考的最大绝对差不超过
+  `2.73e-12 DN/s/pixel`；实际 500×500 图像在 1/2/4 工作者下逐值一致。
+  500×500 查询中位数分别为轴向 23.00/8.40/18.27 秒、斜向
+  29.41/15.59/9.22 秒、对角向 17.86/12.09/6.41 秒。
+  当时存在明显内存压力，不据此宣称四工作者普遍最优。
+- 几何计划：所声明的稀疏/稠密重复准备组合中测得 2.56/6.67 倍改善；
+  构建成本、保留内存和适用范围见原证据。
+- 全域 curl 加两切片：历史单工作者约 31–35 秒，两个进程约 17.5 秒，
+  四个进程约 13 秒，完整结果一致；控制数组上界约 584/735/917 MB。
+- 百万种子最多 32 步：历史 1/4 工作者为 8.176/2.274 秒，共
+  17,273,160 个接受步。1000³ 输出流完整消费十亿点，累计 24 GB 值，
+  81.283 秒，最大 slab 33 MB；没有保存整个立方数组。
 
-No ready authorized implementation or verification remains blocked merely by a
-milestone report. On a supplied response/model or fixture, resume that specific
-gate using the existing core and record, not an unrestricted new exploration.
+## 保留结果与可恢复提交
 
-## Explicit Limits And Dispositions
+- 原实现检查点：`ee96824`、`f6dc48e`、`6558286`、`8a80a2f`、
+  `2c00792`、`a5f1f88`；运行时采用版本 `6172bbb`，恢复记录 `cf4207d`。
+- 辐射/几何原分支：继承文档 `d1aaf66`，首轮实现 `ab75a17`，
+  恢复记录 `a61a0ac`，编译射线 `9f423e9`，最终实测记录 `8e35b2f`。
+  通过合并保留其祖先历史，而非直接覆盖主分支。
+- 原 worktree 的 28 个结果文件已逐个复制并校验 SHA-256，共
+  5,823,026 字节，位于 `benchmark-results/analysis-core/euv-geometry/`。
+  `migration-manifest.json` 保存清单；其中保留原始 JSON、日志、性能剖析、
+  初版 C-API 探索，以及 `thermal-500-images.npz` 和
+  `thermal-500-projections.png`。这些文件继续位于忽略目录。
+- 主目录既有 `benchmark-results/analysis-core/` 数值产物和原始记录保持原位，
+  包括全域 curl、百万种子结果和先前安装产物。
 
-Canonical APIs remain the default/rollback path. Their generated 2D read/write,
-bilinear/coarse-fine, Dataset, VTK and helper workflows are verified. New native
-consumers are nonperiodic Cartesian 3D; periodic metadata roundtrips are not
-periodic halo computation (canonical forest currently disables periodic links).
-No new 2D extrusion, periodic tracing, CT or non-Cartesian computation is claimed.
-Exact boundary footpoints, Q and GPU remain outside the selected delivered
-profiles, with reopen conditions in the design. E1/E2/E3/E4 and new compact
-persistent fill plans are evidence-backed deferred routes, not unfinished
-mandatory prototypes. Retain fast resident and memory-bounded preparations.
+## 剩余缺口与后续入口
 
-## Retained Outputs
+此前 P0–P4 已获授权，P2 是中间检查点；但整体科学与输入规模验收仍未完全结束。
+首个响应/EOS/单位选择已经落实，不再保留“等待委托首个模型”的过时阻塞。
 
-Ignored `benchmark-results/analysis-core/` contains all raw JSON/logs, the ~543 MB
-global-curl native product, ~96 MB million-seed summary, LOS scalar arrays/figure,
-and clean-source build/wheel artifacts. The 24 GB uniform value stream was
-consumed, not saved as a cube. Preserve these useful results; reclaim only owned
-scratch if needed under the recorded resource limit.
+1. 真实温度与物理归一化：WENO 只有密度和磁场，没有能量/温度；历史图像使用
+   制造的 0.45–1.65 MK 温度和明确的演示单位，不能当作真实快照热辐射。
+   历史表缺少完整 CHIANTI/丰度/标定生成元数据，当前仪器标定仍未验证。
+2. 真实大输入：仍需已有、可读的 10–20 GB Cartesian 快照。
+   百万种子、十亿输出点或制造的稀疏文件不能代替该输入验收。
+3. 非线性热辐射当前是驻留字段路径；有限内存响应执行、全域计划保留和生产直接
+   重分块准备没有交付。它们不构成本次整合的额外必做任务。
+4. 存储后续从[应用驱动评估](preparation-reuse-review.md)继续：先明确最终 C 缓冲区
+   所有权，再决定准备工作区能否无完整复制地释放；不要重跑已回退的缓存探索。
+
+当前新原生消费者仍限非周期 Cartesian 3D；不宣称新的 2D 挤出、周期追踪、CT、
+非 Cartesian、精确边界足点、Q 或 GPU 支持。规范用户 API 保持默认入口。
+实现和探索决策见[选定设计](native-core-design.md)，调用方式见[使用说明](usage.md)。
+
+本机沿用 8 GiB 内存、八个逻辑 CPU 的工作配置；验证至多四个计算工作者，
+单例受控数组不超过 2 GiB，新增临时磁盘不超过 2 GiB，保留至少 2 GiB 可用空间。
+这些约束不保证进程 RSS 或系统页缓存上界；本次没有新增时间或 token 预算。

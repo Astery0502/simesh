@@ -15,11 +15,13 @@ comparison measures avoided preparation, not parallel acceleration. Dense bulk
 versus bounded preparation comparisons have different residency and are not
 same-budget backend comparisons.
 
-This round measures sparse F, dense whole-domain curl plus slices, and repeated
-scalar LOS with unchanged numerical requirements and output. Another session
-owns AIA response, rebricking and persistent geometry plans. This session may
-measure transient planning and describe a plan interface; it does not implement
-plan persistence or a thermal response.
+This round measured sparse F, dense whole-domain curl plus slices, and repeated
+scalar LOS with unchanged numerical requirements and output. AIA response,
+rebricking and persistent geometry plans were developed independently and are
+now integrated in the same checkout; see [current](current.md). Their evidence
+remains separate from these runtime measurements. Planned preparation can use
+the retained raw-value cache and the same source-lifetime checks; it does not
+automatically replace pool miss scheduling or thermal ray dispatch.
 
 ## Selected Initial Questions
 

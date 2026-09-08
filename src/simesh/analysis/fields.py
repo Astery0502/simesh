@@ -40,6 +40,7 @@ class FieldSource:
     read_interiors: Callable | None = None
     original_field_ids: tuple | None = None
     validate_values: Callable | None = None
+    plan_builder: Callable | None = None
 
 
 @dataclass(frozen=True, eq=False)

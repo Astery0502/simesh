@@ -48,3 +48,8 @@ def global_curl_file(path,*,field_names=('b1','b2','b3'),field_units=None,
 
 
 __all__ += ["open_source","open_prepared","global_curl_file"]
+
+from .thermal import AIA171, CoronalComposition, ThermalLOSResult, thermal_fields, emissivity_fields, integrate_thermal_los
+from .geometry_plans import FillPlan, build_fill_plan
+__all__ += ["AIA171", "CoronalComposition", "ThermalLOSResult", "thermal_fields", "emissivity_fields", "integrate_thermal_los",
+            "FillPlan", "build_fill_plan"]
