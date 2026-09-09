@@ -26,6 +26,10 @@ from .tracing import Termination, TraceResult, trace, iter_traces, retrace
 from .projection import LOSResult, LOSStatus, integrate_los, integrate_los_views, orthographic_plane
 from .physics.thermal import AIA171, CoronalComposition, ThermalLOSResult, thermal_fields, emissivity_fields, integrate_thermal_los
 from .geometry import PointSet, RaySet, LineSet
+from .reductions import (LengthUnits, AxisAlignedSurface, volume_integral,
+                         weighted_mean, extrema, histogram, surface_flux)
+from .physics.mhd import MHDUnits, IdealMHD, MHDStatus, MHDStateError, mhd_fields
+from .results_io import ResultFile, ResultFileError, save_result, load_result
 
 __all__ = ["FieldDefinition", "Fields", "Mesh", "Selection", "mesh_from_forest", "select_region",
            "Source", "source_from_arrays", "read_fields", "open_amrvac", "prepare", "iter_prepared",
@@ -41,4 +45,7 @@ __all__ += ["qsl", "iter_qsl", "QSLResult", "Boundary", "ConnectivityTermination
 __all__ += ["PointSet", "RaySet", "LineSet"]
 __all__ += ["line_diagnostics","iter_line_diagnostics","magnitude","dot","gradient","divergence",
             "MagneticUnits","current_density","magnetic_pressure","magnetic_energy_density"]
+__all__ += ["LengthUnits","AxisAlignedSurface","volume_integral","weighted_mean","extrema","histogram","surface_flux",
+            "MHDUnits","IdealMHD","MHDStatus","MHDStateError","mhd_fields",
+            "ResultFile","ResultFileError","save_result","load_result"]
 __version__ = "0.2.0.dev0"

@@ -115,7 +115,8 @@ def _magnetic_energy(fields, units, components, name, label, memory_limit):
         norm = np.abs(ctx.field(selected[0])*units.field_tesla)
         for component in selected[1:]:
             norm = np.hypot(norm,ctx.field(component)*units.field_tesla)
-        return norm*(norm/(2*units.permeability_h_m))
+        scaled = norm/np.sqrt(units.permeability_h_m)
+        return (.5*scaled)*scaled
     return _recipe(fields,name,evaluate,label,memory_limit)
 
 

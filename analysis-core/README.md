@@ -20,6 +20,13 @@ explicitly normalized magnetic current/pressure/energy. Surface diagnostics can
 compute Q, twist or both; twist-only requests skip Q work. See
 [standard applications and the complete example](docs/standard-applications.md).
 
+Quantitative workflows now include [native AMR integrals/statistics](docs/reductions.md),
+[explicit ideal-MHD recovery](docs/mhd-thermodynamics.md), and
+[versioned application result files](docs/result-files.md). These APIs are
+available through `simesh` as well as their focused modules. The
+[combined workflow](docs/quantitative-workflow.md) recovers a state, reduces its
+interiors, generates thermal LOS and streamlines, and reloads saved products.
+
 The package imports as `simesh`. Install it in its own environment: the existing
 package in the parent repository uses the same import name. Runtime code and
 build inputs live entirely in this directory; no historical `simesh_rewrite`
