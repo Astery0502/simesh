@@ -1,10 +1,11 @@
 """Explicit historical AIA171 response and H/He thermodynamics on ready fields."""
 from dataclasses import dataclass, replace
-from concurrent.futures import ThreadPoolExecutor, wait
+from contextlib import nullcontext
 import numpy as np
 from ._aia171_table import LOG_T, RESPONSE, UPSTREAM_COMMIT
 from ..fields import FieldDefinition, Fields, require_fields, publish, require_continuous
-from .._validation import frozen_array, admit, remaining
+from .._validation import frozen_array, admit, remaining, workers_count
+from .._execution import native_dispatch, worker_context, run_ranges
 from ..operators.sampling import sample
 from ..projection import LOSResult, LOSStatus, integrate_los
 from ..slices import Plane
@@ -96,8 +97,8 @@ class AIA171:
         if not np.isfinite(t).all() or np.any(t <= 0):
             raise ValueError("temperature must be finite and positive in kelvin")
         logt = np.log10(t)
-        log_response = np.interp(logt, LOG_T, np.log10(RESPONSE))
-        return np.where((logt >= LOG_T[0]) & (logt <= LOG_T[-1]), 10.**log_response, 0.)
+        log_response = np.interp(logt, _RESPONSE_GRID, _LOG_RESPONSE)
+        return np.where((logt >= _RESPONSE_GRID[0]) & (logt <= _RESPONSE_GRID[-1]), 10.**log_response, 0.)
 
     def emissivity(self, mass_density_cgs, temperature_k):
         """Evaluate emission from mass density in g/cm³ and positive kelvin temperature."""
@@ -202,8 +203,7 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
     These orders define different reconstructions. Composite Gauss2 for nonlinear response is an approximation; check convergence and result status.
     """
     _check_thermal(thermodynamics, model)
-    if type(workers) is not int or workers < 1:
-        raise ValueError("workers must be a positive integer")
+    workers_count(workers)
     if implementation not in ("native", "reference"):
         raise ValueError("implementation must be native or reference")
     if implementation == "reference" and workers != 1:
@@ -294,7 +294,6 @@ def _native_los(fields,plane,direction,near,far,subdivisions,max_samples,
                 workers,values,entry,exit,status,samples,backend,schedule):
     from .._kernels.native import initialize_rays
     from .._kernels.thermal_rays import integrate_ready, openmp_build_info
-    from .._execution import native_dispatch
     native, dispatch = native_dispatch(backend,schedule,build_info=openmp_build_info)
     mesh = fields.mesh
     nx,ny = plane.shape
@@ -302,32 +301,21 @@ def _native_los(fields,plane,direction,near,far,subdivisions,max_samples,
                ((np.arange(ny)+.5)/ny)[None,:,None]*plane.v).reshape(-1,3)
     starts,ends = entry.ravel(),exit.ravel()
     flags = status.ravel()
-    flags.fill(0)
     initialize_rays(mesh.lower,mesh.upper,origins,direction,
         np.ascontiguousarray(near.ravel()),np.ascontiguousarray(far.ravel()),starts,ends,flags)
     output,counts = values.ravel(),samples.ravel()
     output[flags >= LOSStatus.MISSING_COVERAGE] = np.nan
-    def run(span):
+    def run(first,last):
+        span = slice(first,last)
         integrate_ready(mesh.roots,mesh.children,mesh.node_leaves,mesh.node_lower,mesh.node_upper,
             mesh.bounds,mesh.spacing,fields.slot_of_leaf,fields.values,fields.storage_halo,
             origins[span],direction,starts[span],ends[span],subdivisions,max_samples,
             _RESPONSE_GRID,_LOG_RESPONSE,_RESPONSE_SLOPES,output[span],flags[span],counts[span],
             workers if native else 1,dispatch)
-    if workers == 1 or native:
-        run(slice(None))
-    else:
-        # Bounded, coherent row ranges. No numeric cache or provider is mutated.
-        tasks = workers*4 if dispatch else workers
-        edges = np.linspace(0,nx*ny,min(tasks,nx*ny)+1,dtype=int)
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = []
-            try:
-                for a,b in zip(edges[:-1],edges[1:]):
-                    futures.append(executor.submit(run,slice(a,b)))
-                for future in futures:
-                    future.result()
-            finally:
-                wait(futures)
+    tasks = workers*4 if dispatch else workers
+    context = nullcontext(None) if native else worker_context(workers)
+    with context as executor:
+        run_ranges(nx*ny,1 if native else tasks,run,executor)
 
 
 def _scale_thermal_values(values, status, valid, length_unit_cm):

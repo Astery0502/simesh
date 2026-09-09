@@ -48,7 +48,7 @@ def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
                         memory_limit=None, backend="threadpool", schedule="static"):
     """Explicit missing-coverage coordination around the shared RK state machine."""
     from contextlib import nullcontext
-    from .tracing import _validate_inputs, _new_state, _advance_state, _result, Termination
+    from .tracing import _validate_inputs, _new_state, _advance_state, _result, _trace_batch_bytes, Termination
     from ._validation import admit, remaining
     from ._execution import native_dispatch, worker_context
     coupled = isinstance(pool,CurlPool)
@@ -61,7 +61,7 @@ def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
                                     direction,workers,seed_batch,trajectories,twist)
     native,dispatch = native_dispatch(backend,schedule)
     seed_batch = min(seed_batch,primary.capacity)
-    reserve = seeds.nbytes+3*seed_ids.nbytes+min(seed_batch,len(seeds))*(640+(48*(max_steps+1) if trajectories else 0))
+    reserve = _trace_batch_bytes(seeds,seed_ids,min(seed_batch,len(seeds)),max_steps,trajectories)
     temporary = None
     if twist and not coupled:
         pool = temporary = CurlPool(primary,memory_limit=remaining(memory_limit,reserve))
@@ -88,6 +88,7 @@ def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
                     elif np.any(state.status==Termination.RUNNING):
                         raise RuntimeError("tracer made no progress without a preparation request")
                 yield _result(state,trajectories,twist)
+                del state
     finally:
         if temporary is not None:
             temporary.close()
@@ -97,11 +98,11 @@ def trace_bounded(pool, seeds, *, max_steps=1000, trajectories=False, twist=Fals
                   memory_limit=None, **kwargs):
     """Collect raw TraceResult batches from an open PreparedPool; controls follow iter_traces_bounded.
     """
-    from .tracing import _collect
+    from .tracing import _collect, _trace_output_bytes
     from ._validation import remaining
     if type(max_steps) is not int or max_steps<0 or type(trajectories) is not bool or type(twist) is not bool:
         raise ValueError("invalid trace output settings")
-    output = len(seeds)*(96+(8 if twist else 0)+(24*(max_steps+1) if trajectories else 0))
+    output = _trace_output_bytes(len(seeds),max_steps,trajectories,twist)
     batches = iter_traces_bounded(pool,seeds,max_steps=max_steps,trajectories=trajectories,
         twist=twist,memory_limit=remaining(memory_limit,output),**kwargs)
     return _collect(batches,len(seeds),max_steps,trajectories,twist)

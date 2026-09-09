@@ -134,6 +134,14 @@ def _advance_state(fields, companion, state, *, step, max_steps, max_length,
 _PATH_SEGMENT_STEPS = 64
 
 
+def _trace_batch_bytes(seeds, seed_ids, count, max_steps, trajectories):
+    return seeds.nbytes+3*seed_ids.nbytes+count*(640+(48*(max_steps+1) if trajectories else 0))
+
+
+def _trace_output_bytes(count, max_steps, trajectories, twist):
+    return count*(96+(8 if twist else 0)+(24*(max_steps+1) if trajectories else 0))
+
+
 def _iter_path_segments(fields, seeds, seed_ids, *, step, max_steps, max_length,
                         null_threshold, direction, workers, backend, schedule,
                         memory_limit=None):
@@ -143,10 +151,11 @@ def _iter_path_segments(fields, seeds, seed_ids, *, step, max_steps, max_length,
     coverage terminates a line; a full segment only pauses it between RK steps.
     """
     native, dispatch = native_dispatch(backend, schedule)
-    reserve = seeds.nbytes+seed_ids.nbytes+len(seeds)*(640+24*(_PATH_SEGMENT_STEPS+1))
+    capacity = min(max_steps, _PATH_SEGMENT_STEPS)+1
+    reserve = seeds.nbytes+seed_ids.nbytes+len(seeds)*(640+24*capacity)
     admit(fields.mesh.nbytes+fields.nbytes+reserve,memory_limit,"trace segment")
     state = _new_state(fields.mesh,seeds,seed_ids,max_steps,max_length,True,False,
-                       path_capacity=_PATH_SEGMENT_STEPS+1)
+                       path_capacity=capacity)
     context = nullcontext(None) if native else worker_context(workers)
     path_start = 0
     with context as executor:
@@ -279,7 +288,7 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_lengt
         null_threshold,direction,workers,seed_batch,trajectories,twist)
     native,dispatch = native_dispatch(backend,schedule)
     count = min(seed_batch,len(seeds))
-    reserve = seeds.nbytes+3*seed_ids.nbytes+count*(640+(48*(max_steps+1) if trajectories else 0))
+    reserve = _trace_batch_bytes(seeds,seed_ids,count,max_steps,trajectories)
     if not len(seeds):
         return
     need_curl = twist and max_steps > 0 and max_length > 0
@@ -302,6 +311,7 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_lengt
                 raise RuntimeError("tracer made no progress and requested no coverage")
             state.status[pending] = Termination.MISSING_COVERAGE
             yield _result(state,trajectories,twist)
+            del state
 
 
 def _collect(batches, n, max_steps, trajectories, twist):
@@ -323,6 +333,7 @@ def _collect(batches, n, max_steps, trajectories, twist):
             if twist:
                 result.twist[offset:last] = batch.twist
             offset = last
+            del batch
             batch = next(batches,None)
         return result
     finally:
@@ -381,7 +392,7 @@ def trace(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_length=np.i
         require_fields(fields,halo=2,operation="twist with automatic curl")
     seeds,seed_ids = _validate_inputs(seeds,seed_ids,step,max_steps,max_length,null_threshold,
                                     direction,workers,seed_batch,trajectories,twist)
-    output = len(seeds)*(96+(8 if twist else 0)+(24*(max_steps+1) if trajectories else 0))
+    output = _trace_output_bytes(len(seeds),max_steps,trajectories,twist)
     batches = iter_traces(fields,seeds,seed_ids=seed_ids,step=step,max_steps=max_steps,max_length=max_length,
         null_threshold=null_threshold,direction=direction,workers=workers,seed_batch=seed_batch,
         trajectories=trajectories,twist=twist,curl_field=curl_field,

@@ -88,7 +88,8 @@ def test_scalar_los_views_depths_and_pool_eviction():
     assert np.isnan(limited.values[~limited.valid]).all()
 
 
-def test_explicit_thermal_models_and_two_reconstruction_orders():
+@pytest.mark.parametrize("workers,schedule", [(1,"static"),(4,"static"),(4,"dynamic")])
+def test_explicit_thermal_models_and_two_reconstruction_orders(workers,schedule):
     source,raw=mixed_source(lambda x,y,z:np.array([2+.1*x,np.ones_like(x),np.ones_like(x)]))
     density=sm.prepare(source,['b1'],scheme='exact-phase')
     temperature=np.empty((source.mesh.leaf_count,1,*source.mesh.block_shape))
@@ -101,7 +102,8 @@ def test_explicit_thermal_models_and_two_reconstruction_orders():
     thermo=sm.thermal_fields(density,t,density_unit_g_cm3=1e-15,temperature_label='manufactured test')
     direction=[.3,.2,1]
     plane=sm.orthographic_plane(source.mesh.lower,source.mesh.upper,direction,(8,8))
-    native=sm.integrate_thermal_los(thermo,plane,direction,length_unit_cm=1e8,workers=4)
+    native=sm.integrate_thermal_los(thermo,plane,direction,length_unit_cm=1e8,
+                                  workers=workers,schedule=schedule)
     reference=sm.integrate_thermal_los(thermo,plane,direction,length_unit_cm=1e8,implementation='reference')
     assert native.complete and reference.complete
     np.testing.assert_allclose(native.values,reference.values,rtol=1e-10,atol=1e-10)

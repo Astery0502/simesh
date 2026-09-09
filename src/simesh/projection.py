@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 import numpy as np
 
-from .fields import require_fields, require_continuous
+from .fields import require_continuous
 from .slices import Plane
 from ._validation import admit, workers_count
 from ._execution import worker_context, run_ranges, native_dispatch

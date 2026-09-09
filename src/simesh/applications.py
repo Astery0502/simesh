@@ -633,8 +633,7 @@ def trace(fields, points, *, direction="both", step, max_steps=1000, max_length=
             finally:
                 segments.close()
             del state,paths
-    # Reserve the packed copy and finite-value validation mask as well as the
-    # retained segments. No intermediate complete per-branch arrays are built.
+    # Packing overlaps retained segments; validation starts after their release.
     admit(base+2*retained+retained//8,memory_limit,"collected trace output")
     offsets = np.r_[np.int64(0),np.cumsum(counts,dtype=np.int64)]
     packed = np.empty((int(offsets[-1]),3))
@@ -643,6 +642,9 @@ def trace(fields, points, *, direction="both", step, max_steps=1000, max_length=
         for path in segments:
             packed[cursor:cursor+len(path)] = path
             cursor += len(path)
+        segments.clear()
+    pieces.clear()
+    path = None
     return LineSet(points,packed,offsets,status,fields.value_identity)
 
 
@@ -690,13 +692,14 @@ def los(fields, rays, *, component=0, quadrature="gauss2", step_fraction=.5,
     n = len(rays.origins)
     admit(fields.mesh.nbytes+fields.nbytes+rays.nbytes+n*48+min(n,ray_batch)*384,
           memory_limit,"ray-set LOS")
-    values,entry,exit = (np.zeros(n) for _ in range(3))
-    status,samples,misses = (np.zeros(n,dtype=np.int64) for _ in range(3))
+    values,entry,exit = (np.empty(n) for _ in range(3))
+    status,samples,misses = (np.empty(n,dtype=np.int64) for _ in range(3))
     m = fields.mesh
+    all_directions = np.broadcast_to(rays.directions,(n,3))
     with worker_context(workers) as executor:
         for start in range(0,n,ray_batch):
             stop = min(start+ray_batch,n)
-            directions = np.ascontiguousarray(np.broadcast_to(rays.directions,(n,3))[start:stop])
+            directions = np.ascontiguousarray(all_directions[start:stop])
             def run(first,last):
                 s = slice(start+first,start+last)
                 integrate_ray_set(m.lower,m.upper,m.roots,m.children,m.node_leaves,m.node_lower,m.node_upper,
@@ -778,10 +781,11 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
               memory_limit,"ray-set thermal LOS")
         values,entry,exit = (np.zeros(n) for _ in range(3))
         status,samples,misses = (np.zeros(n,dtype=np.int64) for _ in range(3))
+        all_directions = np.broadcast_to(rays.directions,(n,3))
         with worker_context(workers) as executor:
             for start in range(0,n,ray_batch):
                 stop = min(start+ray_batch,n)
-                directions = np.ascontiguousarray(np.broadcast_to(rays.directions,(n,3))[start:stop])
+                directions = np.ascontiguousarray(all_directions[start:stop])
                 def run(first,last):
                     s = slice(start+first,start+last)
                     origins = rays.origins.positions[s]
