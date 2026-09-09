@@ -114,7 +114,7 @@ def run(args):
         gc.collect()
         points=sm.PointSet.boundary(mesh,'zmin',(args.map_size,args.map_size))
         diagnostic=stage('bottom_Q_twist',lambda:app.connectivity(magnetic,points,quantities=('q','twist'),
-            method='finite-difference',normalization='mapping',step_fraction=.25,max_steps=args.max_steps,
+            normalization='mapping',step_fraction=.25,max_steps=args.max_steps,
             curl_field=curl,workers=args.workers,seed_batch=64,memory_limit=limit))
         restored=persist('bottom-diagnostics',diagnostic)
         for name in ('q','twist','footpoints','termination','valid'):

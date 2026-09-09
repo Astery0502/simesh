@@ -63,10 +63,9 @@ def test_twist_only_is_independent_of_q_work(monkeypatch):
     def unavailable(*args,**kwargs):
         raise AssertionError("Q computation was requested during twist-only analysis")
     monkeypatch.setattr(implementation,"_stencil",unavailable)
-    monkeypatch.setattr(implementation,"_unit_gradient",unavailable)
     monkeypatch.setattr(implementation,"_squashing",unavailable)
     only_twist = app.surface_diagnostics(replace(fields,valid_halo=1),points,
-        quantities=("twist",),curl_field=curl,method="variational",workers=2)
+        quantities=("twist",),curl_field=curl,workers=2)
     assert only_twist.quantities == ("twist",) and only_twist.data.q is None
     np.testing.assert_array_equal(only_twist.data.twist,combined.data.twist)
     np.testing.assert_array_equal(only_twist.data.footpoints,combined.data.footpoints)

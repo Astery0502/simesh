@@ -47,13 +47,14 @@ def test_constant_field_faces_boundary_seeds_and_streaming(axis):
 
 
 @pytest.mark.parametrize("mixed", [False,True])
-def test_hyperbolic_q_and_independent_endpoint_differences(mixed):
+@pytest.mark.parametrize("method", ["finite-difference","variational"])
+def test_hyperbolic_q_and_independent_endpoint_differences(mixed, method):
     a = .5
     with magnetic_source(lambda x,y,z: np.array([a*x,-a*y,np.ones_like(x)]), mixed=mixed) as source:
         ready = sm.prepare(source, scheme="exact-phase")
     delta = 1e-4
     seeds = np.array([[0.,0.,.5],[delta,0.,.5],[-delta,0.,.5],[0.,delta,.5],[0.,-delta,.5]])
-    result = sm.qsl(ready, seeds, bounds=BOX, twist=False)
+    result = sm.qsl(ready, seeds, bounds=BOX, twist=False, method=method)
     assert result.valid.all()
     expected = 2*np.cosh(2*a*(BOX[1][2]-BOX[0][2]))
     np.testing.assert_allclose(result.q, expected, rtol=.004)
@@ -64,30 +65,31 @@ def test_hyperbolic_q_and_independent_endpoint_differences(mixed):
     np.testing.assert_allclose(result.q[0], q_mapping, rtol=.004)
     np.testing.assert_allclose(result.q_perp[0], expected, rtol=.004)
     permuted = replace(ready, selection=sm.Selection(ready.mesh, ready.leaf_ids[::-1]))
-    again = sm.qsl(permuted, seeds[:1], bounds=BOX, twist=False, normalization="flux")
+    again = sm.qsl(permuted, seeds[:1], bounds=BOX, twist=False, normalization="flux", method=method)
     np.testing.assert_allclose(again.q, result.q[:1], rtol=.003)
 
 
 @pytest.mark.parametrize("a", [-.5,.5])
-def test_helical_twist_whole_line_direction_sign_and_local_sphere(a):
+@pytest.mark.parametrize("method", ["finite-difference","variational"])
+def test_helical_twist_whole_line_direction_sign_and_local_sphere(a, method):
     with magnetic_source(lambda x,y,z: np.array([-a*y,a*x,np.ones_like(x)]), mixed=True) as source:
         ready = sm.prepare(source, scheme="exact-phase")
     seeds = np.array([[0.,0.,.5],[.1,.1,.5]])
     companion = sm.curl(ready)
-    result = sm.qsl(ready, seeds, bounds=BOX, curl_field=companion)
+    result = sm.qsl(ready, seeds, bounds=BOX, curl_field=companion, method=method)
     length_z = BOX[1][2]-BOX[0][2]
     r2 = np.sum(seeds[:,:2]**2, axis=1)
     expected = a*length_z/(2*np.pi*np.sqrt(1+a*a*r2))
     assert result.valid.all()
     np.testing.assert_allclose(result.q, 2., atol=1e-5)
     np.testing.assert_allclose(result.twist, expected, rtol=2e-5)
-    local = sm.qsl(ready, seeds[:1], local_radius=.2)
+    local = sm.qsl(ready, seeds[:1], local_radius=.2, method=method)
     assert local.valid.all() and local.q_local is local.q
     np.testing.assert_array_equal(local.boundary, [[sm.Boundary.LOCAL_SPHERE]*2])
     np.testing.assert_allclose(local.length, .4, atol=1e-9)
     np.testing.assert_allclose(local.twist, a*.4/(2*np.pi), rtol=2e-5)
     # A nearby box surface replaces one side of the local sphere.
-    near = sm.qsl(ready, np.array([[0.,0.,.05]]), local_radius=.2)
+    near = sm.qsl(ready, np.array([[0.,0.,.05]]), local_radius=.2, method=method)
     np.testing.assert_array_equal(near.boundary, [[sm.Boundary.ZMIN,sm.Boundary.LOCAL_SPHERE]])
 
 
@@ -120,6 +122,17 @@ def test_partial_coverage_limits_nulls_corners_and_budget():
     assert np.isnan(corner.q).all()
 
 
+def test_q_converges_with_spatial_resolution():
+    expected = 2*np.cosh(.75)
+    errors = []
+    for cells in (8,16,32):
+        with magnetic_source(lambda x,y,z: np.array([.5*x,-.5*y,np.ones_like(x)]), cells=cells) as source:
+            ready = sm.prepare(source, scheme="exact-phase")
+        result = sm.qsl(ready, np.array([[0.,0.,.5]]), bounds=BOX, twist=False, method="variational")
+        errors.append(abs(result.q[0]-expected))
+    assert errors[1] < errors[0]*.4 and errors[2] < errors[1]*.4
+
+
 def test_nonlinear_amr_map_is_stable_under_step_and_stencil_refinement():
     def quadrupole(x,y,z):
         b = np.zeros((3,*x.shape))
@@ -146,7 +159,7 @@ def test_requested_surface_at_partial_coverage_edge_and_input_contracts():
     result = sm.qsl(partial, seeds, bounds=([-1,-1,0],[1,1,upper_z]))
     assert result.complete.all() and result.valid.all()
     np.testing.assert_array_equal(result.footpoints[0,:,2], [0.,upper_z])
-    for options in ({"delta":-1}, {"step_fraction":2},
+    for options in ({"method":"unknown"}, {"delta":-1}, {"step_fraction":2},
                     {"boundary_tolerance":0}, {"normalization":"unknown"},
                     {"local_radius":1e-12}, {"seed_batch":0}):
         with pytest.raises(ValueError):
@@ -158,20 +171,21 @@ def test_requested_surface_at_partial_coverage_edge_and_input_contracts():
     assert interior_only_twist_disabled.valid.all() and interior_only_twist_disabled.twist is None
 
 
+@pytest.mark.parametrize("method", ["finite-difference", "variational"])
 @pytest.mark.parametrize("seed_z", [.249, .24949999])
-def test_local_sphere_stops_before_missing_coverage(seed_z):
+def test_local_sphere_stops_before_missing_coverage(method, seed_z):
     with magnetic_source(lambda x,y,z: np.array([np.zeros_like(x),np.zeros_like(x),np.ones_like(x)]),
                          mixed=True) as source:
         partial = sm.prepare(source, region=([-1,-1,0],[1,1,.2]), scheme="exact-phase")
     radius = .0005
     result = sm.qsl(partial, np.array([[.1,.1,seed_z]]), local_radius=radius,
-                    twist=False)
+                    twist=False, method=method)
     assert result.valid.all() and result.complete.all()
     np.testing.assert_array_equal(result.termination, sm.ConnectivityTermination.LOCAL_EXIT)
     np.testing.assert_allclose(result.footpoints[0,:,2], [seed_z-radius,seed_z+radius], atol=1e-10)
     np.testing.assert_allclose(result.q, 2., atol=1e-8)
     missing = sm.qsl(partial, np.array([[.1,.1,seed_z]]), local_radius=.002,
-                     twist=False)
+                     twist=False, method=method)
     assert not missing.complete.any()
     assert sm.ConnectivityTermination.MISSING_COVERAGE in missing.termination
 
@@ -186,12 +200,3 @@ def test_valid_stencils_keep_their_rows_among_failed_seeds():
     direct = sm.qsl(ready, seeds[[0,3]], twist=False)
     np.testing.assert_allclose(result.q[[0,3]], direct.q)
     np.testing.assert_allclose(result.footpoints[[0,3]], direct.footpoints)
-
-
-@pytest.mark.parametrize("entry", [sm.qsl, sm.iter_qsl, sm.line_diagnostics, sm.iter_line_diagnostics])
-@pytest.mark.parametrize("method", ["variational", "finite-difference"])
-def test_method_selection_is_not_exposed(entry, method):
-    with magnetic_source(lambda x,y,z: np.array([0*x,0*y,np.ones_like(z)])) as source:
-        fields = sm.prepare(source, scheme="exact-phase")
-    with pytest.raises(TypeError, match="method"):
-        entry(fields, np.array([[0.,0.,.5]]), method=method)

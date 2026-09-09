@@ -234,9 +234,9 @@ def sample(fields, points, *, components=None, output=None, workers=1, memory_li
 def _diagnostic_support(fields, quantities, controls):
     from .connectivity import _require_support, _quantities
     names=None if quantities is None else _quantities(quantities)
-    _require_support(fields,compute_q=names is None or "q" in names,
+    _require_support(fields,
         twist=controls.get("twist",True) if names is None else "twist" in names,
-        method=controls.get("method","finite-difference"),curl_field=controls.get("curl_field"))
+        curl_field=controls.get("curl_field"))
     return names
 
 

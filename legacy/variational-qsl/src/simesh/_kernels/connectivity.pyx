@@ -1,7 +1,11 @@
 # cython: language_level=3, boundscheck=False, wraparound=False, cdivision=True
-"""AMR field-line and twist integration with localized surface events."""
+"""AMR field-line and transverse-variation integration with surface events.
 
-from libc.math cimport fabs, fmin, fmax, hypot, isfinite, nextafter, INFINITY
+Independent implementation of the published variational equations. Geometry
+ownership and trilinear interpolation are shared with the native N4 consumers.
+"""
+
+from libc.math cimport fabs, fmin, fmax, hypot, isfinite, log, nextafter, INFINITY
 from libc.stdint cimport int64_t
 from .native cimport owner, interpolate
 
@@ -11,17 +15,17 @@ cdef class _Sampler:
     cdef const double[::1] sample_lo, sample_hi
     cdef const int64_t[:, :, ::1] roots
     cdef const int64_t[:, ::1] children
-    cdef const int64_t[::1] leaves, slots, cslots
+    cdef const int64_t[::1] leaves, slots, gslots, cslots
     cdef const double[:, ::1] nlo, nhi, spacing
     cdef const double[:, :, ::1] bounds
-    cdef const double[:, :, :, :, ::1] values, curl
-    cdef int halo, chalo
+    cdef const double[:, :, :, :, ::1] values, gradient, curl
+    cdef int halo, ghalo, chalo
     cdef double null_threshold
     cdef double center[3]
     cdef double radius
-    cdef bint twist
+    cdef bint twist, variational
 
-    def __init__(self, fields, companion, null_threshold, lower, upper):
+    def __init__(self, fields, gradient, companion, null_threshold, lower, upper):
         mesh = fields.mesh
         self.lo, self.hi = mesh.lower, mesh.upper
         self.sample_lo, self.sample_hi = lower, upper
@@ -29,13 +33,16 @@ cdef class _Sampler:
         self.nlo, self.nhi = mesh.node_lower, mesh.node_upper
         self.bounds, self.spacing = mesh.bounds, mesh.spacing
         self.slots, self.values, self.halo = fields.slot_of_leaf, fields.values, fields.storage_halo
+        self.variational = gradient is not None
+        if self.variational:
+            self.gslots, self.gradient, self.ghalo = gradient.slot_of_leaf, gradient.values, gradient.storage_halo
         self.null_threshold = null_threshold
         self.radius = 0.
         self.twist = companion is not None
         if self.twist:
             self.cslots, self.curl, self.chalo = companion.slot_of_leaf, companion.values, companion.storage_halo
 
-    cdef int evaluate(self, const double* p, double* b,
+    cdef int evaluate(self, const double* p, double* b, double* g,
                       double* alpha, double* width) noexcept nogil:
         cdef double q[3]
         cdef double cb[3]
@@ -73,6 +80,15 @@ cdef class _Sampler:
             return 8
         if norm <= self.null_threshold:
             return 4
+        if self.variational:
+            if self.gslots[leaf] < 0:
+                return 7
+            if not interpolate(q, leaf, self.gslots[leaf], self.bounds, self.spacing,
+                               self.gradient, self.ghalo, g):
+                return 10
+            for a in range(9):
+                if not isfinite(g[a]):
+                    return 9
         alpha[0] = 0.
         if self.twist:
             if self.cslots[leaf] < 0:
@@ -91,30 +107,36 @@ cdef class _Sampler:
 cdef int _rhs(_Sampler sampler, const double* y, int direction,
               double* out, double* width) noexcept nogil:
     cdef double b[3]
+    cdef double g[9]
     cdef double alpha, norm
-    cdef int a, code
-    code = sampler.evaluate(y, b, &alpha, width)
+    cdef int a, j, column, code
+    code = sampler.evaluate(y, b, g, &alpha, width)
     if code:
         return code
     norm = hypot(hypot(b[0], b[1]), b[2])
     for a in range(3):
         out[a] = direction*b[a]/norm
-    out[3] = alpha
+        for column in range(2):
+            out[3+3*column+a] = 0.
+            if sampler.variational:
+                for j in range(3):
+                    out[3+3*column+a] += direction*g[3*a+j]*y[3+3*column+j]
+    out[9] = alpha
     return 0
 
 
 cdef int _rk4(_Sampler sampler, const double* y, double h, int direction,
               double* out, double* min_width,
               const double* lo, const double* hi, bint* outside_stage) noexcept nogil:
-    cdef double k[4][4]
-    cdef double stage[4]
+    cdef double k[4][10]
+    cdef double stage[10]
     cdef double width, factor, total
     cdef int i, j, code
     min_width[0] = INFINITY
     outside_stage[0] = False
     for i in range(4):
         factor = .5 if i < 3 else 1.
-        for j in range(4):
+        for j in range(10):
             stage[j] = y[j] if i == 0 else y[j] + factor*h*k[i-1][j]
         for j in range(3):
             if stage[j] < lo[j] or stage[j] > hi[j]:
@@ -125,7 +147,7 @@ cdef int _rk4(_Sampler sampler, const double* y, double h, int direction,
         if code:
             return code
         min_width[0] = fmin(min_width[0], width)
-    for j in range(4):
+    for j in range(10):
         total = k[0][j] + 2.*k[1][j] + 2.*k[2][j] + k[3][j]
         out[j] = y[j] + (h/6.)*total
         if not isfinite(out[j]):
@@ -182,16 +204,17 @@ cdef int _boundary(double* p, const double* lo, const double* hi,
 cdef void _half(_Sampler sampler, const double* seed, const double* center, int direction,
                 const double* lo, const double* hi, double fraction, double max_step,
                 int64_t max_steps, double max_length, double tolerance, double radius,
-                double* position, double* b_end,
+                double* position, double* uv, double* scaling, double* b_end,
                 double* normal, double* length, double* twist, int64_t* steps,
                 int64_t* status, int64_t* face) noexcept nogil:
-    cdef double y[4]
-    cdef double trial[4]
-    cdef double middle[4]
+    cdef double y[10]
+    cdef double trial[10]
+    cdef double middle[10]
     cdef double b[3]
+    cdef double g[9]
     cdef double tangent[3]
-    cdef double width, alpha, norm, h, min_width, low, high, mid
-    cdef int a, j, code, iteration, retry
+    cdef double width, alpha, norm, h, min_width, low, high, mid, scale, s
+    cdef int a, j, axis, code, iteration, retry
     cdef bint outside, crossed
     for a in range(3):
         y[a] = seed[a]
@@ -200,14 +223,30 @@ cdef void _half(_Sampler sampler, const double* seed, const double* center, int 
             status[0] = 6
             return
     sampler.radius = radius
-    code = sampler.evaluate(y, b, &alpha, &width)
+    code = sampler.evaluate(y, b, g, &alpha, &width)
     if code:
         status[0] = code
         return
     norm = hypot(hypot(b[0], b[1]), b[2])
+    axis = 0
     for a in range(3):
         tangent[a] = direction*b[a]/norm
-    y[3] = 0.
+        if fabs(b[a]) < fabs(b[axis]):
+            axis = a
+    if sampler.variational:
+        # Project the least parallel Cartesian axis for a stable seed basis.
+        for a in range(3):
+            y[3+a] = (1. if a == axis else 0.) - (b[axis]/norm)*(b[a]/norm)
+        s = hypot(hypot(y[3], y[4]), y[5])
+        for a in range(3):
+            y[3+a] /= s
+        y[6] = (b[1]/norm)*y[5]-(b[2]/norm)*y[4]
+        y[7] = (b[2]/norm)*y[3]-(b[0]/norm)*y[5]
+        y[8] = (b[0]/norm)*y[4]-(b[1]/norm)*y[3]
+    else:
+        for j in range(3,9):
+            y[j] = 0.
+    y[9] = 0.
     face[0] = _boundary(y, lo, hi, center, radius, tolerance, tangent, True, normal)
     if face[0]:
         status[0] = 12 if face[0] == 9 else 3
@@ -266,11 +305,11 @@ cdef void _half(_Sampler sampler, const double* seed, const double* center, int 
         if trial[0] == y[0] and trial[1] == y[1] and trial[2] == y[2]:
             status[0] = 11
             break
-        for j in range(4):
+        for j in range(10):
             y[j] = trial[j]
         length[0] += h
         steps[0] += 1
-        code = sampler.evaluate(y, b, &alpha, &width)
+        code = sampler.evaluate(y, b, g, &alpha, &width)
         if code:
             status[0] = code
             break
@@ -282,22 +321,35 @@ cdef void _half(_Sampler sampler, const double* seed, const double* center, int 
             status[0] = 12 if face[0] == 9 else 3
         elif crossed:
             status[0] = 11
+        if sampler.variational:
+            scale = 0.
+            for j in range(3,9):
+                scale = fmax(scale, fabs(y[j]))
+            if scale == 0. or not isfinite(scale):
+                status[0] = 9
+                break
+            scaling[0] += log(scale)
+            for j in range(3,9):
+                y[j] /= scale
     for a in range(3):
         position[a] = y[a]
         b_end[a] = b[a]
-    twist[0] = y[3]
+        uv[a] = y[3+a]
+        uv[3+a] = y[6+a]
+    twist[0] = y[9]
 
 
-def trace_halves(fields, companion, const double[:, ::1] seeds,
+def trace_halves(fields, gradient, companion, const double[:, ::1] seeds,
                  const double[:, ::1] centers,
                  const double[::1] lower, const double[::1] upper,
                  double step_fraction, double max_step, int64_t max_steps,
                  double max_length, double null_threshold, double boundary_tolerance,
                  double local_radius, double[:, :, ::1] positions,
+                 double[:, :, :, ::1] vectors, double[:, ::1] scales,
                  double[:, :, ::1] endpoint_fields, double[:, :, ::1] normals,
                  double[:, ::1] lengths, double[:, ::1] twists,
                  int64_t[:, ::1] steps, int64_t[:, ::1] status, int64_t[:, ::1] faces):
-    cdef _Sampler sampler = _Sampler(fields, companion, null_threshold, lower, upper)
+    cdef _Sampler sampler = _Sampler(fields, gradient, companion, null_threshold, lower, upper)
     cdef Py_ssize_t i
     cdef int side
     with nogil:
@@ -306,6 +358,6 @@ def trace_halves(fields, companion, const double[:, ::1] seeds,
                 _half(sampler, &seeds[i,0], &centers[i,0], 2*side-1, &lower[0], &upper[0],
                       step_fraction, max_step, max_steps, max_length,
                       boundary_tolerance, local_radius, &positions[i,side,0],
-                      &endpoint_fields[i,side,0],
+                      &vectors[i,side,0,0], &scales[i,side], &endpoint_fields[i,side,0],
                       &normals[i,side,0], &lengths[i,side], &twists[i,side],
                       &steps[i,side], &status[i,side], &faces[i,side])

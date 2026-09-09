@@ -118,7 +118,7 @@ def test_derivative_support_and_categorical_selections():
     assert second.valid_halo == 0 and np.shares_memory(second.values,target)
     assert target.flags.writeable and not second.values.flags.writeable
     for invoke in (lambda: sm.sample(second,[[.2,.2,.2]]),
-                   lambda: sm.qsl(first,[[.2,.2,.2]],method='variational',twist=False),
+                   lambda: sm.qsl(second,[[.2,.2,.2]],twist=False),
                    lambda: sm.trace(first,[[.2,.2,.2]],step=.1,twist=True)):
         with pytest.raises(ValueError,match='valid_halo=.*requires at least'):
             invoke()

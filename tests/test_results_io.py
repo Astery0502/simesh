@@ -395,8 +395,8 @@ def test_empty_and_batched_connectivity_maps(tmp_path, magnetic, points, quantit
         np.testing.assert_array_equal(restored.points.ids, points.ids[2*index:2*index+2])
 
 
-def test_variational_flux_and_native_scalar_radius(tmp_path, magnetic, points):
-    result = app.connectivity(magnetic, points, quantities=("q",), method="variational",
+def test_flux_and_native_scalar_radius(tmp_path, magnetic, points):
+    result = app.connectivity(magnetic, points, quantities=("q",),
                               normalization="flux", local_radius=np.float64(.15))
     roundtrip(tmp_path, result)
 
