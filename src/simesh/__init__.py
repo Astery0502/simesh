@@ -12,6 +12,8 @@ from .io.amrvac import open_amrvac
 from .io.metadata import SnapshotMetadata
 from .io.products import write_amrvac
 from .io.cache import cache_source
+from .io.uniform import export_uniform, export_uniform_vtk
+from .io.vtk import write_uniform_vtk
 from .io.jobs import global_curl_file
 from .preparation import prepare
 from .preparation.plans import FillPlan, plan_preparation
@@ -42,7 +44,7 @@ __all__ += ["select_source", "cache_source", "FillPlan", "plan_preparation", "gl
             "iter_uniform", "retrace", "LOSResult", "LOSStatus", "integrate_los", "integrate_los_views",
             "orthographic_plane", "AIA171", "CoronalComposition", "ThermalLOSResult", "thermal_fields",
             "emissivity_fields", "integrate_thermal_los"]
-__all__ += ["SnapshotMetadata", "write_amrvac"]
+__all__ += ["export_uniform", "export_uniform_vtk", "write_uniform_vtk", "SnapshotMetadata", "write_amrvac"]
 __all__ += ["AxisSlice", "AMRSliceResult", "slice_axis"]
 __all__ += ["derive", "derive_many", "DerivedContext", "select_fields", "merge_fields"]
 __all__ += ["qsl", "iter_qsl", "QSLResult", "Boundary", "ConnectivityTermination"]

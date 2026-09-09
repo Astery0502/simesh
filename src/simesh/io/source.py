@@ -255,7 +255,7 @@ def read_fields(source, fields=None, *, region=None, leaf_ids=None, memory_limit
     -------
     Fields
         Detached component-last interiors with zero valid halo. Use prepare before
-        interpolation or derivatives.
+        linear interpolation or derivatives; zero-order sampling needs no halo.
     """
     selection = resolve_selection(source.mesh, region, leaf_ids)
     field_ids = source.field_ids(fields)

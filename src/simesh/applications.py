@@ -453,13 +453,14 @@ class UniformResult:
 
 
 def uniform_grid(fields, resolution, *, components=None, output=None, bounds=None,
-                 workers=1, tile_rows=64, memory_limit=None):
+                 interpolation="linear", workers=1, tile_rows=64, memory_limit=None):
     """Write a sampled volume directly to final arrays, optionally caller-owned.
 
     Parameters
     ----------
     fields : Fields
-        Continuous selected components with at least one valid halo.
+        Selected components; linear sampling requires continuous values and one valid
+        halo. Zero/native output reads interiors only, including categorical values.
     resolution : sequence of int
         Positive uniform-grid cell counts (nx, ny, nz).
     components : str or int or sequence, optional
@@ -469,10 +470,15 @@ def uniform_grid(fields, resolution, *, components=None, output=None, bounds=Non
         no input aliases. Failure may leave partial writes.
     bounds : array-like, optional
         Lower and upper physical bounds; defaults to the original domain.
+    interpolation : {"linear", "zero", "native"}
+        Linear cell-center sampling (default), containing-cell zero-order sampling,
+        or exact block placement. Native requires matching spacing on every leaf
+        and cell-aligned bounds. Zero-order coarsening is not conservative averaging.
     workers : int
         Number of workers over disjoint ranges.
     tile_rows : int
-        Maximum rows sampled per tile; collected output still occupies memory.
+        Maximum rows per linear-sampling tile; zero/native modes write by leaf.
+        Collected output still occupies memory.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
 
@@ -482,30 +488,19 @@ def uniform_grid(fields, resolution, *, components=None, output=None, bounds=Non
         Complete cell-center volume with component definitions and coverage, even when
         computation is tiled.
     """
+    from ._uniform import resident, output_arrays
+    if type(tile_rows) is not int or tile_rows < 1:
+        raise ValueError("tile_rows must be positive")
+    if interpolation != "linear":
+        return resident(fields, resolution, components, output, bounds, interpolation, workers, memory_limit)
     from .operators.sampling import _sample
-    from ._execution import worker_context
     selected=np.asarray(require_continuous(fields,components,operation="uniform_grid"),dtype=np.int64)
     resolution,lower,upper = _uniform_geometry(fields.mesh,resolution,bounds)
     nx,ny,nz=resolution
-    if type(tile_rows) is not int or tile_rows<1:
-        raise ValueError("tile_rows must be positive")
     count=len(selected)
-    output_bytes=math.prod(resolution)*(8*count+1)+48
     scratch=min(nx,tile_rows)*ny*128
-    admit(fields.nbytes+fields.mesh.nbytes+output_bytes+scratch,memory_limit,"uniform volume")
-    if output is None:
-        values=np.empty((*resolution,count))
-        valid=np.empty(resolution,dtype=bool)
-    else:
-        if not isinstance(output,(tuple,list)) or len(output)!=2:
-            raise ValueError("output must be (values, valid)")
-        values,valid=output
-        if any(not isinstance(a,np.ndarray) or a.shape!=shape or a.dtype!=dtype or
-               not a.flags.c_contiguous or not a.flags.writeable
-               for a,shape,dtype in ((values,(*resolution,count),np.float64),(valid,resolution,np.bool_))):
-            raise ValueError("output must match writable contiguous volume values and validity")
-        if any(np.shares_memory(a,b) for a in output for b in (*_input_arrays(fields),lower,upper)) or np.shares_memory(values,valid):
-            raise ValueError("output must not alias input or other output")
+    values,valid=output_arrays(resolution,count,output,(*_input_arrays(fields),lower,upper),
+        fields.nbytes+fields.mesh.nbytes+scratch,memory_limit)
     width=upper-lower
     v=(np.arange(ny)+.5)/ny
     with worker_context(workers) as executor:

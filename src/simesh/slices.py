@@ -380,21 +380,27 @@ def _uniform_geometry(mesh,resolution,bounds):
     return tuple(map(int,resolution)),lower,upper
 
 
-def iter_uniform(fields,resolution,*,components=None,bounds=None,tile_rows=64,workers=1,memory_limit=None):
+def iter_uniform(fields,resolution,*,components=None,bounds=None,interpolation="linear",tile_rows=64,workers=1,memory_limit=None):
     """Yield owned (z index, SliceResult) slabs without materializing a volume.
 
     Parameters
     ----------
     fields : Fields
-        Continuous selected components with at least one valid halo.
+        Selected components; linear sampling requires continuous values and one valid
+        halo. Zero/native output reads interiors only, including categorical values.
     resolution : sequence of int
         Positive uniform-grid cell counts (nx, ny, nz).
     components : str or int or sequence, optional
         Names or local component indices, in output order.
     bounds : array-like, optional
         Lower and upper physical bounds; defaults to the original domain.
+    interpolation : {"linear", "zero", "native"}
+        Linear sampling, containing-cell zero-order sampling, or exact placement.
+        Native requires matching spacing on every leaf and cell-aligned bounds.
+        Zero-order coarsening is not conservative averaging.
     tile_rows : int
-        Maximum rows sampled per tile; collected output still occupies memory.
+        Maximum rows per linear-sampling tile; zero/native modes write by leaf.
+        Collected output still occupies memory.
     workers : int
         Number of workers over disjoint ranges.
     memory_limit : int, optional
@@ -406,6 +412,12 @@ def iter_uniform(fields,resolution,*,components=None,bounds=None,tile_rows=64,wo
         Owned (z_index, SliceResult) XY slices in z order; input Fields remain resident
         and no complete volume is collected.
     """
+    if type(tile_rows) is not int or tile_rows < 1:
+        raise ValueError("tile_rows must be positive")
+    if interpolation != "linear":
+        from ._uniform import slabs
+        yield from slabs(fields, resolution, components, bounds, interpolation, workers, memory_limit)
+        return
     from ._validation import remaining
     selected=np.asarray(require_continuous(fields,components,operation="iter_uniform"),dtype=np.int64)
     (nx,ny,nz),lower,upper=_uniform_geometry(fields.mesh,resolution,bounds)

@@ -18,7 +18,7 @@ class FieldDefinition:
     units : str
         Unit label, without automatic numerical conversion.
     interpretation : str
-        Meaning of the values; categorical prefixes prohibit interpolation.
+        Meaning of the values; categorical prefixes prohibit linear interpolation.
     """
     name: str
     units: str = "code"

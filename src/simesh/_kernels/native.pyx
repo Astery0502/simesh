@@ -652,3 +652,59 @@ cpdef void advance_rays(
                 if last > count:
                     last = count
                 _advance_ray_range(first, last, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, component, origins, direction, progress, ends, step_fraction, quadrature, max_samples, values, status, requested, samples, misses)
+
+
+cpdef void uniform_zero_blocks(
+    const int64_t[::1] leaf_nodes, const double[:, ::1] nlo,
+    const double[:, ::1] nhi, const double[:, :, ::1] bounds,
+    const double[:, ::1] spacing, const int64_t[::1] ids,
+    const int64_t[::1] slots, const double[:, :, :, :, ::1] data,
+    int halo, const int64_t[::1] selected, const double[::1] lower,
+    const double[::1] step, double[:, :, :, ::1] output,
+    unsigned char[:, :, ::1] valid, int64_t[:, :, ::1] owners=None,
+    int64_t z_offset=0,
+):
+    """Place containing-cell values on a uniform lattice, without reading halo."""
+    cdef Py_ssize_t row, a, i, j, k, column
+    cdef int64_t leaf, node, slot, begin[3], end[3], cell[3], size[3]
+    cdef double p[3], first, last
+    cdef bint inside
+    size[0] = data.shape[1]-2*halo
+    size[1] = data.shape[2]-2*halo
+    size[2] = data.shape[3]-2*halo
+    with nogil:
+        for row in range(ids.shape[0]):
+            leaf, slot = ids[row], slots[row]
+            node = leaf_nodes[leaf]
+            for a in range(3):
+                # Clip before integer conversion; expanded candidates are checked
+                # against authoritative half-open leaf bounds below.
+                first = floor((nlo[node,a]-lower[a])/step[a]-.5)
+                last = ceil((nhi[node,a]-lower[a])/step[a]-.5)+1
+                if a == 2:
+                    first -= z_offset
+                    last -= z_offset
+                begin[a] = <int64_t>max(0., min(<double>output.shape[a], first))
+                end[a] = <int64_t>max(0., min(<double>output.shape[a], last))
+            if begin[0] >= end[0] or begin[1] >= end[1] or begin[2] >= end[2]:
+                continue
+            for i in range(begin[0],end[0]):
+                p[0] = lower[0]+(i+.5)*step[0]
+                for j in range(begin[1],end[1]):
+                    p[1] = lower[1]+(j+.5)*step[1]
+                    for k in range(begin[2],end[2]):
+                        p[2] = lower[2]+(k+z_offset+.5)*step[2]
+                        inside = True
+                        for a in range(3):
+                            if p[a] < nlo[node,a] or p[a] >= nhi[node,a]:
+                                inside = False
+                        if not inside:
+                            continue
+                        for a in range(3):
+                            cell[a] = <int64_t>floor((p[a]-bounds[leaf,0,a])/spacing[leaf,a])
+                            cell[a] = max(0,min(size[a]-1,cell[a]))+halo
+                        for column in range(selected.shape[0]):
+                            output[i,j,k,column] = data[slot,cell[0],cell[1],cell[2],selected[column]]
+                        valid[i,j,k] = 1
+                        if owners is not None:
+                            owners[i,j,k] = leaf
