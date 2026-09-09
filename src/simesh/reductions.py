@@ -12,7 +12,7 @@ import numpy as np
 
 from ._validation import frozen_array
 from .fields import FieldDefinition, require_fields, _field_index
-from .mesh import Selection
+from .mesh import Selection, _axis_candidates, _cell_edges, _cell_index
 
 
 REPRESENTATION = "piecewise-constant leaf interiors"
@@ -296,16 +296,7 @@ class _Domain:
             axis, coordinate = surface.axis, surface.coordinate
             axes = np.array([i for i in range(3) if i != axis])
             box = surface.bounds
-            # Physical faces always take the inward trace. Internal interfaces
-            # use one side only, even when coarse and fine leaves meet there.
-            self.side = surface.side
-            if coordinate == mesh.lower[axis]:
-                self.side = "positive"
-            elif coordinate == mesh.upper[axis]:
-                self.side = "negative"
-            lo, hi = mesh.bounds[:, 0, axis], mesh.bounds[:, 1, axis]
-            candidates = ((lo <= coordinate) & (coordinate < hi) if self.side == "positive"
-                          else (lo < coordinate) & (coordinate <= hi))
+            candidates, self.side = _axis_candidates(mesh, axis, coordinate, surface.side)
         self.box = box
         lower, upper = mesh.lower[axes], mesh.upper[axes]
         width = np.maximum(0., np.minimum(box[1], upper) - np.maximum(box[0], lower))
@@ -323,13 +314,10 @@ class _Domain:
         mesh = self.mesh
         slices, lengths, centers = [], [], []
         transverse = 0
-        for axis, count in enumerate(mesh.block_shape):
-            edges = mesh.bounds[leaf, 0, axis] + np.arange(count + 1) * mesh.spacing[leaf, axis]
-            edges[-1] = mesh.bounds[leaf, 1, axis]
+        for axis in range(3):
+            edges = _cell_edges(mesh, leaf, axis)
             if self.surface is not None and axis == self.surface.axis:
-                index = int(np.searchsorted(edges, self.surface.coordinate,
-                                            side="right" if self.side == "positive" else "left") - 1)
-                index = min(max(index, 0), count - 1)
+                index = _cell_index(edges, self.surface.coordinate, self.side)
                 slices.append(slice(index, index + 1))
                 lengths.append(np.ones(1))
                 centers.append(np.array([self.surface.coordinate]))

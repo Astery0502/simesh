@@ -10,6 +10,33 @@ from ._amr.refined_geometry import refined_leaf_geometry
 from ._amr.balance import validate_refined_all_touch_2to1
 
 
+def _axis_candidates(mesh, axis, coordinate, side):
+    """Select one side of an interface; physical domain faces take the inward trace."""
+    if coordinate == mesh.lower[axis]:
+        side = "positive"
+    elif coordinate == mesh.upper[axis]:
+        side = "negative"
+    lo, hi = mesh.bounds[:, 0, axis], mesh.bounds[:, 1, axis]
+    active = ((lo <= coordinate) & (coordinate < hi) if side == "positive"
+              else (lo < coordinate) & (coordinate <= hi))
+    return active, side
+
+
+def _cell_edges(mesh, leaf, axis, offsets=None):
+    """Build original cell edges, preserving the exact upper block face."""
+    if offsets is None:
+        offsets = np.arange(mesh.block_shape[axis] + 1)
+    edges = mesh.bounds[leaf, 0, axis] + offsets*mesh.spacing[leaf, axis]
+    edges[-1] = mesh.bounds[leaf, 1, axis]
+    return edges
+
+
+def _cell_index(edges, coordinate, side):
+    """Choose an adjacent interior cell using explicit edges, not a rounded quotient."""
+    index = int(np.searchsorted(edges, coordinate, side="right" if side == "positive" else "left")) - 1
+    return min(max(index, 0), len(edges) - 2)
+
+
 @dataclass(frozen=True, eq=False)
 class Selection:
     """Ordered complete target leaves and an optional requested physical box.

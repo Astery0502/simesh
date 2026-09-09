@@ -23,7 +23,7 @@ from .field_ops import select_fields, merge_fields
 from .connectivity import qsl, iter_qsl, line_diagnostics, iter_line_diagnostics, QSLResult, Boundary, ConnectivityTermination
 from .diagnostics import (magnitude, dot, gradient, divergence, MagneticUnits,
                           current_density, magnetic_pressure, magnetic_energy_density)
-from .slices import Plane, SliceResult, sample_plane, iter_uniform
+from .slices import Plane, SliceResult, sample_plane, iter_uniform, AxisSlice, AMRSliceResult, slice_axis
 from .tracing import Termination, TraceResult, trace, iter_traces, retrace
 from .projection import LOSResult, LOSStatus, integrate_los, integrate_los_views, orthographic_plane
 from .physics.thermal import AIA171, CoronalComposition, ThermalLOSResult, thermal_fields, emissivity_fields, integrate_thermal_los
@@ -43,6 +43,7 @@ __all__ += ["select_source", "cache_source", "FillPlan", "plan_preparation", "gl
             "orthographic_plane", "AIA171", "CoronalComposition", "ThermalLOSResult", "thermal_fields",
             "emissivity_fields", "integrate_thermal_los"]
 __all__ += ["SnapshotMetadata", "write_amrvac"]
+__all__ += ["AxisSlice", "AMRSliceResult", "slice_axis"]
 __all__ += ["derive", "derive_many", "DerivedContext", "select_fields", "merge_fields"]
 __all__ += ["qsl", "iter_qsl", "QSLResult", "Boundary", "ConnectivityTermination"]
 __all__ += ["PointSet", "RaySet", "LineSet"]
