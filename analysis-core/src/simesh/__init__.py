@@ -17,7 +17,8 @@ from .preparation.plans import FillPlan, plan_preparation
 from .bounded import iter_prepared, global_curl
 from .operators.sampling import sample
 from .operators.derivatives import derivative, curl
-from .operators.derived import derive, DerivedContext
+from .operators.derived import derive, derive_many, DerivedContext
+from .field_ops import select_fields, merge_fields
 from .connectivity import qsl, iter_qsl, line_diagnostics, iter_line_diagnostics, QSLResult, Boundary, ConnectivityTermination
 from .diagnostics import (magnitude, dot, gradient, divergence, MagneticUnits,
                           current_density, magnetic_pressure, magnetic_energy_density)
@@ -26,6 +27,7 @@ from .tracing import Termination, TraceResult, trace, iter_traces, retrace
 from .projection import LOSResult, LOSStatus, integrate_los, integrate_los_views, orthographic_plane
 from .physics.thermal import AIA171, CoronalComposition, ThermalLOSResult, thermal_fields, emissivity_fields, integrate_thermal_los
 from .geometry import PointSet, RaySet, LineSet
+from .line_profiles import LineProfile, LineProfiles, sample_line_profiles
 from .reductions import (LengthUnits, AxisAlignedSurface, volume_integral,
                          weighted_mean, extrema, histogram, surface_flux)
 from .physics.mhd import MHDUnits, IdealMHD, MHDStatus, MHDStateError, mhd_fields
@@ -40,9 +42,10 @@ __all__ += ["cache_source", "FillPlan", "plan_preparation", "global_curl", "glob
             "orthographic_plane", "AIA171", "CoronalComposition", "ThermalLOSResult", "thermal_fields",
             "emissivity_fields", "integrate_thermal_los"]
 __all__ += ["source_from_dataset", "write_amrvac"]
-__all__ += ["derive", "DerivedContext"]
+__all__ += ["derive", "derive_many", "DerivedContext", "select_fields", "merge_fields"]
 __all__ += ["qsl", "iter_qsl", "QSLResult", "Boundary", "ConnectivityTermination"]
 __all__ += ["PointSet", "RaySet", "LineSet"]
+__all__ += ["LineProfile", "LineProfiles", "sample_line_profiles"]
 __all__ += ["line_diagnostics","iter_line_diagnostics","magnitude","dot","gradient","divergence",
             "MagneticUnits","current_density","magnetic_pressure","magnetic_energy_density"]
 __all__ += ["LengthUnits","AxisAlignedSurface","volume_integral","weighted_mean","extrema","histogram","surface_flux",

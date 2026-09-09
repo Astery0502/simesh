@@ -27,6 +27,12 @@ available through `simesh` as well as their focused modules. The
 [combined workflow](docs/quantitative-workflow.md) recovers a state, reduces its
 interiors, generates thermal LOS and streamlines, and reloads saved products.
 
+[Field composition](docs/field-composition.md) adds owned component selection,
+leaf-aligned merging and multi-output pointwise recipes. Use
+[line profiles](docs/line-profiles.md) to sample these quantities along stored
+curves with seed IDs, branch distances and per-component validity. Both APIs
+are available through `simesh`; the combined workflow also demonstrates them.
+
 The package imports as `simesh`. Install it in its own environment: the existing
 package in the parent repository uses the same import name. Runtime code and
 build inputs live entirely in this directory; no historical `simesh_rewrite`
@@ -203,7 +209,7 @@ Only pass groups needed by the recipe, since every supplied group limits support
 
 Results own their arrays even when an input is a scoped prepared batch. Recipes
 and input arrays are not retained, and there is no registry or automatic
-recomputation. `memory_limit` covers the input/output arrays and a result block;
+recomputation. `memory_limit` covers the input/output arrays and two result blocks;
 arbitrary temporary allocations in user callbacks are outside that estimate.
 Nonfinite formula values propagate; choose explicit handling for invalid physics.
 

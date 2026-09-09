@@ -139,6 +139,26 @@ def _field_index(definitions, name):
     return matches[0]
 
 
+def _component_indices(fields, components):
+    if components is None:
+        return tuple(range(len(fields.fields)))
+    if isinstance(components, (str, int, np.integer)):
+        components = (components,)
+    selected = []
+    for component in components:
+        if isinstance(component, str):
+            component = _field_index(fields.fields, component)
+        if (isinstance(component, (bool, np.bool_)) or
+                not isinstance(component, (int, np.integer)) or
+                not 0 <= component < len(fields.fields)):
+            raise ValueError("components must be field names or available integer indices")
+        selected.append(int(component))
+    if not selected or len(set(selected)) != len(selected):
+        raise ValueError("select at least one component without duplicates")
+    return tuple(selected)
+
+
+
 def source_value_identity(source_identity, field_ids, scheme):
     """Logical immutable primary values, independent of packing or retention."""
     return source_identity, tuple(map(int,field_ids)), scheme

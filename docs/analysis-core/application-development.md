@@ -17,6 +17,8 @@
 | 图像/截面/固定网格消费 | `sample_plane`、`iter_uniform` |
 | 轨迹与沿线诊断 | `trace`、`iter_traces`、`retrace`、显式 curl |
 | 自定义派生量与微分组合 | `derive`、按名称指定的 `derivative` |
+| 准备场子集、字段合并与多输出公式 | `select_fields`、`merge_fields`、`derive_many` |
+| 存储曲线的物理量剖面 | `sample_line_profiles`、带编号/双支弧长/有效性的 `LineProfiles` |
 | 标准数学与磁场诊断 | `magnitude`、`gradient`、`divergence`、`dot`、带 `MagneticUnits` 的物理量 |
 | 均匀体积与常见面产品 | `applications.uniform_grid`、`field_map`、`surface_diagnostics`、`bottom_diagnostics` |
 | 点/射线几何、图结果关联与筛选后追踪 | `PointSet`、`RaySet`、`simesh.applications` |

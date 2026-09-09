@@ -64,10 +64,26 @@ def run(output):
     line_path = sm.save_result(output/"streamlines.result.npz",lines,
                               metadata={"vector":"instantaneous velocity","step":.025},overwrite=True)
     np.testing.assert_array_equal(sm.load_result(line_path).result.positions,lines.positions)
+    scaled = sm.derive_many(state,{"temperature_MK":"MK","density_cgs":"g cm^-3"},
+        lambda ctx: {"temperature_MK":ctx.field("temperature")*1e-6,
+                     "density_cgs":ctx.field("density")*1e-3})
+    magnetic = sm.select_fields(prepared,("b1","b2","b3"))
+    current = sm.current_density(magnetic,units=model.units.magnetic)
+    quantities = sm.merge_fields((scaled,current))
+    profiles = sm.sample_line_profiles(quantities,lines,("temperature_MK","density_cgs","jz"),
+                                      length_units=lengths,point_batch=32,workers=2)
+    assert profiles.usable.all()
+    # Physical boundary continuation is constant; check analytic variation
+    # where interpolation does not touch a boundary ghost cell.
+    interior = (lines.positions[:,2] >= .125) & (lines.positions[:,2] <= .875)
+    np.testing.assert_allclose(profiles.values[interior,0],.8*(1+.1*lines.positions[interior,2]))
+    np.testing.assert_allclose(profiles.values[:,1],1e-15*(1+.2*lines.positions[:,0]))
+    np.testing.assert_array_equal(profiles.values[:,2],0.)
     print(f"Mass: {mass.value:g} {mass.units}")
     print(f"Mass-weighted temperature: {mean_t.value:g} K")
     print(f"Outward bottom flux: {flux.value:g} {flux.units}")
     print(f"Thermal rays complete: {image.complete}; streamlines: {len(lines.seeds)}")
+    print(f"Usable profile samples: {int(profiles.usable.all(axis=1).sum())}")
     print(f"Restored source verification: {restored.source_verification}")
     print(f"Saved: {path} and {line_path}")
 

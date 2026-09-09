@@ -47,3 +47,21 @@ def test_recovery_reductions_los_and_persistence(tmp_path):
     np.testing.assert_array_equal(restored.seeds.ids,rays.origins.ids)
     np.testing.assert_array_equal(restored.positions,lines.positions)
     assert np.all(restored.termination == sm.Termination.DOMAIN_EXIT)
+    magnetic = sm.select_fields(prepared, ("b1", "b2", "b3"))
+    current = sm.current_density(magnetic, units=units.magnetic)
+    scaled = sm.derive_many(state_fields, {"temperature_MK": "MK", "density_cgs": "g cm^-3"},
+        lambda ctx: {"density_cgs": ctx.field("density")*1e-3,
+                     "temperature_MK": ctx.field("temperature")*1e-6})
+    quantities = sm.merge_fields((scaled, current))
+    profiles = sm.sample_line_profiles(quantities, restored, ("density_cgs", "temperature_MK", "jz"),
+                                      point_batch=7, workers=2, length_units=length)
+    assert profiles.usable.all() and profiles.line_source_identity is None
+    assert profiles.source_identity is quantities.value_identity
+    np.testing.assert_allclose(profiles.values, np.broadcast_to([density*1e-3, temperature*1e-6, 0.],
+                                                               profiles.values.shape), atol=1e-14)
+    np.testing.assert_array_equal(profiles.seed_ids, rays.origins.ids)
+    for seed_id in profiles.seed_ids:
+        for direction in (-1, 1):
+            branch = profiles.branch(seed_id, direction)
+            expected = np.r_[0., np.cumsum(np.linalg.norm(np.diff(branch.positions, axis=0), axis=1))]
+            np.testing.assert_allclose(branch.arclength, expected)

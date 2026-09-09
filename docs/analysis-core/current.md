@@ -10,6 +10,9 @@
   公共导出和联合流程已检查，见[整合记录](feature-integration.md)及
   [联合调用示例](../../analysis-core/docs/quantitative-workflow.md)。
 - 原生 `derive` 支持逐点公式组合，`derivative` 支持字段名与方向名。
+- 字段组合与沿线诊断已完成整合及 simplify：`select_fields`、`merge_fields`、
+  `derive_many` 和 `sample_line_profiles` 已公开导出。
+  见[本轮整合记录](composition-profile-integration.md)。
 - 标准诊断提供模长、梯度、散度、点积，以及显式 SI 归一化的电流、磁压和磁能密度。
   面上诊断支持 Q-only、twist-only 和联合请求；twist-only 跳过 Q 的计算。
   统一示例覆盖均匀场、电流图、诊断筛选后双向追踪，以及标量/热 LOS。
@@ -31,7 +34,12 @@
 只有出现具体核心缺陷、能力阻塞或实际性能问题时，才展开针对性的深入检查。
 
 完整历史进度和开发规范已放入[归档](archive/README.md)，按需查阅，
-不作为下一轮应用设计的必读材料。当前没有运行中的核心探索或待完成的整合。
+不作为下一轮应用设计的必读材料。当前没有运行中的核心重构。
+
+字段组合与沿线诊断来自两个 `gpt-6-astra`、`high` 独立 worktree 任务，
+已按用户要求汇总到当前分支，原分支及工作区保留。范围见[并行任务记录](parallel-work.md)。
+当前任务的大数据探索见[内存峰值与实现路径](memory-workflows.md)：已检查现有接口并运行
+小规模内存探针，优先建议原始叶块统计链与结果分片；尚未实现新的流式框架或恢复内核。
 
 后续按具体数据和应用目标选择方法、步长与扰动间距，并检查收敛；
 不预先引入新的分析会话框架、统一执行器或核心重构任务。
