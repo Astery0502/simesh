@@ -6,6 +6,7 @@ and migration documents have been removed; committed versions remain in Git hist
 
 | Directory | Origin and purpose |
 | --- | --- |
+| `variational-qsl/` | Retired variational QSL source and analytic tests, including the formerly shared tracing kernel |
 | `previous/` | The preceding root package, its `rewrite/` provider, tests and build tools |
 | `python-first/` | The earlier `src/simesh/legacy/` Python implementation and `archive/` sources, separated from the preceding main package |
 | `core-development/` | Historical N1–N4 comparison runners, logs, environments and generated artifacts from the former `analysis-core/` workspace |
@@ -19,7 +20,7 @@ Recreate an isolated environment and use the original revision/layout for exact
 historical reproduction. Saved virtual environments and generated extensions
 are local artifacts, not portable installations.
 
-Retained code that still provides current functionality is maintained in the
-active package: stateful AMRVAC operations under `simesh.amrvac`, their private
-Cython mesh under `simesh.amrvac._mesh`, and array configurations under
-`simesh.tools.configurations`. Native analysis uses `simesh._kernels`.
+Current functionality uses native `Source`/`Fields`, `simesh._kernels`, the private
+AMRVAC serializer under `simesh.io._v5`, and array tools under `simesh.tools`.
+The stateful Dataset, its mutable Cython mesh, and its 2D/VTK interfaces belong
+to the historical package under `previous/`; they are not current public APIs.

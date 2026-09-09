@@ -1,7 +1,7 @@
 # Architecture
 
 ```text
-file / arrays / explicit Dataset copy
+           file / arrays
                  |
                Source ---- Mesh / Selection
                  |
@@ -23,8 +23,9 @@ file / arrays / explicit Dataset copy
 | Owned / borrowed | Iterator and pool views expire with their lease; caller output retains alias constraints |
 | Science / execution | Numerical schemes, models and units remain explicit; consumers do not fetch missing input |
 | Input / output batching | Batching results does not make all input consumers support bounded memory |
-| Dataset / native | Mutable AMRMesh stays in `amrvac`; crossing uses explicit copies or ordinary file export |
 
 `_kernels` and checked `_amr` wrappers implement active native arithmetic.
-`_kernels/primitives` and `amrvac/_mesh` retain separate compiler semantics.
+`io/_v5/writer.py` serializes complete native field interiors without a mutable
+mesh dependency. Historical Dataset implementations are excluded from the package.
+`_kernels/primitives` retains its original compiler semantics.
 See [core contracts](api.md) and [build groups](cython-build.md).

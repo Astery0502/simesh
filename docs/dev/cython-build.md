@@ -73,7 +73,6 @@ the archived preceding package.
 | --- | --- | --- |
 | `src/simesh/_kernels/primitives/` | Retained AMR numerical primitives | Separate original Cython arithmetic/checking semantics |
 | `src/simesh/_kernels/*.pyx` | Preparation, sampling, differentiation, tracing, connectivity and LOS | Optimized native configuration; explicit optional OpenMP |
-| `src/simesh/amrvac/_mesh/*.pyx` | Stateful Dataset mesh, forest and Morton operations | Separate retained configuration; serial even with OpenMP enabled |
 
 Headers such as `tree.pxd`, `math.pxd` and `native.pxd` are Cython interfaces;
 they are not separately compiled extensions. All build inputs live under `src/`.
@@ -91,10 +90,7 @@ SIMESH_OPENMP=1 make build
 ```
 
 This enables supported native kernels when a suitable compiler/OpenMP runtime
-is available. It does not parallelize the stateful compatibility extensions.
-`simesh.amrvac.openmp_build_info()` describes those compatibility extensions;
-it is not the build status of the native kernels. Use ordinary serial builds
-when the optional runtime is unavailable.
+is available. Use ordinary serial builds when the optional runtime is unavailable.
 
 ## Isolated wheel verification
 

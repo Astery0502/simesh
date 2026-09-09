@@ -2,11 +2,10 @@
 
 The selected implementation now lives at the repository root. Historical
 source paths in the provenance tables below identify the pinned revision, not
-runtime imports. During root promotion, retained `utils/lib/amr/` extensions
-and `utils/lib/{tree,math}.pxd` moved to `amrvac/_mesh/`, `utils/runtime.py` moved
-to `amrvac/runtime.py`, and `utils/configurations.py` moved to
-`tools/configurations.py`. Their algorithmic provenance is unchanged. There is
-no active `simesh.utils` namespace.
+runtime imports. Array configurations moved to `tools/configurations.py` during
+root promotion. Mutable Dataset and its `amrvac/_mesh` extensions have since
+been removed from the active build; the preceding implementation remains under
+`legacy/previous/`. There is no active `simesh.amrvac` or `simesh.utils` namespace.
 
 The subsequent `connectivity.py` and `_kernels/connectivity.pyx` consumer is an
 independent implementation of published magnetic-connectivity mathematics using
@@ -19,6 +18,13 @@ it remains an external comparison reference, not a runtime dependency. Compariso
 used revision `314bbf01ab72e43f82cb6b2e1c2a4d22d93aacdd`.
 
 Source revision: `b91bbc015d882ffd7dfcd7e10590cdce559f8532`.
+
+The native interior-only uniform exporter follows the block placement and
+containing-cell sampling algorithms from the former `amrvac/_mesh/mesh.pyx`
+(`uniform_full_level1` and `uniform_grid_zero_order`). `_uniform.py` and
+`_kernels/native.pyx` use immutable geometry and component-last storage, with
+half-open ownership, explicit missing coverage and bounded source orchestration
+in `io/uniform.py`; they do not instantiate the mutable AMRMesh.
 
 These are selected low-level AMR, file-format and numerical assets. The new
 source, field, preparation and consumer orchestration is implemented here.
@@ -41,29 +47,24 @@ N2 also validates coordinate-derived coarse stencil indices before execution.
 Large origins or under-resolved coordinates that would index outside the coarse
 buffer are rejected rather than entering the unchecked interpolation kernel.
 
-N4 retains the public stateful AMRVAC and independent array-tool paths alongside
-the new core. `amrvac/{api,amrvac_dataset,amrvac_uniform,boundary,datio,dataset_base,
-derived_fields,layouts}.py` and its `__init__.py`, `tools/{__init__,potential_field}.py`,
-`utils/{__init__,runtime,configurations}.py`, the three `utils/lib/amr/{forest,mesh,morton}`
-extensions and their headers, and `utils/lib/{math,tree}.pxd` come from the same
-pinned revision. Namespace paths are retained and trailing whitespace normalized.
-Empty package initializers complete this self-contained dependency subset.
-These describe the N4 extraction layout; current retained paths follow the
-root-promotion mapping above.
+The N4 extraction included stateful AMRVAC interfaces from the same pinned
+revision. Those interfaces and their mutable mesh are now excluded from the
+active package; `legacy/previous/` retains the preceding implementation. The
+independent array tools remain under `tools/`.
 
-These compatibility modules are not imported by native Source or scientific
-consumers. Their stateful AMRMesh and compiler arithmetic remain independent of
-the new data model. The compatibility build stays serial because the historical
-uniform-grid OpenMP boundary writes have unresolved conformance evidence.
-N4 applies the N2 fourth-row prolong support correction to its retained mesh,
-rejects periodic ghost exchange that the old Dataset did not implement, and
-rejects ordinary serialization of a header still marked as staggered. It retains
-the existing VTK level-1 structured-points and endpoint-coordinate convention.
+`io/_v5/writer.py` adapts the ordinary-field SFC serializer from
+`amrvac/datio.py`, retaining the binary header, tree and block layout. It accepts
+only the current nonperiodic Cartesian 3D v5 profile, calculates offsets from
+the encoded header and writes NumPy buffers without per-value Python packing.
+`io/products.py` repacks complete Fields interiors into SFC order and owns file
+creation and atomic publication. The serializer excludes old readers, Dataset
+constructors and uniform/VTK wrappers; it retains its GPL-3.0 provenance and
+rejection of staggered-face serialization.
 
-`io/products.py` is new boundary code: Dataset interiors are copied into a
-detached native Source; complete Fields are explicitly repacked into SFC order
-for the retained serializer and atomically published as an ordinary data file.
-Neither adapter carries old mutable ownership into a native Fields product.
+`io/vtk.py` independently implements uniform-volume output using the
+[VTK legacy file specification](https://docs.vtk.org/en/latest/vtk_file_formats/vtk_legacy_file_format.html).
+It writes binary structured-points geometry and cell data at the native sampling
+bounds. It does not restore the former Dataset or endpoint-based VTK writer.
 
 The orchestration was adapted separately from these retained low-level files:
 

@@ -20,10 +20,9 @@ at the repository root. The N4 numerical and ownership boundaries remain fixed.
 - `src/simesh/_kernels/`: current Cython consumers; `primitives/` retains
   low-level AMR arithmetic with its own compiler semantics.
 - `src/simesh/_amr/`: checked Python wrappers for those primitives.
-- `src/simesh/amrvac/`: bundled mutable Dataset and ordinary file interfaces.
-  Its private `_mesh/` directory contains the retained stateful Cython mesh,
-  forest, Morton code and support headers. Native scientific consumers must
-  not depend on its mutable AMRMesh.
+- `src/simesh/io/`: native Source adapters and ordinary AMRVAC v5 file products.
+  Its private `_v5/` directory owns file indexing, reading and serialization.
+  Mutable Dataset and AMRMesh implementations remain historical and are not shipped.
 - `src/simesh/tools/`: array-only potential field and analytic configurations.
 - `legacy/previous/`: archived preceding main package and rewrite provider.
 - `legacy/python-first/`: archived earlier Python implementation and pre-package
@@ -33,7 +32,8 @@ at the repository root. The N4 numerical and ownership boundaries remain fixed.
 New work consumes Source/Fields and existing scientific interfaces. Keep
 source/preparation, storage/validity and owned/borrowed lifetime boundaries
 explicit. Change core behavior only for a concrete defect or required capability.
-Do not restore removed `simesh.utils` or `simesh.legacy` compatibility dispatchers.
+Do not restore removed `simesh.amrvac`, `simesh.utils` or `simesh.legacy`
+compatibility dispatchers.
 Allocated padding is not valid halo. A first derivative consumes one valid halo
 layer; region boundaries are not physical boundaries. Numerical schemes and
 physical unit/model choices stay explicit. Scientific consumers do not read

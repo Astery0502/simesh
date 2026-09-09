@@ -29,7 +29,77 @@ The scales are teaching values, not simulation calibration.
 | --- | --- |
 | [Quickstart](../../examples/user_quickstart.py) | Generated teaching snapshot and reloadable magnetic map |
 | [Magnetic applications](../../examples/standard_applications.py) | Synthetic AMR arcade, Q/twist, paths and LOS; custom NumPy archive |
+| [Uniform export](../../examples/uniform_export.py) | AMRVAC fields to NumPy memory maps or uniform VTK using explicit reconstruction |
 | [MHD analysis](../../examples/recovered_state_analysis.py) | Analytic recovered state, reductions, profiles and result files |
 
 Exact API text is generated when
 building the documentation; GitHub Markdown displays the object directives.
+
+## Native AMR sections
+
+Extract a section while retaining each leaf block's physical cell spacing:
+
+```python
+with sm.open_amrvac("snapshot.dat") as source:
+    fields = sm.read_fields(source, ("rho", "b3"))
+section = sm.slice_axis(fields, "z", 0.5)
+geometry = section.geometry
+u_edges, v_edges = geometry.cell_edges(0)
+block_values = section.values[0]
+```
+
+The [API reference](api.md) describes block layout, interface-side selection,
+coverage and ownership. Geometry and values are independent of plotting tools.
+
+## Uniform output
+
+Export stored fields directly from a snapshot:
+
+```python
+grid = sm.export_uniform("snapshot.dat", (256, 256, 256),
+                         fields=("rho",), interpolation="zero", batch_size=32)
+```
+
+For already loaded or derived interiors, use
+`app.uniform_grid(fields, resolution, interpolation="zero")`. Select
+`interpolation="native"` for exact placement on the matching source cell lattice.
+See the [API reference](api.md) for coverage, output ownership and memory limits.
+
+```bash
+.venv/bin/python examples/uniform_export.py snapshot.dat \
+  --resolution 256 256 256 --fields rho --output example-output/uniform
+```
+
+For direct trilinear output with bounded preparation, choose the scheme explicitly:
+
+```python
+grid = sm.export_uniform("snapshot.dat", (256, 256, 256),
+                         fields=("rho",), interpolation="linear",
+                         scheme="exact-phase", batch_size=32, tile_rows=16)
+```
+
+The same workflow is available in the example with
+`--interpolation linear --scheme exact-phase`.
+
+## Uniform VTK output
+
+Save an existing uniform result or resample a snapshot directly to a VTK file:
+
+```python
+sm.write_uniform_vtk("rho.vtk", grid)
+sm.export_uniform_vtk("snapshot.dat", "magnetic.vtk", (256, 256, 256),
+                      fields=("b1", "b2", "b3"), interpolation="zero")
+```
+
+The [binary legacy VTK format](https://docs.vtk.org/en/latest/vtk_file_formats/vtk_legacy_file_format.html)
+uses a uniform cell grid spanning the result bounds. Each component is a separate
+scalar cell array; `simesh_valid` records coverage independently of finite values.
+Units and source metadata are not stored. Export supports uniform volumes only,
+including volumes resampled from AMR data; it does not write AMR hierarchy or lines.
+Direct export retains a complete volume and accepts the same sampling controls as
+`export_uniform`, including explicit `scheme="exact-phase"` for linear interpolation.
+
+```bash
+.venv/bin/python examples/uniform_export.py snapshot.dat --format vtk \
+  --resolution 256 256 256 --fields rho --output rho.vtk
+```

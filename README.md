@@ -14,15 +14,18 @@ See the [documentation map](docs/index.md) for the full structure.
 - Native sampling, slices, uniform-grid products and custom derived fields
 - Gradients, divergence, curl and explicitly normalized magnetic diagnostics
 - Magnetic tracing, Q/Q-perpendicular, localized footpoints and twist
-- Ideal-MHD recovery, AMR integrals/statistics and rectangular surface flux
+- CGS ideal-MHD recovery with `MHDUnits.solar()`, AMR integrals/statistics and rectangular surface flux
 - Scalar and historical AIA171 thermal LOS
 - Identified lines/profiles, result save/load and incremental output shards
-- Retained Dataset, ordinary `.dat`, Cartesian 2D and level-1 VTK interfaces
+- AMRVAC v5 ordinary-field input and complete-mesh `.dat` export
+- Uniform-volume VTK export from sampled results or directly from AMRVAC files
 
 Native analysis accepts balanced, nonperiodic Cartesian 3D AMRVAC v5 ordinary
-fields and equivalent array sources. Models, unit scales and numerical schemes
-are explicit. CT face analysis, spherical/periodic native analysis and GPU
-execution are outside the current profile. Inspect validity and termination
+fields and equivalent array sources. Public workflows use Source and Fields;
+the archived mutable Dataset and 2D workflows are not shipped. VTK output is
+limited to uniform volumes.
+Models, unit scales and numerical schemes are explicit. CT face analysis,
+spherical/periodic native analysis and GPU execution are outside the current profile. Inspect validity and termination
 before treating an output as a complete physical result.
 
 ## Install and run

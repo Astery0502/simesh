@@ -119,9 +119,3 @@ Scientific and application functions are in the [user API](../user/api.md).
     options:
       members: [depth_cm]
       merge_init_into_class: false
-
-## Build introspection
-
-::: simesh.amrvac.openmp_build_info
-
-::: simesh.amrvac.openmp_enabled

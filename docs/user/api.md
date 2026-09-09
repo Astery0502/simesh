@@ -9,8 +9,6 @@ Core object contracts are in the [developer API](../dev/api.md).
 
 ::: simesh.source_from_arrays
 
-::: simesh.source_from_dataset
-
 ::: simesh.read_fields
 
 ::: simesh.prepare
@@ -24,6 +22,12 @@ Core object contracts are in the [developer API](../dev/api.md).
 ::: simesh.sample
 
 ::: simesh.sample_plane
+
+::: simesh.slice_axis
+
+::: simesh.export_uniform
+
+::: simesh.export_uniform_vtk
 
 ::: simesh.iter_uniform
 
@@ -55,6 +59,10 @@ Core object contracts are in the [developer API](../dev/api.md).
 
 ::: simesh.Plane
 
+::: simesh.AxisSlice
+    options:
+      members: [axes, block_shape, bounds, spacing, levels, cell_edges, nbytes]
+
 ::: simesh.PointSet
     options:
       members: [from_plane, iter_plane, boundary, select, reshape, nbytes]
@@ -79,6 +87,11 @@ Core object contracts are in the [developer API](../dev/api.md).
       merge_init_into_class: false
 
 ## Maps and volumes
+
+::: simesh.AMRSliceResult
+    options:
+      members: [usable, nbytes]
+      merge_init_into_class: false
 
 ::: simesh.applications.sample
 
@@ -147,6 +160,8 @@ Core object contracts are in the [developer API](../dev/api.md).
 ## MHD and thermodynamics
 
 ::: simesh.MHDUnits
+    options:
+      members: [solar, velocity_cm_s, time_s, magnetic_si]
 
 ::: simesh.IdealMHD
 
@@ -254,23 +269,9 @@ Core object contracts are in the [developer API](../dev/api.md).
 
 ::: simesh.write_amrvac
 
-## Retained interfaces
+::: simesh.write_uniform_vtk
 
-::: simesh.amrvac.open_dataset
-
-::: simesh.amrvac.read_blocks
-
-::: simesh.amrvac.read_uniform
-
-::: simesh.amrvac.load_from_uniform
-
-::: simesh.amrvac.write_datfile
-
-::: simesh.amrvac.write_datfile_from_uniform
-
-::: simesh.amrvac.load_uniform_data
-
-::: simesh.amrvac.datfile_to_vtk
+## Array tools
 
 ::: simesh.tools.potential_field_green
 

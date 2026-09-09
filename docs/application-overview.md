@@ -6,7 +6,7 @@
 
 ```python
 import simesh as sm
-from simesh import applications as app, amrvac, tools
+from simesh import applications as app, tools
 from simesh.tools import configurations
 ```
 
@@ -117,7 +117,7 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 
 结果含请求的诊断量、脚点、长度、边界编号与终止状态。画 Q 图用 `q_valid`，画完整线 twist 图用 `twist_valid`；没有请求的量不应继续读取。诊断阶段不保存全路径，选中种子后用 A03 生成曲线。采样平面定义的是种子位置，不自动成为目标脚点边界。
 
-默认 `method="finite-difference"` 使用邻种子脚点差分；`"variational"` 使用方向场导数传播，要求两层输入 halo。`normalization="mapping"` 与 `"flux"` 是不同归一化选择。`delta` 控制邻种子扰动距离，`step_fraction` 控制局部积分步长，两者应分别检查收敛。twist 若显式传入 `curl_field`，必须使用匹配的原始 `sm.curl(magnetic)`，不能换成物理电流。
+QSL 使用邻种子脚点差分，不提供算法选择参数。`normalization="mapping"` 与 `"flux"` 是不同归一化选择。`delta` 控制邻种子扰动距离，`step_fraction` 控制局部积分步长，两者应分别检查收敛。twist 若显式传入 `curl_field`，必须使用匹配的原始 `sm.curl(magnetic)`，不能换成物理电流。
 
 参考：[应用接口](user/api.md)。
 
@@ -134,9 +134,20 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 | `beta`、`sound_speed`、`alfven_speed` | 热压与磁压比较、特征速度分析 |
 | `sonic_mach`、`alfven_mach`、`status` | 马赫数与状态分类 |
 
-返回 `Fields`，有量纲物理输出采用 SI，温度为 K。模型适用于经典动量 `m=rho*v`、恒定 gamma、完全电离 H/He，以及明确的总能量或内能定义。背景磁场分裂、额外能量库或其他状态方程不能仅凭字段名自动兼容。
+返回 `Fields`，密度为 g/cm³，速度为 cm/s，内能密度为 erg/cm³，热压为 dyn/cm²，温度为 K。模型适用于经典动量 `m=rho*v`、恒定 gamma、完全电离 H/He，以及明确的总能量或内能定义。背景磁场分裂、额外能量库或其他状态方程不能仅凭字段名自动兼容。
 
 默认 `invalid="raise"` 拒绝非法物理状态；选择 `"nan"` 时应请求并查看 `status`。零磁场可以是有效状态，但 beta 等比值可能未定义。状态列是分类数据，不能参与插值。仅做单元统计时可从 `read_fields` 恢复；后续需要采样或流线时应从已准备的输入恢复连续量。
+
+太阳日冕归一化可直接调用；这里的数密度单位指氢核数密度，需与模拟设置一致：
+
+```python
+composition = sm.CoronalComposition(helium_abundance=0.1)
+units = sm.MHDUnits.solar(composition=composition)
+model = sm.IdealMHD(gamma=5/3, energy_kind="total", composition=composition, units=units)
+state = sm.mhd_fields(conserved, model=model)
+```
+
+归一化约定与 AMRVAC 的 CGS、完全电离 H/He、`eq_state_units=True` 相容。参数与默认值见 [MHDUnits](user/api.md#simesh.MHDUnits)。恢复密度传给 `thermal_fields` 时使用 `density_unit_g_cm3=1.0`；积分长度使用 `sm.LengthUnits(units.length_cm, "cm")`。独立的磁场诊断仍输出 SI，可通过 `units.magnetic_si` 显式提供换算。
 
 参考：[应用接口](user/api.md)。
 
@@ -216,9 +227,9 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 
 外推的 `direct` 与 `fft` 对应同一中点源卷积的不同实现，后者需要 SciPy。默认 `balance_flux=True` 会移除底面均值，改变外推使用的边界场；几何信息记录被移除的均值。势场外推不包含电流驱动的非势场重建。
 
-解析构型的坐标通常为分量在前的数组，不能直接当作 `(n, 3)` 点表。要接入 A01—A09，需核对坐标、单元中心位置、分量轴、网格描述和单位后建立 Source 或 Dataset。
+解析构型的坐标通常为分量在前的数组，不能直接当作 `(n, 3)` 点表。要接入 A01—A09，需核对坐标、单元中心位置、分量轴、网格描述和单位后建立 Source。
 
-参考：[数组工具接口](user/api.md#retained-interfaces)。
+参考：[数组工具接口](user/api.md#array-tools)。
 
 ## 12. A11：数据读写与结果交付
 
@@ -226,21 +237,22 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 
 | 任务与入口 | 功能和范围 |
 | --- | --- |
-| `amrvac.open_dataset(...)`、`read_blocks(...)`、`read_uniform(...)` | 保留的可变 Dataset 与普通文件接口；均匀数组采用分量在后布局 |
-| `sm.source_from_dataset(dataset, fields=...)` | 将已加载、符合原生条件的三维内部值建立为独立 Source |
+| `sm.open_amrvac(...)`、`sm.read_fields(...)` | 读取非周期笛卡尔三维 AMRVAC v5 普通场，数值采用分量在后布局 |
+| `sm.source_from_arrays(...)` | 从明确的网格与块数组建立 Source |
+| `sm.export_uniform(...)` | 将普通场导出为均匀体数据，支持按批读取 |
+| `sm.write_uniform_vtk(path, grid)` | 将已有均匀体结果保存为二进制 VTK，保留网格边界、标量分量与覆盖标记 |
+| `sm.export_uniform_vtk(source, path, resolution, ...)` | 直接从原始文件或 Source 重采样并生成均匀网格 VTK，复用均匀场接口的采样控制 |
 | `sm.save_result(path, result, metadata=...)`、`sm.load_result(path)` | 保存和恢复支持的几何、采样、连接性、射线、曲线、剖面及均匀结果对象 |
 | `sm.save_result_shards(...)`、`sm.open_result_shards(...)` | 逐批保存并按分片加载曲线/剖面等支持的批次结果 |
 | `sm.write_amrvac(path, fields, metadata=...)` | 将完整原网格覆盖的字段导出为普通 `.dat` |
-| `amrvac.write_datfile(...)`、`write_datfile_from_uniform(...)` | 普通文件转写或均匀数组写出 |
-| `amrvac.datfile_to_vtk(...)` | 保留的 level-1 结构化点 VTK 输出 |
 
-Dataset 路径保留 Cartesian 二维 singleton-z 数据处理；这不等于原生三维科学接口支持二维分析。既有 VTK 输出不表示 AMR 层级，也不导出 `LineSet` 为 PolyData。
+当前包仅提供 Source/Fields 数据流程。VTK 导出仅支持均匀体，不保存 AMR 层级或曲线；每个分量保存为单元标量，`simesh_valid` 单独记录覆盖有效性，单位和来源信息需另行保存。历史 Dataset 和二维数据流程不在当前发布范围内；旧代码见 `legacy/previous/`。
 
 `load_result(...).result` 恢复保存的应用对象；自定义 `numpy.savez_compressed` 文件需用 `numpy.load`。原始 `Fields`、`TraceResult` 和归约类等不能直接传给 `save_result`。额外数值控制、模型和来源应放入 `metadata` 等记录中；加载器不会核验结果与原始快照的物理对应关系。
 
 大曲线使用 `app.iter_lines`，大均匀体使用 `sm.iter_uniform`。分批输出不意味着所有算法都支持有限容量输入，尤其 QSL 与热 LOS 仍要求输入字段驻留。分片清单完成也不代表所有积分成功，分片不是积分状态断点。
 
-参考：[数据产品与保存协议](user/api.md#outputs)、[高级执行](dev/api.md#preparation-and-bounded-execution)、[保留文件接口](user/api.md#retained-interfaces)。
+参考：[数据产品与保存协议](user/api.md#outputs)、[高级执行](dev/api.md#preparation-and-bounded-execution)。
 
 ## 13. 可直接运行的示例
 
