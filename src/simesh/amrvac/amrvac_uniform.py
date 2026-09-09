@@ -3,12 +3,12 @@ import numpy as np
 from simesh.amrvac.amrvac_dataset import AMRVACDataSet
 from simesh.amrvac.datio import extract_uniform_data, header_template, update_header
 from simesh.amrvac.layouts import udata_to_datau
-from simesh.utils.lib.amr.forest import AMRForest
-from simesh.utils.lib.amr.mesh import AMRMesh
-from simesh.utils.lib.amr.morton import fill_morton_mapping3D
+from simesh.amrvac._mesh.forest import AMRForest
+from simesh.amrvac._mesh.mesh import AMRMesh
+from simesh.amrvac._mesh.morton import fill_morton_mapping3D
 
 
-def load_from_uniform(udata:np.ndarray, w_names:list[str], xmin:np.ndarray, xmax:np.ndarray, 
+def load_from_uniform(udata:np.ndarray, w_names:list[str], xmin:np.ndarray, xmax:np.ndarray,
         block_nx:np.ndarray, **kwargs):
     """
     Load data from a user-facing uniform grid with shape (nx, ny, nz, nw).
@@ -252,7 +252,7 @@ def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.
 
     """
     Convert the uniform grid data to VTK format with binary data and ASCII header
-    
+
     Parameters:
     -----------
     udata : np.ndarray
@@ -281,7 +281,7 @@ def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.
     if len(xmin) == 2 and nz == 1:
         xmin = np.array([xmin[0], xmin[1], 0.0], dtype=np.double)
     assert len(xmin) == 3, f"xmin must have 3 elements, but got {len(xmin)}"
-    
+
     # Compute spacing
     if xmax is not None:
         xmax = np.asarray(xmax, dtype=np.double)
@@ -294,35 +294,35 @@ def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.
     else:
         # Default to unit spacing
         dx = dy = dz = 1.0
-    
+
     # Ensure data is float64 and in C-contiguous order for binary writing
     udata = np.ascontiguousarray(udata.astype(np.float64))
-    
+
     with open(filename, 'wb') as f:
         # Write ASCII header
         f.write(b'# vtk DataFile Version 2.0\n')
         f.write(b'Uniform grid data\n')
         f.write(b'BINARY\n')
         f.write(b'DATASET STRUCTURED_POINTS\n')
-        
+
         # Write dimensions (ASCII)
         f.write(f'DIMENSIONS {nx} {ny} {nz}\n'.encode('ascii'))
-        
+
         # Write origin (ASCII)
         f.write(f'ORIGIN {xmin[0]:.6e} {xmin[1]:.6e} {xmin[2]:.6e}\n'.encode('ascii'))
-        
+
         # Write spacing (ASCII)
         f.write(f'SPACING {dx:.6e} {dy:.6e} {dz:.6e}\n'.encode('ascii'))
-        
+
         # Write point data header (ASCII)
         f.write(f'POINT_DATA {nx * ny * nz}\n'.encode('ascii'))
-        
+
         # Write each field as binary data
         for iw in range(nw):
             # Write field name and data type (ASCII)
             f.write(f'SCALARS {w_names[iw]} double 1\n'.encode('ascii'))
             f.write(b'LOOKUP_TABLE default\n')
-            
+
             # Write binary data
             # VTK legacy format expects big-endian format for binary data
             # Transpose to swap x and z axes so that x varies fastest in the flattened C-order stream
@@ -330,7 +330,7 @@ def uniform_to_vtk(udata: np.ndarray, w_names:list[str], filename: str, xmin:np.
             # Transposing (nx, ny, nz) -> (nz, ny, nx) and flattening 'C' makes nx (original x) vary fastest.
             field_data = np.transpose(udata[iw, :, :, :], (2, 1, 0)).flatten(order='C')
             field_data_big_endian = field_data.astype('>f8')  # Big-endian float64
-            
+
             # Write binary data directly (no size prefix in standard VTK legacy format)
             f.write(field_data_big_endian.tobytes())
             f.write(b'\n')  # Add newline after binary data block

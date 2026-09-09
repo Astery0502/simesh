@@ -1,113 +1,55 @@
 # Architecture
 
-This page maps the parent package's implementation layers. The independent N4
-core has a [fixed design](analysis-core/next-generation-design.md); new application
-work starts with its [application guide](analysis-core/application-development.md).
-Earlier architecture investigations remain in the [archive](analysis-core/archive/README.md).
+The repository root builds the native AMR analysis package previously developed
+in `analysis-core/`. Its import and distribution name remains `simesh`.
+See the [Chinese application guide](application-guide.md) for scientific
+workflows and [migration guide](../MIGRATION.md) for moved interfaces.
 
-## Project goal
+## Native data and calculation
 
-`simesh` is built to read, write, explore, and manipulate AMRVAC-style adaptive
-mesh refinement data. In practice, that means the repository serves two roles:
+`mesh.py` owns shared integer topology and physical geometry. `io/` supplies
+immutable file/array Sources and detached snapshot metadata. `preparation/`
+reads explicit support and publishes independent `Fields`; `fields.py` keeps
+storage halo separate from valid halo. Scientific consumers operate on these
+completed fields. `bounded.py` explicitly coordinates limited-capacity input
+preparation for its supported consumers.
 
-- a file-format toolkit for AMRVAC `.dat` snapshots
-- an AMR mesh toolkit for block-structured simulation data
+`operators/`, `tracing.py`, `projection.py`, `connectivity.py`, `physics/` and
+`reductions.py` expose scientific operations. Their hot loops use Cython under
+`_kernels/`. `_amr/` supplies Python validation and bindings for the retained
+AMR routines under `_kernels/primitives/`. These routines are current runtime
+code even when their numerical algorithms originated in preceding versions.
 
-The codebase is split between Python interfaces for users and Cython-backed
-implementations for speed-sensitive AMR operations.
+`geometry.py`, `applications.py` and `line_profiles.py` associate results with
+identified points, rays and curves. `results_io.py` and `result_shards.py`
+provide explicit numerical product delivery. No consumer silently expands
+coverage or changes the preparation scheme to meet an execution constraint.
 
-## High-level layers
+## Stateful AMRVAC and array tools
 
-### 1. User-facing Python entrypoints
+`amrvac/` retains mutable Dataset, ordinary file read/write, 2D singleton-z and
+legacy structured-points VTK workflows. Its `_mesh/` folder contains only the
+stateful Cython mesh, forest, Morton implementation and support headers needed
+by these workflows. It replaces the old `utils/lib/amr/` hierarchy.
 
-The canonical user workflows live under `src/simesh/amrvac/`.
+Native preparation, sampling, tracing and LOS do not call that mutable AMRMesh.
+`io/products.py` provides two explicit boundaries: copying loaded Dataset
+interiors into a Source and serializing complete native Fields through the
+ordinary AMRVAC writer. File export does not make the compatibility mesh an
+owner of native data.
 
-Important functions:
+`tools/potential_field.py` and `tools/configurations.py` work on arrays without
+an AMR Dataset. OpenMP introspection for the stateful mesh is exposed through
+`simesh.amrvac.openmp_build_info`; native kernel build settings are separate.
 
-- `read_uniform(...)`
-- `read_blocks(...)`
-- `open_dataset(...)`
-- `load_from_uniform(...)`
-- `write_datfile(...)`
-- `write_datfile_from_uniform(...)`
-- `load_uniform_data(...)`
-- `datfile_to_vtk(...)`
+## Archives and builds
 
-These functions are the most direct expression of the intended public API:
-users load AMRVAC files, sample AMR data onto uniform grids, inspect metadata,
-construct datasets from arrays, and write data back out in AMRVAC-compatible
-form.
+`legacy/previous/` holds the preceding main implementation;
+`legacy/python-first/` holds its earlier Python reference implementation.
+Historical core-development runners/artifacts are under
+`legacy/core-development/`. These directories are excluded from package
+discovery and default pytest collection. There is no active `simesh.utils`,
+`simesh.legacy` or `simesh_rewrite` package.
 
-### 2. Dataset and mesh objects
-
-The Python object model is built around:
-
-- dataset and format-facing objects in `src/simesh/amrvac/`
-- compiled AMR structures and support code in `src/simesh/utils/`
-
-These modules handle:
-
-- dataset assembly from parsed file components
-- block coordinate bookkeeping
-- neighbor relationships
-- ghost-cell and boundary updates
-- block-level AMR operations
-
-### 3. Cython performance layer
-
-Compiled AMR structures live under `src/simesh/utils/lib/`, with the current
-active AMR-specific implementations under `src/simesh/utils/lib/amr/`.
-
-These modules implement performance-critical pieces such as:
-
-- Morton ordering
-- forest construction and connectivity
-- mesh indexing and coordinate bookkeeping
-- uniform-grid extraction from AMR data
-
-The intent is that Python exposes convenient interfaces while Cython handles
-the heavy loops and memory-sensitive logic.
-
-## Main directories
-
-### `src/simesh/amrvac/`
-
-Canonical AMRVAC-specific file I/O and dataset code.
-
-### `src/simesh/legacy/`
-
-Legacy Python-first implementation path, including the older mesh, dataset,
-geometry, and frontend code that is preserved for reference and fallback use.
-
-### `src/simesh/utils/lib/`
-
-Cython source tree used for speed-sensitive operations. All `.pyx` files under
-this directory are part of the compiled extension discovery path. The current
-AMR-focused modules live under `src/simesh/utils/lib/amr/`.
-
-### `src/simesh/utils/configurations.py`
-
-Helpers for generating synthetic or physically motivated fields, useful for
-testing and constructing example datasets.
-
-## Current architectural reality
-
-The repository currently contains two implementation tracks:
-
-- the canonical path centered on `src/simesh/amrvac/` and `src/simesh/utils/`
-- a legacy Python-first path centered on `src/simesh/legacy/`
-
-This is important when making changes. Work on the canonical path by default and
-treat `simesh.legacy` as preserved older code rather than the primary target.
-
-## Recommended reading order
-
-1. `README.md`
-2. `docs/README.md`
-3. `docs/user-guide.md`
-4. `docs/2d-guide.md` if working with Cartesian 2D data
-5. `docs/api-reference.md`
-6. `docs/python-api-map.md`
-7. `docs/amrvac-dat-format.md`
-8. `docs/amr-forest-mesh.md`
-9. `docs/cython-build.md`
+`setup.py` builds the current `_kernels/` and `amrvac/_mesh/` extensions only.
+See [Cython build notes](cython-build.md) for compiler groups and wheel checks.

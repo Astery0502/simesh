@@ -19,3 +19,7 @@ __all__ = [
     "write_datfile",
     "write_datfile_from_uniform",
 ]
+
+from .runtime import openmp_build_info, openmp_enabled
+
+__all__ += ["openmp_build_info", "openmp_enabled"]

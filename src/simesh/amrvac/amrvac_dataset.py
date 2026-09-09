@@ -11,8 +11,8 @@ from .derived_fields import (
     FIELD_SOURCE_ORIGINAL,
 )
 from .layouts import datau_to_udata
-from simesh.utils.lib.amr.forest import AMRForest
-from simesh.utils.lib.amr.mesh import AMRMesh
+from simesh.amrvac._mesh.forest import AMRForest
+from simesh.amrvac._mesh.mesh import AMRMesh
 
 
 @dataclass(frozen=True)
@@ -80,6 +80,8 @@ class AMRVACDataSet(AMRVACDerivedFieldsMixin, DataSet):
         self.ng = self.ghost_width
 
         header, is_leaf, tree_info = get_metadata(self.sfile)
+        if self.ghost_width and np.any(header['periodic']):
+            raise ValueError('periodic ghost exchange is not implemented; use ghost_width=0 for file workflows')
         self.metadata = header.copy()
         self.is_leaf = is_leaf.copy().astype(np.int32)
         self.tree_info = tree_info
@@ -108,10 +110,10 @@ class AMRVACDataSet(AMRVACDerivedFieldsMixin, DataSet):
         ng3 = np.uint32(1)
         if int(self.ndim) == 3:
             ng3 = np.uint32(self.domain_nx[2]//self.block_nx[2])
-        self.forest = AMRForest(self.ndim, 
-                                np.uint32(self.domain_nx[0]//self.block_nx[0]), 
-                                np.uint32(self.domain_nx[1]//self.block_nx[1]), 
-                                ng3, 
+        self.forest = AMRForest(self.ndim,
+                                np.uint32(self.domain_nx[0]//self.block_nx[0]),
+                                np.uint32(self.domain_nx[1]//self.block_nx[1]),
+                                ng3,
                                 self.is_leaf)
         self.mesh = self._build_mesh()
 
@@ -568,7 +570,7 @@ class AMRVACDataSet(AMRVACDerivedFieldsMixin, DataSet):
         ``(n_fields, nx, ny, nz)``. If you want user-facing ``udata`` layout
         ``(nx, ny, nz, n_fields)``, convert it with
         ``simesh.amrvac.layouts.datau_to_udata``.
-        
+
         Parameters:
         -----------
         field_indices : list[int], optional
@@ -604,7 +606,7 @@ class AMRVACDataSet(AMRVACDerivedFieldsMixin, DataSet):
             field_names=field_names,
         )
         n_fields = len(loaded_columns)
-        
+
         uniform_grid = np.zeros((n_fields, int(nx[0]), int(nx[1]), int(nx[2])), dtype=np.double)
 
         interpolation = interpolation.lower()

@@ -1,45 +1,29 @@
-[project]
-name = "simesh"
-version = "0.1.0"
-description = "Python/Cython toolkit for reading, writing, and manipulating AMRVAC-style AMR mesh data"
-readme = "README.md"
-requires-python = ">=3.11"
-license = "GPL-3.0"
-authors = [
-    { name = "Astery", email = "aster0502@outlook.com" },
-]
-dependencies = [
-    "numpy>=1.23.5,<3.0",
-]
-
-[project.optional-dependencies]
-test = [
-    "jupyterlab>=4.3.4,<5.0.0",
-    "ipykernel>=6.29.5,<7.0.0",
-]
-benchmark = [
-    "matplotlib>=3.7,<4.0",
-]
-
 [build-system]
-requires = [
-    "setuptools>=68",
-    "wheel",
-    "numpy>=1.23.5,<3.0",
-    "Cython>=3.0,<4.0",
-]
+requires = ["setuptools>=77", "wheel", "numpy>=1.23.5,<3", "Cython>=3,<4"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-package-dir = { "" = "src", "simesh_rewrite" = "rewrite/src/simesh_rewrite" }
+[project]
+name = "simesh"
+version = "0.2.0.dev0"
+description = "Independent native AMR fields and scientific analysis"
+authors = [{name = "Astery", email = "aster0502@outlook.com"}]
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+dependencies = ["numpy>=1.23.5,<3"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+dev = ["pytest>=8", "Cython>=3,<4", "setuptools>=77", "wheel"]
+fft = ["scipy>=1.10"]
+plot = ["matplotlib>=3.7"]
 
 [tool.setuptools.packages.find]
-where = ["src", "rewrite/src"]
+where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["*.pyx", "*.pxd"]
 
 [tool.pytest.ini_options]
-markers = [
-    "heavy: optional long-running tests disabled by default unless explicitly enabled",
-]
+testpaths = ["tests"]

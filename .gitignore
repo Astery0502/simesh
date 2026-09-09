@@ -29,3 +29,7 @@ report/
 # spared
 *bak.*
 .DS_Store
+
+# Active package test and build logs
+.pytest_cache/
+*.log

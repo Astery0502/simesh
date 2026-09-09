@@ -1,41 +1,12 @@
-# Documentation Index
+# 当前文档
 
-## User docs
+- [中文应用手册](application-guide.md)：按任务选择输入、计算和输出，含调用示例。
+- [接口参考](api-reference.md)：当前签名、返回对象、参数差异与高级入口。
+- [应用接口与资源审查](interface-review.md)：已确认的复制、工作区、重复计算及输出开销。
+- [当前架构](architecture.md)：生产模块及其依赖边界。
+- [构建与安装](cython-build.md)：本地构建、测试和独立 wheel 验证。
 
-Read these when you want to use `simesh` from Python.
-
-| Need | Read |
-| --- | --- |
-| Install the package or set up development builds | `docs/installation.md` |
-| Choose the right public interface | `docs/user-guide.md` |
-| Work with Cartesian 2D data | `docs/2d-guide.md` |
-| Understand potential-field extrapolation equations | `docs/potential-field-tools.md` |
-| Look up public function signatures | `docs/api-reference.md` |
-
-## Maintainer docs
-
-The independent N4 core is fixed. Start with its [current state](analysis-core/current.md),
-[core boundaries](analysis-core/next-generation-design.md) and
-[application development guide](analysis-core/application-development.md).
-Earlier specifications, comparisons and heavy development procedures are in the
-[archive](analysis-core/archive/README.md), available when a specific question
-requires historical evidence.
-
-Read these when you are changing implementation behavior.
-
-| Need | Read |
-| --- | --- |
-| Understand the intended public API surface | `docs/python-api-map.md` |
-| Understand repository layout and layers | `docs/architecture.md` |
-| Change AMRVAC `.dat` parsing or writing | `docs/amrvac-dat-format.md` |
-| Change AMR forest, mesh, Morton order, or ghost cells | `docs/amr-forest-mesh.md` |
-| Change Cython build behavior | `docs/cython-build.md` |
-| Run or update performance workflows | `docs/performance-benchmarks.md` |
-
-## Documentation roles
-
-- `README.md` is the project landing page.
-- `docs/user-guide.md` explains workflows and tradeoffs.
-- `docs/api-reference.md` lists public functions and compact examples.
-- Technical implementation notes stay in focused `docs/` pages instead of the
-  README.
+目录和旧导入路径的变更见根目录[迁移说明](../MIGRATION.md)。
+历史开发记录及被本手册替代的分散应用说明已移到
+`legacy/core-development/documentation-before-application-guide/`，不作为当前使用入口。
+代码来源与许可证信息仍保留在根目录 `ASSETS.md` 和 `LICENSE`。

@@ -1,0 +1,102 @@
+{
+  "python": "3.11.14",
+  "numpy": "2.4.6",
+  "simesh": "0.2.0.dev0",
+  "platform": "macOS-26.5.2-arm64-arm-64bit",
+  "fixture": {
+    "leaves": 8,
+    "block_shape": [
+      16,
+      16,
+      16
+    ],
+    "valid_halo": 2
+  },
+  "memory_method": "tracemalloc incremental peak; excludes pre-existing inputs; not RSS",
+  "sampling": {
+    "points": 50000,
+    "direct": {
+      "median_seconds": 0.0014256248250603676,
+      "minimum_seconds": 0.0013447918463498354,
+      "maximum_seconds": 0.0020036250352859497
+    },
+    "wrapped": {
+      "median_seconds": 0.0015405828598886728,
+      "minimum_seconds": 0.0015005420427769423,
+      "maximum_seconds": 0.0018157078884541988
+    },
+    "reuses_native_arrays": true,
+    "pointset_bytes": 1600000,
+    "pointset_copies_coordinates": true
+  },
+  "field_copies": {
+    "input_payload_bytes": 4096000,
+    "selected_payload_bytes": 512000,
+    "merged_payload_bytes": 2048000,
+    "selection_shares_input": false,
+    "merge_shares_input": false
+  },
+  "mhd": {
+    "velocity_only": {
+      "payload_bytes": 1536000,
+      "retained_traced_bytes": 1547856,
+      "peak_traced_bytes": 3498688,
+      "median_seconds": 0.003880083095282316,
+      "minimum_seconds": 0.0037556251045316458,
+      "maximum_seconds": 0.004011458018794656
+    },
+    "default": {
+      "payload_bytes": 6144000,
+      "retained_traced_bytes": 6153465,
+      "peak_traced_bytes": 8040152,
+      "median_seconds": 0.005145665956661105,
+      "minimum_seconds": 0.00498254201374948,
+      "maximum_seconds": 0.0055185831151902676
+    },
+    "computed_keys_for_velocity_request": [
+      "alfven_mach",
+      "alfven_speed",
+      "beta",
+      "density",
+      "internal_energy",
+      "pressure",
+      "sonic_mach",
+      "sound_speed",
+      "speed",
+      "status",
+      "temperature",
+      "velocity"
+    ]
+  },
+  "trace": {
+    "100": {
+      "retained_traced_bytes": 83606,
+      "peak_traced_bytes": 265177,
+      "stored_points": 3200,
+      "final_position_bytes": 76800,
+      "one_branch_path_capacity_bytes": 155136
+    },
+    "5000": {
+      "retained_traced_bytes": 82574,
+      "peak_traced_bytes": 7790441,
+      "stored_points": 3200,
+      "final_position_bytes": 76800,
+      "one_branch_path_capacity_bytes": 7681536
+    }
+  },
+  "save_result": {
+    "retained_traced_bytes": 6097,
+    "peak_traced_bytes": 6460223,
+    "points": 50000,
+    "numerical_payload_bytes": 2450000,
+    "compressed_file_bytes": 1241391
+  },
+  "shard_manifest": {
+    "seeds": 10000,
+    "shard_count": 40,
+    "writes": 42,
+    "cumulative_bytes": 2612727,
+    "final_bytes": 65253,
+    "npz_bytes": 75505
+  }
+}

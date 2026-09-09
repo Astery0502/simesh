@@ -135,7 +135,7 @@ def get_header(istream):
     h["params"] = np.array(vals)
     h["param_names"] = names
 
-    # Read snapshot next if not specified 
+    # Read snapshot next if not specified
     fmt = ALIGN + "i"
     [snapshotnext] = struct.unpack(fmt, istream.read(struct.calcsize(fmt)))
     h["snapshotnext"] = snapshotnext
@@ -192,21 +192,21 @@ def read_blocks_mmap_sequential(filename, field_indices=None):
     """
     Sequential block reading using mmap for performance.
     No parallel processing = no mmap conflicts!
-    
+
     Features:
     - Uses mmap for fast file access
     - Sequential processing (no parallel conflicts)
     - Memory efficient
     - Reliable and simple
     """
-    
+
     # Get metadata first
     header, forest, block_info = get_metadata(filename)
     block_offsets = block_info[2].copy()
     block_shape = header['block_nx'].copy()
     ndim = header['ndim']
     nw = header['nw']
-    
+
     if field_indices is None:
         field_indices = list(range(nw))
 
@@ -214,38 +214,38 @@ def read_blocks_mmap_sequential(filename, field_indices=None):
     del header, forest, block_info
     block_offsets = [int(x) for x in block_offsets]
     block_shape = tuple(int(x) for x in block_shape)
-    
+
     nblocks = len(block_offsets)
     print(f"Reading {nblocks} blocks sequentially with mmap...")
 
     # Pre-allocate memory for results: (nblocks, nfields, *block_shape)
     result_shape = (nblocks, len(field_indices)) + block_shape
     block_fields_all = np.empty(result_shape, dtype=np.float64)
-    
+
     # Open file and create mmap
     with open(filename, 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-            
+
             for i, offset in enumerate(block_offsets):
                 ghost_offset = 2 * ndim * SIZE_INT
-                
+
                 # Read ghost cells
                 ghostcells_view = np.frombuffer(mm, dtype='=i4', count=2*ndim, offset=offset)
                 ghostcells = ghostcells_view.reshape(2, ndim)
-                
+
                 # Calculate shape with ghost cells (what's stored on disk)
                 bg_shape = block_shape + ghostcells[0] + ghostcells[1]
                 count = np.prod(bg_shape)
                 byte_size_field = count * SIZE_DOUBLE
-                
+
                 # Read requested fields
                 for field_idx_idx, field_idx in enumerate(field_indices):
                     byte_offset = offset + ghost_offset + field_idx * byte_size_field
-                    
+
                     # Read full bg_shape from disk
                     arr = np.frombuffer(mm, dtype='=f8', count=count, offset=byte_offset)
                     arr = arr.reshape(bg_shape[::-1]).T
-                    
+
                     # Extract interior region by removing ghost cells
                     # Create slice for each dimension
                     slices = []
@@ -253,10 +253,10 @@ def read_blocks_mmap_sequential(filename, field_indices=None):
                         start = ghostcells[0, dim]
                         end = bg_shape[dim] - ghostcells[1, dim] if ghostcells[1, dim] > 0 else None
                         slices.append(slice(start, end))
-                    
+
                     # Extract interior region (without ghost cells)
                     interior = arr[tuple(slices)]
-                    
+
                     # Store in pre-allocated array
                     block_fields_all[i, field_idx_idx, ...] = interior.copy()
 
@@ -270,35 +270,35 @@ def read_blocks_sequential(filename, field_indices=None):
     Parallel block reading using simple file I/O
     Each worker opens its own file handle, so no shared state issues.
     """
-    
+
     # Get metadata first
     header, forest, block_info = get_metadata(filename)
     block_offsets = block_info[2]
     block_shape = tuple(header['block_nx'])
     ndim = header['ndim']
     nw = header['nw']
-    
+
     if field_indices is None:
         field_indices = list(range(nw))
-    
+
     # Pre-allocate memory for results: (nblocks, nfields, *block_shape)
     block_fields_all = np.empty((len(block_offsets), len(field_indices)) + block_shape, dtype=np.float64)
     with open(filename, 'rb') as f:
         for i, offset in enumerate(block_offsets):
             f.seek(offset)
-            
+
             # Read ghost cells
             nghostcells = np.frombuffer(f.read(2 * ndim * SIZE_INT), dtype='=i4').reshape(2, ndim)
             bg_shape = block_shape + nghostcells[0] + nghostcells[1]
             count = np.prod(bg_shape)
             byte_size_field = count * SIZE_DOUBLE
-            
+
             # Read requested fields
             for field_idx_idx, field_idx in enumerate(field_indices):
                 f.seek(offset + 2 * ndim * SIZE_INT + field_idx * byte_size_field)
                 arr = np.frombuffer(f.read(byte_size_field), dtype='=f8')
                 arr = arr.reshape(bg_shape[::-1]).T
-                
+
                 # Extract interior region by removing ghost cells
                 # Create slice for each dimension
                 slices = []
@@ -306,11 +306,11 @@ def read_blocks_sequential(filename, field_indices=None):
                     start = nghostcells[0, dim]
                     end = bg_shape[dim] - nghostcells[1, dim] if nghostcells[1, dim] > 0 else None
                     slices.append(slice(start, end))
-                
+
                 # Extract interior region (without ghost cells)
                 interior = arr[tuple(slices)]
                 block_fields_all[i, field_idx_idx, ...] = interior.copy()
-    
+
     return block_fields_all
 
 
@@ -379,7 +379,7 @@ def get_tree_size(header):
     tree_size = 0
     tree_size += 10 * SIZE_INT # first 10 integers fixed
     tree_size += SIZE_DOUBLE # time
-    
+
     for key, value in header.items():
         if key in ['w_names', 'param_names']:
             tree_size += len(value) * NAME_LEN
@@ -401,7 +401,7 @@ def get_tree_size(header):
     offset_size += SIZE_INT*header['nleafs'] # the block levels
     offset_size += SIZE_INT*header['nleafs']*header['ndim'] # the block indices
     offset_size += SIZE_DOUBLE*header['nleafs'] # the block offsets with long long int
-    
+
     return tree_size, offset_size
 
 def write_header(fi, header):
@@ -430,21 +430,21 @@ def write_header(fi, header):
      )
     fi.write(packed_data)
 
-    # 
+    #
     fmt = ALIGN + header['ndim'] * "d"
     packed_data = struct.pack(fmt, *header['xmin'])
     fi.write(packed_data)
     packed_data = struct.pack(fmt, *header['xmax'])
     fi.write(packed_data)
 
-    # 
+    #
     fmt = ALIGN + header["ndim"] * "i"
     packed_data = struct.pack(fmt, *header["domain_nx"])
     fi.write(packed_data)
     packed_data = struct.pack(fmt, *header["block_nx"])
     fi.write(packed_data)
 
-    # 
+    #
     if header["datfile_version"] >= 5:
         fmt = ALIGN + header["ndim"] * "i"
         # Convert boolean array to integers for struct.pack
@@ -455,7 +455,7 @@ def write_header(fi, header):
         fi.write(packed_data)
 
         decoded_data = header["geometry"].encode().ljust(NAME_LEN)
-        fi.write(decoded_data) 
+        fi.write(decoded_data)
 
         fmt = ALIGN + "i"
         # Convert boolean to integer for struct.pack
@@ -469,7 +469,7 @@ def write_header(fi, header):
     for i in range(header['nw']):
         decoded_data = header['w_names'][i].encode().ljust(NAME_LEN)
         fi.write(decoded_data)
-    
+
     # Write physics_type
     decoded_data = header["physics_type"].encode().ljust(NAME_LEN)
     fi.write(decoded_data)
@@ -507,26 +507,26 @@ def update_header(header: dict, **kwargs):
     """
     Create a new header dictionary with updated values from kwargs.
     Validates that kwargs only contain standard header keywords from the template.
-    
+
     Args:
         header: Original header dictionary
         **kwargs: Keyword arguments to update in the header
-        
+
     Returns:
         Updated header dictionary
-        
+
     Raises:
         ValueError: If any key in kwargs is not a standard header keyword
     """
     # Get all standard header keywords from the template
     standard_keys = set(header_template.keys())
-    
+
     # Validate that all kwargs are standard header keywords
     for key in kwargs.keys():
         if key not in standard_keys:
             raise ValueError(f"Key '{key}' is not a standard header keyword. "
                            f"Valid keys are: {sorted(standard_keys)}")
-    
+
     # Create a copy of the header and update with kwargs
     header_new = header.copy()
     for key, value in kwargs.items():
@@ -542,6 +542,8 @@ def _normalize_header_for_sfc_write(header: dict, data: np.ndarray) -> dict:
     """
     Normalize header values for writing Morton/SFC-ordered block data.
     """
+    if header.get('staggered', False):
+        raise ValueError('ordinary-field writer does not serialize staggered face values')
     data = np.asarray(data)
     if data.ndim != 5:
         raise ValueError(f"data must be a 5D array with shape (nleafs, nfields, bx, by, bz), got {data.shape}")
@@ -677,7 +679,7 @@ def write_forest_tree(fi, header, forest, tree):
     block_lvls, block_ixs, block_offsets = tree
     assert(len(block_lvls) == len(block_ixs) == len(block_offsets))
     assert(len(block_lvls) == header['nleafs'])
-    
+
     fmt = ALIGN + len(block_lvls) * "i"
     packed_data = struct.pack(fmt, *block_lvls)
     fi.write(packed_data)

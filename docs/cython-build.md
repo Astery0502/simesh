@@ -1,163 +1,59 @@
-# Cython Build Notes
+# Cython build and installation
 
-## Purpose
-
-This repository uses Cython to accelerate selected AMR operations. This document
-describes where those extensions live and how the current build flow is wired.
-
-## Main build files
-
-- `build.py`
-- `setup.py`
-- `scripts/build_ext.py`
-- `pyproject.toml`
-
-## Current build entrypoint
-
-The packaging configuration uses `setuptools.build_meta`, with `setup.py`
-calling into `build.py`.
-
-`build.py`:
-
-- discovers all `.pyx` files recursively under `src/simesh/utils/lib/`
-- sets include directories, including NumPy headers
-- applies Cython compiler directives
-- supports subdirectory-scoped builds for development
-- supports `--inplace` builds when run directly
-- acts as the single source of truth for setuptools extension discovery
-
-## Discovery model
-
-The package build compiles every `.pyx` file under:
-
-- `src/simesh/utils/lib/`
-
-Files such as `.pxd` are not compiled directly; they act as Cython interface
-or header files.
-
-Full package builds also explicitly include the retained provider extensions in
-`rewrite/src/simesh_rewrite/`. The distribution bundles that package as an analysis
-implementation dependency; installed file workflows require no manual PYTHONPATH.
-Provider Cython directives remain separate (language level 3 only), preserving
-its existing division/bounds semantics. Group-scoped canonical development builds
-remain scoped, including `--group analysis` for native consumer kernels.
-
-For development, `--group <name>` means:
-
-- compile only the subdirectory `src/simesh/utils/lib/<name>/`
-
-At the moment, the practical example is:
-
-- `--group amr`
-
-## What is compiled
-
-Representative compiled modules:
-
-- `src/simesh/utils/lib/amr/morton.pyx`
-- `src/simesh/utils/lib/amr/forest.pyx`
-- `src/simesh/utils/lib/amr/mesh.pyx`
-
-These cover:
-
-- Morton encoding and index mappings
-- AMR forest construction and connectivity
-- mesh indexing and uniform-grid extraction
-
-## Development usage
-
-For local development, the repository includes `scripts/build_ext.py`, which can
-invoke `build.py` and optionally clean generated artifacts first.
-
-Typical intent:
-
-- rebuild all compiled extensions in place
-- rebuild only one subdirectory during iteration
-
-Current Make targets:
-
-- `make build`
-- `make build-amr`
-- `make build-amr-openmp`
-- `make test`
-
-Editable installs are expected to compile the extensions during:
-
-- `pip install -e .`
-
-After editing `.pyx` files, rebuild in place with:
-
-- `make build`
-- `make build-amr`
-- `make build-amr-openmp` when testing OpenMP-enabled AMR kernels
-
-To reset generated extension and packaging artifacts:
-
-- `make clean`
-
-The clean target uses `--clean-only`: it removes generated siblings of known
-package `.pyx` files and known build metadata, without rebuilding. It does not
-recursively remove `.so`/`.c` files or egg-info from the virtualenv, references or
-results. The helper's `--clean` option still means clean before a requested build.
-
-Current tests mirror the package structure:
-
-- `tests/utils/lib/` covers compiled AMR internals
-- `tests/amrvac/` covers canonical AMRVAC dataset behavior
-
-## Why this matters
-
-The repository contains both canonical and legacy AMR code. When
-changing behavior, verify whether the active user workflow depends on:
-
-- canonical AMRVAC code under `src/simesh/amrvac/`
-- Cython-backed implementations under `src/simesh/utils/lib/`
-- legacy Python-first code under `src/simesh/legacy/`
-
-Do not assume that changing one layer automatically updates the other.
-
-## OpenMP build mode
-
-OpenMP is opt-in. Plain package builds, editable installs, `make build`, and
-`make build-amr` do not add OpenMP flags. This keeps the default source build
-usable on systems without an OpenMP runtime.
-
-OpenMP can be enabled through either the build flag or the environment variable:
+Run all commands from the repository root with Python 3.11 or newer.
+The root package is the selected implementation; `legacy/` is not a build input.
 
 ```bash
-python build.py --inplace --group amr --openmp
-SIMESH_OPENMP=1 pip install -e .
-make build-amr-openmp
+python3.11 -m venv .venv
+.venv/bin/python -m pip install -e '.[dev]'
+make build
+make test
 ```
 
-The build helper adds these flags when OpenMP is requested:
+`make build` runs `setup.py build_ext --inplace --force` using
+`.venv/bin/python`. Rebuild after editing `.pyx`/`.pxd` files or moving compiled
+modules. `make test` runs pytest on `tests/`; it does not collect archived tests.
+Old `build.py`, `scripts/build_ext.py` and `make build-amr` workflows belong to
+the archived preceding package.
 
-- macOS: `-Xpreprocessor -fopenmp` for compilation and `-lomp` for linking
-- other platforms: `-fopenmp` for compilation and linking
+## Extension groups
 
-On macOS, install `libomp` if the OpenMP build cannot find `omp.h` or `libomp`.
-Homebrew installs are detected under `/opt/homebrew` and `/usr/local`. If a
-user does not have OpenMP available, they should use the default non-OpenMP
-build and leave `SIMESH_OPENMP` unset.
+| Sources | Role | Compiler configuration |
+| --- | --- | --- |
+| `src/simesh/_kernels/primitives/` | Retained AMR numerical primitives | Separate original Cython arithmetic/checking semantics |
+| `src/simesh/_kernels/*.pyx` | Preparation, sampling, differentiation, tracing, connectivity and LOS | Optimized native configuration; explicit optional OpenMP |
+| `src/simesh/amrvac/_mesh/*.pyx` | Stateful Dataset mesh, forest and Morton operations | Separate retained configuration; serial even with OpenMP enabled |
 
-The AMR mesh extension exposes build status for user scripts and support
-checks:
+Headers such as `tree.pxd`, `math.pxd` and `native.pxd` are Cython interfaces;
+they are not separately compiled extensions. All build inputs live under `src/`.
+Generated C files and shared objects are ignored by Git and must not be used as
+a substitute for the source files in a release.
 
-```python
-from simesh.utils import openmp_build_info, openmp_enabled
+## Optional dependencies and OpenMP
 
-assert isinstance(openmp_enabled(), bool)
-print(openmp_build_info())
+The base runtime needs NumPy. `.[test]` adds pytest; `.[dev]` also installs
+Cython/setuptools/wheel for direct local rebuilds. `.[fft]` adds SciPy for
+optional FFT convolution, and `.[plot]` adds Matplotlib for example PNG output.
+
+```bash
+SIMESH_OPENMP=1 make build
 ```
 
-OpenMP-enabled builds use the same public AMRVAC APIs. Users should tune thread
-count with standard OpenMP runtime variables such as `OMP_NUM_THREADS` and
-`OMP_DYNAMIC`.
+This enables supported native kernels when a suitable compiler/OpenMP runtime
+is available. It does not parallelize the stateful compatibility extensions.
+`simesh.amrvac.openmp_build_info()` describes those compatibility extensions;
+it is not the build status of the native kernels. Use ordinary serial builds
+when the optional runtime is unavailable.
 
-## Caveats
+## Isolated wheel verification
 
-- Editable installs compile the current extensions, but later `.pyx` changes
-  still require an explicit rebuild.
-- The build configuration should be treated as code to verify against current
-  imports, tests, and package structure rather than as guaranteed synchronized
-  documentation.
+```bash
+.venv/bin/python -m pip wheel . --no-deps --wheel-dir dist
+.venv/bin/python scripts/verify_install.py \
+    --wheel dist/<built-wheel>.whl --target /tmp/simesh-installed-check
+```
+
+Substitute the produced wheel filename and use a new target directory. The
+checker loads the extracted wheel with isolated Python path handling, runs the
+active tests against it, and checks that package modules come from that wheel.
+Neither an editable checkout nor an archived provider may supply simesh code.
