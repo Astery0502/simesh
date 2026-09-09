@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simesh"
-version = "0.2.0.dev0"
+version = "0.2.0rc1"
 description = "Independent native AMR fields and scientific analysis"
 authors = [{name = "Astery", email = "aster0502@outlook.com"}]
 readme = "README.md"

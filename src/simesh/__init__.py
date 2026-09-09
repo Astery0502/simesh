@@ -52,7 +52,7 @@ __all__ += ["line_diagnostics","iter_line_diagnostics","magnitude","dot","gradie
 __all__ += ["LengthUnits","AxisAlignedSurface","volume_integral","weighted_mean","extrema","histogram","surface_flux",
             "MHDUnits","IdealMHD","MHDStatus","MHDStateError","mhd_fields",
             "ResultFile","ResultFileError","save_result","load_result"]
-__version__ = "0.2.0.dev0"
+__version__ = "0.2.0rc1"
 
 from .result_shards import ResultShards, save_result_shards, open_result_shards
 __all__ += ["iter_line_profiles", "ResultShards", "save_result_shards", "open_result_shards"]
