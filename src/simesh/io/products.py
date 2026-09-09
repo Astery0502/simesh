@@ -1,4 +1,4 @@
-"""Explicit snapshots and file products across the stateful compatibility edge."""
+"""Explicit ordinary AMRVAC file products from completed native fields."""
 
 from copy import deepcopy
 import os
@@ -7,73 +7,9 @@ import tempfile
 
 import numpy as np
 
-from .source import source_from_arrays, definitions_from_names
 from .metadata import SnapshotMetadata
-from ..fields import FieldDefinition, require_fields
-from ..mesh import mesh_from_forest
+from ..fields import require_fields
 from .._validation import admit
-
-
-def source_from_dataset(dataset, fields=None, *, units=None, memory_limit=None):
-    """Snapshot loaded 3D Dataset interiors into an independent immutable Source.
-
-    Parameters
-    ----------
-    dataset : AMRVACDataSet
-        Nonperiodic Cartesian 3D Dataset with the requested columns already loaded; no
-        extra file reads occur.
-    fields : str or sequence of str, optional
-        Distinct loaded names, including materialized derived fields.
-    units : str or mapping, optional
-        Field unit labels, without numerical scaling.
-    memory_limit : int, optional
-        Accounted-array budget in bytes for this call, not a process RSS limit.
-
-    Returns
-    -------
-    Source
-        Independent interior copy; ghosts and mutable Dataset/AMRMesh references are
-        excluded.
-    """
-    from ..amrvac.amrvac_dataset import AMRVACDataSet
-
-    if not isinstance(dataset, AMRVACDataSet) or dataset.data is None:
-        raise ValueError('source_from_dataset requires a Dataset with loaded fields')
-    if (int(dataset.ndim) != 3 or dataset.geometry != 'Cartesian_3D' or
-            np.any(dataset.periodic)):
-        raise ValueError('native Source requires nonperiodic Cartesian 3D geometry')
-    metadata = SnapshotMetadata(dataset.metadata, path=dataset.sfile)
-    names = list(dataset.loaded_field_names if fields is None else
-                 [fields] if isinstance(fields, str) else fields)
-    if not names or len(set(names)) != len(names):
-        raise ValueError('select distinct loaded field names')
-    columns = dataset._columns_for_field_names(names)
-    block = tuple(map(int, dataset.block_nx))
-    count = int(dataset.nleafs)
-    shape = (count, len(names), *block)
-    # Dataset's padded backing can be larger than its public interior view.
-    live = np.asarray(dataset.data).nbytes
-    if dataset.ghost_width:
-        live = max(live, dataset.mesh.padded_view().nbytes)
-        coarse = dataset.mesh.datac
-        if coarse is not None:
-            live += np.asarray(coarse).nbytes
-    required = live + 8*int(np.prod(shape)) + count*4096 + len(dataset.is_leaf)*512
-    admit(required, memory_limit, 'Dataset snapshot')
-    mesh = mesh_from_forest(
-        np.asarray(dataset.domain_nx, dtype=np.int64)//np.asarray(block),
-        np.asarray(dataset.is_leaf, dtype=bool), lower=dataset.physical_domain[0],
-        upper=dataset.physical_domain[1], block_shape=block,
-    )
-    values = np.empty(shape)
-    for target, column in enumerate(columns):
-        values[:, target] = dataset.data[:, column]
-    values.flags.writeable = False
-    definitions = definitions_from_names(names, units)
-    derived = set(dataset.derived_field_names)
-    definitions = tuple(FieldDefinition(d.name, d.units,
-        'materialized-derived' if d.name in derived else 'cell-average') for d in definitions)
-    return source_from_arrays(mesh, values, definitions, copy=False, metadata=metadata)
 
 
 def write_amrvac(path, fields, *, metadata, overwrite=False, memory_limit=None):
@@ -134,9 +70,12 @@ def write_amrvac(path, fields, *, metadata, overwrite=False, memory_limit=None):
         raise ValueError('AMRVAC field names must be ASCII') from None
     if len(set(names)) != len(names) or any(len(name) > 16 for name in encoded):
         raise ValueError('AMRVAC field names must be distinct and at most 16 ASCII bytes')
+    destination = Path(path)
+    if not overwrite and os.path.lexists(destination):
+        raise FileExistsError(destination)
     shape = (mesh.leaf_count, len(names), *mesh.block_shape)
     required = (fields.nbytes + mesh.nbytes + 8*int(np.prod(shape)) +
-                96*int(np.prod(shape[1:])) + mesh.leaf_count*128)
+                8*int(np.prod(shape[1:])) + mesh.leaf_count*128)
     admit(required, memory_limit, 'AMRVAC export')
     data = np.empty(shape)
     h = fields.storage_halo
@@ -149,23 +88,18 @@ def write_amrvac(path, fields, *, metadata, overwrite=False, memory_limit=None):
     header.update(nw=len(names), w_names=names, nleafs=mesh.leaf_count,
                   nparents=len(mesh.node_leaves)-mesh.leaf_count,
                   levmax=int(forest.node_levels.max()), staggered=False)
-    tree = (forest.node_levels[nodes], forest.node_coords[nodes]+1,
-            np.zeros(mesh.leaf_count, dtype=np.int64))
-    from ..amrvac.datio import write_datfile_from_sfc
+    tree = (forest.node_levels[nodes], forest.node_coords[nodes]+1)
+    from ._v5.writer import write_datfile_from_sfc
 
-    destination = Path(path)
-    if not overwrite and destination.exists():
-        raise FileExistsError(destination)
     fd, temporary = tempfile.mkstemp(prefix='.simesh-', suffix='.dat', dir=destination.parent)
-    os.close(fd)
     try:
-        written = write_datfile_from_sfc(temporary, data, header,
-                                       mesh.node_leaves >= 0, tree, overwrite=True)
+        with os.fdopen(fd, 'wb') as stream:
+            written = write_datfile_from_sfc(stream, data, header,
+                                           mesh.node_leaves >= 0, tree)
         if overwrite:
             os.replace(temporary, destination)
         else:
             os.link(temporary, destination)
         return written
     finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+        Path(temporary).unlink(missing_ok=True)

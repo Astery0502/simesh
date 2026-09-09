@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import simesh as sm
-from simesh import amrvac, applications as app
+from simesh import applications as app
 
 
 def run(output):
@@ -32,10 +32,20 @@ def run(output):
                     + magnetic_z**2 / (2 * magnetic_units.permeability_h_m))
     data[..., 7] = magnetic_z
     snapshot = output / "snapshot.dat"
-    amrvac.write_datfile_from_uniform(
-        str(snapshot), data, names, np.zeros(3), np.ones(3),
-        np.array([8, 8, 8]), params=np.array([gamma]),
-    )
+    mesh = sm.mesh_from_forest((1, 1, 1), np.array([True]), lower=(0, 0, 0),
+                              upper=(1, 1, 1), block_shape=data.shape[:3])
+    blocks = np.ascontiguousarray(np.moveaxis(data, -1, 0)[None])
+    header = {
+        "datfile_version": 5, "ndim": 3, "ndir": 3, "geometry": "Cartesian_3D",
+        "periodic": np.zeros(3, dtype=bool), "staggered": False,
+        "xmin": mesh.lower, "xmax": mesh.upper,
+        "domain_nx": np.array(data.shape[:3]), "block_nx": np.array(mesh.block_shape),
+        "time": 0., "it": 0, "physics_type": "mhd",
+        "n_par": 1, "params": np.array([gamma]), "param_names": ["gamma"],
+        "snapshotnext": 1, "slicenext": 0, "collapsenext": 0,
+    }
+    with sm.source_from_arrays(mesh, blocks, names, copy=False) as generated:
+        sm.write_amrvac(snapshot, sm.read_fields(generated), metadata=header)
 
     with sm.open_amrvac(snapshot, units=units) as source:
         magnetic = sm.prepare(source, ("b1", "b2", "b3"), scheme="coordinate-phase")

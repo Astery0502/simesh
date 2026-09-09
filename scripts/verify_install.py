@@ -17,6 +17,7 @@ def main():
     args = parser.parse_args()
     args.target.mkdir(parents=True, exist_ok=False)
     with zipfile.ZipFile(args.wheel) as archive:
+        assert not any(name.startswith('simesh/amrvac/') for name in archive.namelist())
         archive.extractall(args.target)
     root = Path(__file__).resolve().parents[1]
     code = r'''
@@ -34,7 +35,7 @@ for name, module in tuple(sys.modules.items()):
         path = getattr(module, '__file__', None)
         if path:
             assert Path(path).resolve().is_relative_to(installed), (name, path)
-assert not any(name.startswith(('simesh_rewrite', 'simesh.utils', 'simesh.legacy')) for name in sys.modules)
+assert not any(name.startswith(('simesh_rewrite', 'simesh.utils', 'simesh.legacy', 'simesh.amrvac')) for name in sys.modules)
 raise SystemExit(status)
 '''
     subprocess.run([sys.executable, "-I", "-S", "-c", code, str(args.target.resolve()),

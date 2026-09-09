@@ -51,18 +51,4 @@ extensions += cythonize(
     compiler_directives={"language_level": 3, "boundscheck": False,
                          "wraparound": False, "cdivision": True},
 )
-# Stateful compatibility AMR keeps its original compiler arithmetic, but stays
-# serial until its historical overlapping uniform-grid writes are resolved.
-# SIMESH_OPENMP only enables the independent analysis kernels above.
-compatibility = [Extension(
-    '.'.join(path.relative_to(SOURCE).with_suffix('').parts),
-    [path.relative_to(ROOT).as_posix()], include_dirs=[np.get_include()],
-    extra_compile_args=['-O3'],
-) for path in sorted((SOURCE/'simesh/amrvac/_mesh').glob('*.pyx'))]
-extensions += cythonize(
-    compatibility, include_path=[str(SOURCE)],
-    compiler_directives={'language_level': 3, 'boundscheck': False,
-                         'wraparound': False, 'cdivision': True,
-                         'embedsignature': True},
-)
 setup(ext_modules=extensions)

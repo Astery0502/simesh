@@ -67,7 +67,7 @@ def main():
                         errors.append(f"{name}: parameter {missing!r} is missing from Parameters")
 
     exported = []
-    for module in (package, package["applications"], package["amrvac"], package["tools"]):
+    for module in (package, package["applications"], package["tools"]):
         exported.extend(module[name] for name in module.exports)
     # These advanced modules have no __all__; include locally defined public
     # callables, not imported implementation helpers or dependencies.

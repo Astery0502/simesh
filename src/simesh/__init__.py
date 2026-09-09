@@ -2,7 +2,7 @@
 
 The delivered profiles supply explicit sources, regional and whole-domain fields,
 scientific consumers and opt-in bounded workflows. See the README for numerical
-scope and docs/user/api.md for retained Dataset interfaces.
+scope and docs/user/api.md for supported interfaces.
 """
 
 from .fields import FieldDefinition, Fields
@@ -10,7 +10,7 @@ from .mesh import Mesh, Selection, mesh_from_forest, select_region
 from .io.source import Source, source_from_arrays, read_fields, select_source
 from .io.amrvac import open_amrvac
 from .io.metadata import SnapshotMetadata
-from .io.products import source_from_dataset, write_amrvac
+from .io.products import write_amrvac
 from .io.cache import cache_source
 from .io.jobs import global_curl_file
 from .preparation import prepare
@@ -42,7 +42,7 @@ __all__ += ["select_source", "cache_source", "FillPlan", "plan_preparation", "gl
             "iter_uniform", "retrace", "LOSResult", "LOSStatus", "integrate_los", "integrate_los_views",
             "orthographic_plane", "AIA171", "CoronalComposition", "ThermalLOSResult", "thermal_fields",
             "emissivity_fields", "integrate_thermal_los"]
-__all__ += ["SnapshotMetadata", "source_from_dataset", "write_amrvac"]
+__all__ += ["SnapshotMetadata", "write_amrvac"]
 __all__ += ["derive", "derive_many", "DerivedContext", "select_fields", "merge_fields"]
 __all__ += ["qsl", "iter_qsl", "QSLResult", "Boundary", "ConnectivityTermination"]
 __all__ += ["PointSet", "RaySet", "LineSet"]

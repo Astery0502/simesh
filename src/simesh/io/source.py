@@ -13,7 +13,7 @@ from .metadata import SnapshotMetadata
 class Source:
     """Immutable input lifetime and stable stored-field directory.
 
-    Use open_amrvac, source_from_arrays or source_from_dataset.
+    Use open_amrvac or source_from_arrays.
 
     Reading is separate from numerical preparation; caching is opt-in.
 
