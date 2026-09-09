@@ -14,34 +14,110 @@ import numpy as np
 from .._validation import admit, array_bytes
 from ..diagnostics import MagneticUnits, _components
 from ..fields import FieldDefinition, publish, require_fields
-from .thermal import CoronalComposition
+from .thermal import CoronalComposition, PROTON_MASS_G, BOLTZMANN_ERG_K
+
+
+def _positive_scale(value, label):
+    if (isinstance(value, (bool, np.bool_)) or np.ndim(value) != 0 or
+            not np.isfinite(value) or value <= 0):
+        raise ValueError(f"{label} must be finite positive scalars")
+    return float(value)
 
 
 @dataclass(frozen=True, kw_only=True)
 class MHDUnits:
-    """SI multipliers per stored density, momentum density and energy density.
+    """Gaussian CGS multipliers per stored MHD quantity and coordinate.
 
-    ``magnetic`` supplies tesla per stored B, permeability and coordinate length.
-    The length is retained for consumers; local recovery does not use it.
-    Momentum normalization is independent: rho_unit * velocity_unit is a common
-    choice, but is never inferred. All output quantities use SI, except kelvin
-    temperature and dimensionless ratios/status.
+    Parameters
+    ----------
+    density_g_cm3 : float
+        Grams per cubic centimeter per stored density.
+    momentum_g_cm2_s : float
+        Grams per square centimeter per second per stored momentum density.
+    energy_erg_cm3 : float
+        Ergs per cubic centimeter per stored total or internal energy density.
+    field_gauss : float
+        Gauss per stored magnetic field; magnetic pressure is B**2/(8*pi).
+    length_cm : float
+        Centimeters per coordinate unit, retained for downstream consumers.
+
+    Notes
+    -----
+    Input factors are independent and never inferred from field metadata.
+    Recovery outputs use CGS, kelvin and dimensionless ratios/status.
     """
 
-    density_kg_m3: float
-    momentum_kg_m2_s: float
-    energy_j_m3: float
-    magnetic: MagneticUnits
+    density_g_cm3: float
+    momentum_g_cm2_s: float
+    energy_erg_cm3: float
+    field_gauss: float
+    length_cm: float
 
     def __post_init__(self):
-        if not isinstance(self.magnetic, MagneticUnits):
-            raise TypeError("magnetic must be a MagneticUnits configuration")
-        for name in ("density_kg_m3", "momentum_kg_m2_s", "energy_j_m3"):
-            value = getattr(self, name)
-            if (isinstance(value, (bool, np.bool_)) or np.ndim(value) != 0 or
-                    not np.isfinite(value) or value <= 0):
-                raise ValueError("MHD unit multipliers must be finite positive scalars")
-            object.__setattr__(self, name, float(value))
+        for name in ("density_g_cm3", "momentum_g_cm2_s", "energy_erg_cm3",
+                     "field_gauss", "length_cm"):
+            object.__setattr__(self, name, _positive_scale(getattr(self, name), "MHD unit multipliers"))
+
+    @classmethod
+    def solar(cls, *, length_cm=1.e9, number_density_cm3=1.e9,
+              temperature_k=1.e6, composition=CoronalComposition()):
+        """Construct the common AMRVAC solar-coronal CGS normalization.
+
+        Parameters
+        ----------
+        length_cm : float, optional
+            Coordinate scale in cm; the default is 10 Mm.
+        number_density_cm3 : float, optional
+            Hydrogen nucleus density scale in cm^-3, not electron density.
+        temperature_k : float, optional
+            Temperature scale in kelvin.
+        composition : CoronalComposition, optional
+            Fully ionized H/He abundance; use the same composition in IdealMHD.
+
+        Returns
+        -------
+        MHDUnits
+            rho0=(1+4a)*mp*nH0, p0=(2+3a)*nH0*kB*T0,
+            v0=sqrt(p0/rho0), momentum0=rho0*v0, energy0=p0 and
+            B0=sqrt(4*pi*p0). The velocity scale is not the sound speed.
+
+        Notes
+        -----
+        This preset follows AMRVAC with si_unit=False, eq_state_units=True and
+        fully ionized H/He. It is a common coronal choice, not a universal solar
+        standard. Match the simulation's scales explicitly when they differ.
+        Constants are shared with CoronalComposition (mp=1.67262192369e-24 g,
+        kB=1.380649e-16 erg/K); older AMRVAC constants differ slightly.
+        """
+        if not isinstance(composition, CoronalComposition):
+            raise TypeError("composition must be an explicit CoronalComposition")
+        length, number_density, temperature = (
+            _positive_scale(value, "solar scales")
+            for value in (length_cm, number_density_cm3, temperature_k))
+        a = composition.helium_abundance
+        rho = ((1 + 4*a)*PROTON_MASS_G)*number_density
+        pressure = ((2 + 3*a)*BOLTZMANN_ERG_K)*number_density*temperature
+        if not (math.isfinite(rho) and rho > 0 and math.isfinite(pressure) and pressure > 0):
+            raise ValueError("solar density and pressure scales must be finite and positive")
+        velocity = math.sqrt(pressure)/math.sqrt(rho)
+        return cls(density_g_cm3=rho, momentum_g_cm2_s=rho*velocity,
+                   energy_erg_cm3=pressure, field_gauss=math.sqrt(4*math.pi)*math.sqrt(pressure),
+                   length_cm=length)
+
+    @property
+    def velocity_cm_s(self):
+        """Centimeters per second per stored velocity, from momentum/density."""
+        return self.momentum_g_cm2_s / self.density_g_cm3
+
+    @property
+    def time_s(self):
+        """Seconds per code time, from length/velocity."""
+        return self.length_cm / self.velocity_cm_s
+
+    @property
+    def magnetic_si(self):
+        """Equivalent SI normalization for the separate magnetic diagnostics."""
+        return MagneticUnits(field_tesla=self.field_gauss*1.e-4, length_m=self.length_cm*.01)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -100,15 +176,15 @@ class MHDStateError(ValueError):
 
 
 _OUTPUTS = {
-    "density": (("density", "kg m^-3"),),
-    "velocity": tuple(("v"+axis, "m s^-1") for axis in "xyz"),
-    "speed": (("speed", "m s^-1"),),
-    "internal_energy": (("internal_energy", "J m^-3"),),
-    "pressure": (("pressure", "Pa"),),
+    "density": (("density", "g cm^-3"),),
+    "velocity": tuple(("v"+axis, "cm s^-1") for axis in "xyz"),
+    "speed": (("speed", "cm s^-1"),),
+    "internal_energy": (("internal_energy", "erg cm^-3"),),
+    "pressure": (("pressure", "dyn cm^-2"),),
     "temperature": (("temperature", "K"),),
     "beta": (("beta", "1"),),
-    "sound_speed": (("sound_speed", "m s^-1"),),
-    "alfven_speed": (("alfven_speed", "m s^-1"),),
+    "sound_speed": (("sound_speed", "cm s^-1"),),
+    "alfven_speed": (("alfven_speed", "cm s^-1"),),
     "sonic_mach": (("sonic_mach", "1"),),
     "alfven_mach": (("alfven_mach", "1"),),
     "status": (("mhd_status", "1"),),
@@ -144,14 +220,14 @@ def _recover(rho_raw, momentum_raw, energy_raw, magnetic_raw, model, outputs, di
         status[~np.isfinite(value)] |= int(MHDStatus.NONFINITE_INPUT)
     units = model.units
     with np.errstate(divide="ignore", invalid="ignore", over="ignore", under="ignore"):
-        rho = rho_raw * units.density_kg_m3
-        momentum = tuple(value * units.momentum_kg_m2_s for value in momentum_raw)
-        energy = energy_raw * units.energy_j_m3
-        b = tuple(value * units.magnetic.field_tesla for value in magnetic_raw)
+        rho = rho_raw * units.density_g_cm3
+        momentum = tuple(value * units.momentum_g_cm2_s for value in momentum_raw)
+        energy = energy_raw * units.energy_erg_cm3
+        b = tuple(value * units.field_gauss for value in magnetic_raw)
         velocity = tuple(value / rho for value in momentum)
         speed = np.hypot(np.hypot(*velocity[:2]), velocity[2])
         bnorm = np.hypot(np.hypot(*b[:2]), b[2])
-        b_over_sqrt_mu = bnorm / np.sqrt(units.magnetic.permeability_h_m)
+        b_over_sqrt_mu = bnorm / np.sqrt(4*np.pi)
         magnetic_pressure = (.5 * b_over_sqrt_mu) * b_over_sqrt_mu
         internal = energy
         if model.energy_kind == "total":
@@ -164,16 +240,13 @@ def _recover(rho_raw, momentum_raw, energy_raw, magnetic_raw, model, outputs, di
         finite = np.isfinite(rho) & np.isfinite(internal) & np.isfinite(pressure)
         for value in (*momentum, energy, *b, *velocity, speed, magnetic_pressure):
             finite &= np.isfinite(value)
-        # Reuse the established H/He EOS, converting kg/m^3 -> g/cm^3 and Pa
-        # -> erg/cm^3. Invalid nodes are excluded rather than clipped or repaired.
-        rho_cgs, pressure_cgs = rho * 1.e-3, pressure * 10.
-        eligible = (finite & (rho_cgs > 0) & np.isfinite(rho_cgs) &
-                    (pressure_cgs > 0) & np.isfinite(pressure_cgs) & (status == 0))
+        # Use the shared CGS H/He EOS; invalid nodes are never clipped or repaired.
+        eligible = finite & (rho > 0) & (pressure > 0) & (status == 0)
         hydrogen_density = model.composition.number_density(
-            rho_cgs[eligible], convention="amrvac-hydrogen")
+            rho[eligible], convention="amrvac-hydrogen")
         eligible[eligible] = np.isfinite(hydrogen_density) & (hydrogen_density > 0)
         temperature = np.full(rho.shape, np.nan)
-        temperature[eligible] = model.composition.temperature(rho_cgs[eligible], pressure_cgs[eligible])
+        temperature[eligible] = model.composition.temperature(rho[eligible], pressure[eligible])
         representable = finite & np.isfinite(temperature) & (temperature > 0)
         # Do not obscure primary input/positivity errors with consequent NaNs.
         status[(status == 0) & ~representable] |= int(MHDStatus.UNREPRESENTABLE_STATE)
@@ -182,7 +255,7 @@ def _recover(rho_raw, momentum_raw, energy_raw, magnetic_raw, model, outputs, di
         status[zero_b] |= int(MHDStatus.ZERO_MAGNETIC_FIELD)
         # Unit conversions and state validation are shared by every request.
         # Release their scratch before allocating any optional diagnostics.
-        del momentum, b, energy, rho_cgs, pressure_cgs, hydrogen_density
+        del momentum, b, energy, hydrogen_density
         del finite, eligible, representable
         values = {"density": (rho,), "velocity": velocity, "speed": (speed,),
                   "internal_energy": (internal,), "pressure": (pressure,),
@@ -236,7 +309,7 @@ def mhd_fields(conserved, *, model, magnetic=None, density="rho",
         interpolated.
     model : IdealMHD
         Explicit gamma, total/internal energy convention, fully ionized H/He composition and
-        SI scales.
+        Gaussian CGS scales.
     magnetic : Fields, optional
         Separate magnetic group sharing Mesh identity and leaf coverage; slot order may
         differ. None selects B from conserved.
@@ -262,7 +335,7 @@ def mhd_fields(conserved, *, model, magnetic=None, density="rho",
     Returns
     -------
     Fields
-        Independent selected SI quantities and optional categorical status, in conserved
+        Independent selected CGS quantities and optional categorical status, in conserved
         leaf order with common valid halo. preparation_stats records
         evaluated_diagnostics and interior/all-node flag counts (not volumes); unchecked
         diagnostic counts are None, not zero.

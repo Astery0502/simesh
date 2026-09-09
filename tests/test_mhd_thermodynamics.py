@@ -14,11 +14,11 @@ from simesh.physics.thermal import BOLTZMANN_ERG_K, PROTON_MASS_G
 
 
 NAMES = ("rho", "m1", "m2", "m3", "e", "b1", "b2", "b3")
-SI = MHDUnits(density_kg_m3=1., momentum_kg_m2_s=1., energy_j_m3=1.,
-              magnetic=sm.MagneticUnits(field_tesla=1., length_m=1., permeability_h_m=5.))
+CGS = MHDUnits(density_g_cm3=1., momentum_g_cm2_s=1., energy_erg_cm3=1.,
+               field_gauss=1., length_cm=1.)
 
 
-def model(energy_kind="total", units=SI):
+def model(energy_kind="total", units=CGS):
     return IdealMHD(gamma=2., energy_kind=energy_kind,
                     composition=sm.CoronalComposition(helium_abundance=.1), units=units)
 
@@ -38,11 +38,11 @@ def source_for(state=None, *, configuration=None, mixed=False):
         energy = pressure/(configuration.gamma-1)
         if configuration.energy_kind == "total":
             energy = energy + .5*rho*sum(v*v for v in velocity)
-            energy = energy + sum(component*component for component in b)/(2*u.magnetic.permeability_h_m)
-        raw[leaf, 0] = rho/u.density_kg_m3
-        raw[leaf, 1:4] = np.array([np.broadcast_to(rho*v/u.momentum_kg_m2_s, x.shape) for v in velocity])
-        raw[leaf, 4] = energy/u.energy_j_m3
-        raw[leaf, 5:8] = np.array([np.broadcast_to(component/u.magnetic.field_tesla, x.shape) for component in b])
+            energy = energy + sum(component*component for component in b)/(2*(4*np.pi))
+        raw[leaf, 0] = rho/u.density_g_cm3
+        raw[leaf, 1:4] = np.array([np.broadcast_to(rho*v/u.momentum_g_cm2_s, x.shape) for v in velocity])
+        raw[leaf, 4] = energy/u.energy_erg_cm3
+        raw[leaf, 5:8] = np.array([np.broadcast_to(component/u.field_gauss, x.shape) for component in b])
     return sm.source_from_arrays(mesh, raw, NAMES), raw
 
 
@@ -57,16 +57,16 @@ def test_analytic_state_and_consistent_magnetic_diagnostics(energy_kind):
         ready = sm.prepare(source, scheme="exact-phase")
     state = mhd_fields(ready, model=config, outputs=("density", "velocity", "speed", "internal_energy",
         "pressure", "temperature", "beta", "sound_speed", "alfven_speed", "sonic_mach", "alfven_mach", "status"))
-    temperature = 60./((2+3*.1)*(.002/((1+4*.1)*PROTON_MASS_G))*BOLTZMANN_ERG_K)
-    expected = [2., 3., 4., 0., 5., 6., 6., temperature, 2.4, np.sqrt(6.),
-                np.sqrt(2.5), 5/np.sqrt(6.), np.sqrt(10.), 0.]
+    temperature = 6./((2+3*.1)*(2./((1+4*.1)*PROTON_MASS_G))*BOLTZMANN_ERG_K)
+    expected = [2., 3., 4., 0., 5., 6., 6., temperature, 48*np.pi/25, np.sqrt(6.),
+                5/np.sqrt(8*np.pi), 5/np.sqrt(6.), np.sqrt(8*np.pi), 0.]
     np.testing.assert_allclose(state.values, np.broadcast_to(expected, state.values.shape), rtol=2e-14)
     assert state.storage_halo == state.valid_halo == 2
-    assert tuple(f.units for f in state.fields)[0:6] == ("kg m^-3", "m s^-1", "m s^-1", "m s^-1", "m s^-1", "J m^-3")
+    assert tuple(f.units for f in state.fields)[0:6] == ("g cm^-3", "cm s^-1", "cm s^-1", "cm s^-1", "cm s^-1", "erg cm^-3")
     assert not state.values.flags.writeable and not np.shares_memory(state.values, ready.values)
     assert state.preparation_stats["invalid_state_counts"] == {"interior": 0, "evaluated": 0}
-    magnetic_pressure = sm.magnetic_pressure(ready, units=config.units.magnetic, components=("b1", "b2", "b3"))
-    np.testing.assert_allclose(state.values[..., column(state, "beta")]*magnetic_pressure.values[..., 0], 6.)
+    magnetic_pressure = sm.magnetic_pressure(ready, units=config.units.magnetic_si, components=("b1", "b2", "b3"))
+    np.testing.assert_allclose(state.values[..., column(state, "beta")]*magnetic_pressure.values[..., 0]*10, 6.)
 
 
 def test_energy_definition_is_explicit_and_does_not_follow_field_name():
@@ -75,7 +75,7 @@ def test_energy_definition_is_explicit_and_does_not_follow_field_name():
     total = mhd_fields(raw, model=model(), outputs="pressure")
     internal = mhd_fields(raw, model=model("internal"), outputs="pressure")
     np.testing.assert_allclose(total.values, 6.)
-    np.testing.assert_allclose(internal.values, 33.5)
+    np.testing.assert_allclose(internal.values, 31.+25/(8*np.pi))
     assert raw.fields[4].name == "e"
     with pytest.raises(TypeError):
         mhd_fields(raw)
@@ -86,10 +86,10 @@ def test_energy_definition_is_explicit_and_does_not_follow_field_name():
 @pytest.mark.parametrize("energy_kind", ["total", "internal"])
 def test_independent_si_cgs_and_code_units(energy_kind):
     configurations = [model(energy_kind), model(energy_kind, MHDUnits(
-        density_kg_m3=1e3, momentum_kg_m2_s=10., energy_j_m3=.1,
-        magnetic=sm.MagneticUnits(field_tesla=1e-4, length_m=.01, permeability_h_m=5.))),
-        model(energy_kind, MHDUnits(density_kg_m3=.25, momentum_kg_m2_s=7., energy_j_m3=11.,
-            magnetic=sm.MagneticUnits(field_tesla=.3, length_m=9., permeability_h_m=5.)))]
+        density_g_cm3=1e-3, momentum_g_cm2_s=.1, energy_erg_cm3=10.,
+        field_gauss=1e4, length_cm=100.)),
+        model(energy_kind, MHDUnits(density_g_cm3=.25, momentum_g_cm2_s=7., energy_erg_cm3=11.,
+            field_gauss=.3, length_cm=9.))]
     results = []
     for config in configurations:
         with source_for(configuration=config)[0] as source:
@@ -98,6 +98,52 @@ def test_independent_si_cgs_and_code_units(energy_kind):
         results.append(mhd_fields(raw, model=config))
     for result in results[1:]:
         np.testing.assert_allclose(result.values, results[0].values, rtol=2e-14)
+
+
+@pytest.mark.parametrize("energy_kind", ["total", "internal"])
+@pytest.mark.parametrize("custom", [False, True])
+def test_solar_units_recover_amrvac_dimensionless_conserved_state(energy_kind, custom):
+    composition = sm.CoronalComposition(helium_abundance=.2 if custom else .1)
+    temperature, number_density = (2e6, 3e8) if custom else (1e6, 1e9)
+    overrides = dict(length_cm=5e8, number_density_cm3=number_density,
+                     temperature_k=temperature) if custom else {}
+    units = sm.MHDUnits.solar(composition=composition, **overrides)
+    config = IdealMHD(gamma=5/3, energy_kind=energy_kind, composition=composition, units=units)
+    # AMRVAC code units: rho=2, m=(3,4,0), p=6, B=(1,2,2).
+    # E=p/(gamma-1)+|m|^2/(2*rho)+|B|^2/2, with no explicit 4*pi.
+    energy = 6/(config.gamma-1)
+    if energy_kind == "total":
+        energy += 25/4 + 9/2
+    mesh = sm.mesh_from_forest((1, 1, 1), np.array([True]), lower=(0, 0, 0),
+                               upper=(1, 1, 1), block_shape=(8, 8, 8))
+    raw = np.broadcast_to(np.array([2., 3., 4., 0., energy, 1., 2., 2.])[None, :, None, None, None],
+                          (1, 8, 8, 8, 8)).copy()
+    with sm.source_from_arrays(mesh, raw, NAMES) as source:
+        conserved = sm.read_fields(source)
+    state = sm.mhd_fields(conserved, model=config)
+    np.testing.assert_allclose(state.values[..., column(state, "temperature")], 3*temperature)
+    np.testing.assert_allclose(composition.number_density(
+        state.values[..., column(state, "density")], convention="amrvac-hydrogen"), 2*number_density)
+    np.testing.assert_allclose(state.values[..., column(state, "vx")], 1.5*units.velocity_cm_s)
+    np.testing.assert_allclose(state.values[..., column(state, "pressure")], 6*units.energy_erg_cm3)
+    np.testing.assert_allclose(state.values[..., column(state, "beta")], 4/3)
+    np.testing.assert_allclose(state.values[..., column(state, "alfven_speed")],
+                               3/np.sqrt(2)*units.velocity_cm_s)
+    np.testing.assert_array_equal(state.values[..., column(state, "mhd_status")], 0.)
+    magnetic_pressure = sm.magnetic_pressure(conserved, components=(5, 6, 7), units=units.magnetic_si)
+    np.testing.assert_allclose(magnetic_pressure.values[..., 0]*10,
+                               state.values[..., column(state, "pressure")]/(4/3))
+
+
+def test_solar_units_reject_invalid_scales_and_unrepresentable_normalization():
+    for name in ("length_cm", "number_density_cm3", "temperature_k"):
+        for value in (0., -1., np.inf, np.nan, True, [1.]):
+            with pytest.raises(ValueError, match="solar scales"):
+                MHDUnits.solar(**{name: value})
+    with pytest.raises(TypeError, match="composition"):
+        MHDUnits.solar(composition=None)
+    with pytest.raises(ValueError, match="solar density and pressure"):
+        MHDUnits.solar(composition=sm.CoronalComposition(helium_abundance=1e308))
 
 
 def test_mixed_amr_separate_groups_permutations_and_invalid_padding():
@@ -150,8 +196,8 @@ def test_partial_coverage_requested_bounds_and_mesh_mismatch():
 
 
 @pytest.mark.parametrize("component,value,flag", [(0, 0., MHDStatus.NONPOSITIVE_DENSITY),
-    (0, -1., MHDStatus.NONPOSITIVE_DENSITY), (4, 27.5, MHDStatus.NONPOSITIVE_INTERNAL_ENERGY),
-    (4, 26., MHDStatus.NONPOSITIVE_INTERNAL_ENERGY), (2, np.nan, MHDStatus.NONFINITE_INPUT),
+    (0, -1., MHDStatus.NONPOSITIVE_DENSITY), (4, 25., MHDStatus.NONPOSITIVE_INTERNAL_ENERGY),
+    (4, 24., MHDStatus.NONPOSITIVE_INTERNAL_ENERGY), (2, np.nan, MHDStatus.NONFINITE_INPUT),
     (6, np.inf, MHDStatus.NONFINITE_INPUT), (0, np.nan, MHDStatus.NONFINITE_INPUT),
     (4, np.inf, MHDStatus.NONFINITE_INPUT)])
 def test_invalid_nodes_raise_or_remain_visible_as_nan(component, value, flag):
@@ -171,7 +217,7 @@ def test_invalid_nodes_raise_or_remain_visible_as_nan(component, value, flag):
     assert output.preparation_stats["invalid_state_counts"] == {"interior": 1, "evaluated": 1}
     assert output.valid_halo == 2  # Spatial support is distinct from physical validity.
     with pytest.raises(ValueError, match="temperature|density"):
-        sm.thermal_fields(ready, output, density_unit_g_cm3=.001,
+        sm.thermal_fields(ready, output, density_unit_g_cm3=1.,
             temperature_component=column(output, "temperature"), temperature_label="invalid-state test")
 
 
@@ -206,7 +252,7 @@ def test_zero_magnetic_field_is_a_valid_state_with_undefined_ratios():
 def test_nonfinite_normalization_and_diagnostic_overflow_are_visible():
     with source_for()[0] as source:
         raw = sm.read_fields(source)
-    overflow = replace(SI, energy_j_m3=1e308)
+    overflow = replace(CGS, energy_erg_cm3=1e308)
     output = mhd_fields(raw, model=model(units=overflow), invalid="nan")
     assert np.isnan(output.values[..., :-1]).all()
     np.testing.assert_array_equal(output.values[..., -1], int(MHDStatus.UNREPRESENTABLE_STATE))
@@ -218,27 +264,24 @@ def test_nonfinite_normalization_and_diagnostic_overflow_are_visible():
     np.testing.assert_array_equal(output.values[..., -1], int(MHDStatus.UNREPRESENTABLE_DIAGNOSTIC))
 
 
-def test_finite_magnetic_energy_does_not_overflow_intermediate_permeability():
-    units = replace(SI, magnetic=sm.MagneticUnits(field_tesla=1., length_m=1., permeability_h_m=1e308))
-    config = model(units=units)
-    # E = u + K + B^2/(2 mu) = 6 + 25 + .5. Squaring B or doubling
-    # permeability first can overflow even though the recovered state is finite.
-    with source_for(configuration=model("internal", units))[0] as source:
+def test_finite_cgs_magnetic_energy_does_not_overflow_intermediate_square():
+    with source_for(configuration=model("internal"))[0] as source:
         raw = sm.read_fields(source)
     changed = raw.values.copy()
-    changed[..., 4] = 31.5
-    changed[..., 5:8] = [1e154, 0., 0.]
+    # B**2 overflows, while B**2/(8*pi) and the complete state are finite.
+    b = 1.5e154
+    magnetic_energy = (b/np.sqrt(8*np.pi))**2
+    changed[..., 0] = 1e284
+    changed[..., 1:4] = 0.
+    changed[..., 4] = 1e307 + magnetic_energy
+    changed[..., 5:8] = [b, 0., 0.]
     changed_fields = replace(raw, _values=changed)
-    output = mhd_fields(changed_fields, model=config)
-    np.testing.assert_allclose(output.values[..., column(output, "pressure")], 6.)
-    np.testing.assert_allclose(output.values[..., column(output, "beta")], 12.)
+    output = mhd_fields(changed_fields, model=model())
+    np.testing.assert_allclose(output.values[..., column(output, "pressure")], 1e307)
+    np.testing.assert_allclose(output.values[..., column(output, "beta")], 1e307/magnetic_energy)
     np.testing.assert_array_equal(output.values[..., -1], 0.)
-    magnetic_pressure = sm.magnetic_pressure(changed_fields,components=(5,6,7),units=units.magnetic)
-    energy_density = sm.magnetic_energy_density(changed_fields,components=(5,6,7),units=units.magnetic)
-    np.testing.assert_allclose(magnetic_pressure.values[...,0],.5)
-    np.testing.assert_array_equal(magnetic_pressure.values,energy_density.values)
-    np.testing.assert_allclose(output.values[...,column(output,"beta")]*magnetic_pressure.values[...,0],
-                               output.values[...,column(output,"pressure")])
+    magnetic_pressure = sm.magnetic_pressure(changed_fields, components=(5,6,7), units=CGS.magnetic_si)
+    np.testing.assert_allclose(magnetic_pressure.values[..., 0]*10, magnetic_energy)
 
 
 def test_custom_field_names_composition_and_internal_energy_positivity():
@@ -249,7 +292,7 @@ def test_custom_field_names_composition_and_internal_energy_positivity():
     config = replace(model("internal"), composition=sm.CoronalComposition(helium_abundance=0.))
     output = mhd_fields(renamed, model=config, density="mass", momentum=("mx", "my", "mz"),
         energy="internal", magnetic_components=("Bx", "By", "Bz"), outputs="temperature")
-    expected = 60./(2*(.002/PROTON_MASS_G)*BOLTZMANN_ERG_K)
+    expected = 6./(2*(2./PROTON_MASS_G)*BOLTZMANN_ERG_K)
     np.testing.assert_allclose(output.values, expected, rtol=2e-14)
     for internal in (0., -1.):
         changed = raw.values.copy()
@@ -296,14 +339,14 @@ def test_selectors_validation_and_memory_admission():
     for gamma in (1., .5, np.inf, np.nan, True):
         with pytest.raises(ValueError, match="gamma"):
             replace(model(), gamma=gamma)
-    for name in ("density_kg_m3", "momentum_kg_m2_s", "energy_j_m3"):
+    for name in ("density_g_cm3", "momentum_g_cm2_s", "energy_erg_cm3", "field_gauss", "length_cm"):
         for factor in (0., -1., np.inf, np.nan, True):
             with pytest.raises(ValueError):
-                replace(SI, **{name: factor})
+                replace(CGS, **{name: factor})
     with pytest.raises(TypeError):
         replace(model(), composition=None)
     with pytest.raises(TypeError):
-        replace(model(), units="SI")
+        replace(model(), units="CGS")
 
 
 def test_borrowed_inputs_detach_and_expired_inputs_fail():
@@ -327,23 +370,22 @@ def test_borrowed_inputs_detach_and_expired_inputs_fail():
 
 
 def test_recovered_temperature_thermal_los_and_velocity_tracing():
-    units = MHDUnits(density_kg_m3=1e-12, momentum_kg_m2_s=1e-8, energy_j_m3=1e-4,
-        magnetic=sm.MagneticUnits(field_tesla=1e-4, length_m=1e6))
+    units = MHDUnits.solar()
     config = replace(model(units=units), gamma=5/3)
-    rho, target_t = 2e-12, 8e5
+    rho, target_t = 2e-15, 8e5
     a = config.composition.helium_abundance
-    pressure = (2+3*a)*(rho*.001/((1+4*a)*PROTON_MASS_G))*BOLTZMANN_ERG_K*target_t/10
-    state = lambda x, y, z: (rho, (0., 0., 2e4), pressure, (0., 0., 1e-4))
+    pressure = (2+3*a)*(rho/((1+4*a)*PROTON_MASS_G))*BOLTZMANN_ERG_K*target_t
+    state = lambda x, y, z: (rho, (0., 0., 2e6), pressure, (0., 0., 1.))
     with source_for(state, configuration=config, mixed=True)[0] as source:
         ready = sm.prepare(source, scheme="exact-phase")
     recovered = mhd_fields(ready, model=config, outputs=("density", "temperature"))
     np.testing.assert_allclose(recovered.values[..., 1], target_t, rtol=2e-14)
     response = sm.AIA171(composition=config.composition)
-    thermo = sm.thermal_fields(recovered, recovered, density_unit_g_cm3=.001,
+    thermo = sm.thermal_fields(recovered, recovered, density_unit_g_cm3=1.,
         temperature_component=1, temperature_label="explicit ideal-MHD total energy", model=response)
     plane = sm.orthographic_plane(ready.mesh.lower, ready.mesh.upper, [0, 0, 1], (6, 5))
-    length_cm = units.magnetic.length_m*100
-    expected_emissivity = response.emissivity(rho*.001, target_t)
+    length_cm = units.length_cm
+    expected_emissivity = response.emissivity(rho, target_t)
     for order in ("thermodynamics-first", "emissivity-first"):
         image = sm.integrate_thermal_los(thermo, plane, [0, 0, 1], length_unit_cm=length_cm,
                                         model=response, order=order, workers=2)

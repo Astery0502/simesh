@@ -53,12 +53,12 @@ def fixture():
     raw = np.zeros((8, 8, 16, 16, 16))
     model = sm.IdealMHD(gamma=5/3, energy_kind="total",
         composition=sm.CoronalComposition(),
-        units=sm.MHDUnits(density_kg_m3=1., momentum_kg_m2_s=1., energy_j_m3=1.,
-                         magnetic=sm.MagneticUnits(field_tesla=1., length_m=1.)))
+        units=sm.MHDUnits(density_g_cm3=1.e-3, momentum_g_cm2_s=.1, energy_erg_cm3=10.,
+                         field_gauss=1.e4, length_cm=100.))
     raw[:, 0] = 1.e-12
     raw[:, 3] = 1.e-12 * 2.e4
     raw[:, 7] = 1.e-4
-    raw[:, 4] = .01/(model.gamma-1) + .5*1.e-12*(2.e4)**2 + 1.e-8/(2*model.units.magnetic.permeability_h_m)
+    raw[:, 4] = .01/(model.gamma-1) + .5*1.e-12*(2.e4)**2 + 1.e-8/(2*model.units.magnetic_si.permeability_h_m)
     with sm.source_from_arrays(mesh, raw, ("rho", "m1", "m2", "m3", "e", "b1", "b2", "b3")) as source:
         fields = sm.prepare(source, scheme="coordinate-phase")
     return fields, model
@@ -104,17 +104,17 @@ def run(output):
     state = sm.mhd_fields(fields,model=model,outputs=("density","temperature"))
     def compose_old():
         selected_b = sm.select_fields(fields,("b1","b2","b3"))
-        current = sm.current_density(selected_b,units=model.units.magnetic)
+        current = sm.current_density(selected_b,units=model.units.magnetic_si)
         scaled = sm.derive_many(state,{"temperature_MK":"MK","density_cgs":"g cm^-3"},
             lambda ctx: {"temperature_MK":ctx.field("temperature")*1e-6,
-                         "density_cgs":ctx.field("density")*1e-3})
+                         "density_cgs":ctx.field("density")})
         return sm.merge_fields((scaled,current))
     def compose_selected():
-        current = sm.current_density(fields,units=model.units.magnetic,components=("b1","b2","b3"))
+        current = sm.current_density(fields,units=model.units.magnetic_si,components=("b1","b2","b3"))
         return sm.derive_many({"state":state,"current":current},
             {"temperature_MK":"MK","density_cgs":"g cm^-3","jz":current.fields[2].units},
             lambda ctx: {"temperature_MK":ctx.field("temperature",group="state")*1e-6,
-                         "density_cgs":ctx.field("density",group="state")*1e-3,
+                         "density_cgs":ctx.field("density",group="state"),
                          "jz":ctx.field("jz",group="current")})
     old, before = allocated(compose_old)
     selected, after = allocated(compose_selected)
