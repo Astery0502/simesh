@@ -1,11 +1,12 @@
 # Historical implementations
 
 This directory is excluded from the root package build and default tests.
-Current implementation work belongs in `../src/simesh/`.
+Current implementation work belongs in `../src/simesh/`. Superseded development
+and migration documents have been removed; committed versions remain in Git history.
 
 | Directory | Origin and purpose |
 | --- | --- |
-| `previous/` | The preceding root package, its `rewrite/` provider, tests, build tools and documents |
+| `previous/` | The preceding root package, its `rewrite/` provider, tests and build tools |
 | `python-first/` | The earlier `src/simesh/legacy/` Python implementation and `archive/` sources, separated from the preceding main package |
 | `core-development/` | Historical N1–N4 comparison runners, logs, environments and generated artifacts from the former `analysis-core/` workspace |
 

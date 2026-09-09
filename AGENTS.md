@@ -6,14 +6,12 @@ at the repository root. The N4 numerical and ownership boundaries remain fixed.
 
 ## Start here
 
-- `README.md` and the user-requested Chinese `docs/application-guide.md`:
-  supported scientific workflows, output formats and runnable examples.
-- `docs/api-reference.md`: current application signatures and selector rules.
-- `docs/interface-review.md`: current interface/resource findings and implemented
-  output optimizations, with measured limits.
-- `docs/architecture.md`: module responsibilities and runtime dependencies.
-- `MIGRATION.md`: import changes and retained Dataset/file interfaces.
-- `docs/cython-build.md`: extension layout, build and installation checks.
+- `README.md`: supported scientific workflows, output formats and runnable examples.
+- `docs/user/index.md` and `docs/user/api.md`: concise user entry and generated public interfaces.
+- `docs/dev/index.md` and `docs/dev/api.md`: developer entry and core/advanced interfaces.
+- `docs/index.md`: documentation map, separating application use from development.
+- `docs/dev/architecture.md`: module responsibilities and runtime dependencies.
+- `docs/dev/cython-build.md`: extension layout, build and installation checks.
 - `ASSETS.md`: retained algorithm provenance when relevant.
 
 ## Code map and editing boundaries
@@ -58,10 +56,20 @@ simple formulas. Measure performance only for a concrete question or claim.
 
 ## Documentation
 
-Implementation and code comments are in English. The application manual, API
-reference and current interface review are in Chinese as explicitly requested
-by the user. Keep current documentation under `docs/` small and task-oriented.
-Historical development and superseded technical/application documents live in
-`legacy/core-development/documentation-before-application-guide/`; they are not
-active instructions or prerequisites. Preserve implementation provenance and
-license information in ASSETS.md and LICENSE.
+Interface descriptions live in English NumPy-style source docstrings. API pages
+under `docs/user/` and `docs/dev/` contain explicit mkdocstrings object references,
+not copied signatures. Install `.[docs]`; run `make docs` for static API/parameter
+checks and a strict HTML build, or `make docs-serve` for local preview. Do not
+commit `site/`. Keep exact API descriptions at one source definition and retain
+ownership, support, units and termination constraints when shortening text.
+Follow the content placement and Notes brevity rules in
+[Docstring content](docs/dev/cython-build.md#docstring-content); that section is
+the authoritative writing guide rather than a second copy of each API contract.
+
+Implementation and code comments are in English. Active Chinese documentation
+is limited to application use. Keep
+architecture, build and source-generated API references in the English developer
+and user sections. Put development reviews, measurements and future test plans
+under `legacy/core-development/`, outside the active documentation site. Keep current documentation under `docs/` small and task-oriented.
+Do not retain superseded development or migration documents in the repository.
+Preserve implementation provenance and license information in ASSETS.md and LICENSE.

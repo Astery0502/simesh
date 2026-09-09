@@ -6,14 +6,17 @@ runtime imports. During root promotion, retained `utils/lib/amr/` extensions
 and `utils/lib/{tree,math}.pxd` moved to `amrvac/_mesh/`, `utils/runtime.py` moved
 to `amrvac/runtime.py`, and `utils/configurations.py` moved to
 `tools/configurations.py`. Their algorithmic provenance is unchanged. There is
-no active `simesh.utils` namespace; see [migration](MIGRATION.md).
+no active `simesh.utils` namespace.
 
 The subsequent `connectivity.py` and `_kernels/connectivity.pyx` consumer is an
 independent implementation of published magnetic-connectivity mathematics using
 this package's existing AMR primitives. No FastQSL2 code is bundled or translated.
-Scientific references and external comparison provenance are recorded in
-[archived method and reference notes](legacy/core-development/documentation-before-application-guide/connectivity.md). FastQSL2's CC BY-NC-SA 4.0 code
-is used only as a separately obtained reference; it is not a runtime dependency.
+Definitions follow [Chen et al. (2026), FastQSL 2](https://arxiv.org/abs/2604.16195),
+including Scott et al. (2017), Pariat and Démoulin (2012), Titov (2007), and Berger
+and Prior (2006). See also [Zhang et al. (2022), FastQSL](https://arxiv.org/abs/2208.12569).
+The [FastQSL2 repository](https://github.com/el2718/FastQSL2) declares CC BY-NC-SA 4.0;
+it remains an external comparison reference, not a runtime dependency. Comparison
+used revision `314bbf01ab72e43f82cb6b2e1c2a4d22d93aacdd`.
 
 Source revision: `b91bbc015d882ffd7dfcd7e10590cdce559f8532`.
 
@@ -55,7 +58,7 @@ uniform-grid OpenMP boundary writes have unresolved conformance evidence.
 N4 applies the N2 fourth-row prolong support correction to its retained mesh,
 rejects periodic ghost exchange that the old Dataset did not implement, and
 rejects ordinary serialization of a header still marked as staggered. It retains
-the existing VTK endpoint-coordinate convention; see `MIGRATION.md`.
+the existing VTK level-1 structured-points and endpoint-coordinate convention.
 
 `io/products.py` is new boundary code: Dataset interiors are copied into a
 detached native Source; complete Fields are explicitly repacked into SFC order

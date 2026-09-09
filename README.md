@@ -4,11 +4,10 @@
 numerical result delivery. The repository root contains the selected package,
 including its AMRVAC file interfaces and array-based magnetic field tools.
 
-Start with the [Chinese application guide](docs/application-guide.md) for
-working examples, units, supported physics and output formats. The
-[API reference](docs/api-reference.md) lists current signatures; the
-[interface/resource review](docs/interface-review.md) records measured costs
-and proposed improvements.
+Start with the [user interfaces](docs/user/index.md) and the
+[source-generated API index](docs/user/api.md). The
+[developer interfaces](docs/dev/index.md) cover core objects and advanced execution.
+See the [documentation map](docs/index.md) for the full structure.
 
 ## Scientific workflows
 
@@ -33,24 +32,33 @@ Python 3.11 or newer is required. From the repository root:
 ```bash
 python3.11 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
-.venv/bin/python examples/standard_applications.py --output /tmp/simesh-standard
-.venv/bin/python examples/recovered_state_analysis.py --output /tmp/simesh-quantitative
+.venv/bin/python examples/user_quickstart.py --output example-output/user-quickstart
 ```
 
-The first example writes an ordinary NumPy bundle and JSON summary. The second
-writes application result files readable with `simesh.load_result`. See the
-application guide for the exact contents and the distinction between formats.
-Optional `.[plot]` enables PNG rendering; `.[fft]` enables SciPy FFT convolution.
+The quickstart creates a teaching snapshot and verifies a magnetic map, mass
+and result save/load. Use a fresh output directory. More executable examples
+are linked from the [user entry](docs/user/index.md).
+Optional `.[plot]` enables PNG rendering; `.[fft]` adds FFT convolution.
 
-For development, `make build` rebuilds Cython and `make test` runs current tests.
-See [build instructions](docs/cython-build.md) for OpenMP and isolated installation
-checks, and [architecture](docs/architecture.md) for module boundaries.
+## Build the interface reference
+
+```bash
+.venv/bin/python -m pip install -e '.[docs]'
+make docs
+make docs-serve
+```
+
+The build reads signatures and NumPy-style docstrings directly from `src/`
+without importing compiled modules. `make docs` checks public API coverage,
+parameter descriptions and links, then writes HTML to ignored `site/`.
+GitHub Markdown shows the API directives; the built site renders their content.
+For package development use `make build` and `make test`; see
+[build instructions](docs/dev/cython-build.md).
 
 ## Project layout and history
 
 Current implementation, tests and examples live in `src/`, `tests/` and
-`examples/`. [Migration notes](MIGRATION.md) list moved imports. Historical
-implementations and superseded documents are under [legacy/](legacy/README.md)
+`examples/`. Historical implementations are under [legacy/](legacy/README.md)
 and are excluded from the build. They are not prerequisites for using the
 current package. [ASSETS.md](ASSETS.md) and `LICENSE` retain implementation
 provenance and licensing information.

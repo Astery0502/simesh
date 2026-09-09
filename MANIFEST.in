@@ -1,5 +1,6 @@
 include ASSETS.md
-include MIGRATION.md
+include mkdocs.yml
+include Makefile
 recursive-include docs *.md *.json
 recursive-include examples *.py
 recursive-include tests *.py

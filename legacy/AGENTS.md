@@ -1,8 +1,8 @@
 # Archived code
 
-These directories preserve preceding implementations and development evidence.
-They are not active package roots or default edit targets. Historical nested
-instructions describe their original workspaces, not the current root project.
+These directories preserve preceding implementations and comparison artifacts.
+They are not active package roots or default edit targets. Superseded development
+documents and nested workspace instructions have been removed.
 
 For current work use the root AGENTS.md, src/, tests/, examples/ and docs/.
 Only modify archived implementations when the user explicitly requests

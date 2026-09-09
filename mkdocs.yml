@@ -1,0 +1,61 @@
+site_name: simesh
+site_description: Native AMR scientific analysis interfaces
+repo_url: https://github.com/Astery0502/simesh/
+edit_uri: edit/main/docs/
+docs_dir: docs
+site_dir: site
+use_directory_urls: false
+exclude_docs: |
+  application-overview.md
+theme:
+  name: readthedocs
+  highlightjs: true
+hooks:
+  - scripts/docs_hooks.py
+nav:
+  - Home: index.md
+  - User:
+      - Start: user/index.md
+      - API: user/api.md
+  - Developer:
+      - Start: dev/index.md
+      - Architecture: dev/architecture.md
+      - API: dev/api.md
+      - Build and documentation: dev/cython-build.md
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          load_external_modules: false
+          options:
+            allow_inspection: false
+            extensions:
+              - scripts/docs_hooks.py:LiteralDefaults
+            docstring_style: numpy
+            docstring_section_style: table
+            show_root_heading: true
+            show_root_full_path: true
+            show_source: false
+            separate_signature: true
+            merge_init_into_class: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            members: false
+            inherited_members: false
+            show_bases: false
+            heading_level: 3
+            line_length: 88
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+      slugify: !!python/name:markdown.extensions.toc.slugify_unicode
+validation:
+  nav:
+    omitted_files: warn
+  links:
+    not_found: warn
+    anchors: warn
