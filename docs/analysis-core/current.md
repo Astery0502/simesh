@@ -7,6 +7,13 @@
 
 - 选定实现：根目录 `analysis-core/`；在 N4 基线 `a817221` 上增加应用接口。
 - 原生 `derive` 支持逐点公式组合，`derivative` 支持字段名与方向名。
+- 标准诊断提供模长、梯度、散度、点积，以及显式 SI 归一化的电流、磁压和磁能密度。
+  面上诊断支持 Q-only、twist-only 和联合请求；twist-only 跳过 Q 的计算。
+  统一示例覆盖均匀场、电流图、诊断筛选后双向追踪，以及标量/热 LOS。
+  见[标准应用](../../analysis-core/docs/standard-applications.md)。
+- `PointSet`、`RaySet` 和 `simesh.applications` 提供点/射线编号、几何与结果关联。
+  按用户最新决定，QSL/twist 不保存积分路径；阈值筛选后再单独追踪。
+  用法见[应用接口](../../analysis-core/docs/applications.md)。
 - `qsl` / `iter_qsl` 支持 AMR 上的 Q、Q⊥、局部映射、边界脚点与完整线 twist；
   方法、状态与误差边界见[实现检查](connectivity.md)和[调用说明](../../analysis-core/docs/connectivity.md)。
 - 设计边界：[固定核心设计](next-generation-design.md)。
@@ -25,3 +32,6 @@
 
 后续按具体数据和应用目标选择方法、步长与扰动间距，并检查收敛；
 不预先引入新的分析会话框架、统一执行器或核心重构任务。
+
+应用层已完成一轮 simplify 与分析能力复查，见[修复结果和后续建议](application-review.md)。
+后续建议尚未视为新的实现任务。

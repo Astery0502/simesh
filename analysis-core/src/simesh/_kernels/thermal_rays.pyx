@@ -215,3 +215,22 @@ cpdef void integrate_ready(
                 begin = task*32
                 end = min(begin+32,count)
                 _integrate_range(begin,end,roots,children,leaves,nlo,nhi,bounds,spacing,slots,data,halo,origins,direction,first,last,subdivisions,limit,grid,log_response,slopes,values,status,samples)
+
+
+cpdef void integrate_ray_set_ready(
+    const int64_t[:, :, ::1] roots, const int64_t[:, ::1] children,
+    const int64_t[::1] leaves, const double[:, ::1] nlo, const double[:, ::1] nhi,
+    const double[:, :, ::1] bounds, const double[:, ::1] spacing,
+    const int64_t[::1] slots, const double[:, :, :, :, ::1] data, int halo,
+    const double[:, ::1] origins, const double[:, ::1] directions,
+    const double[::1] first, const double[::1] last,
+    int64_t subdivisions, int64_t limit,
+    const double[::1] grid, const double[::1] log_response, const double[::1] slopes,
+    double[::1] values, int64_t[::1] status, int64_t[::1] samples,
+):
+    cdef int64_t ray
+    with nogil:
+        for ray in range(origins.shape[0]):
+            _integrate_range(ray,ray+1,roots,children,leaves,nlo,nhi,bounds,spacing,slots,data,halo,
+                             origins,directions[ray],first,last,subdivisions,limit,grid,
+                             log_response,slopes,values,status,samples)

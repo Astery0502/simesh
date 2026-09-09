@@ -10,6 +10,16 @@ see [MIGRATION.md](MIGRATION.md) for their separate data and execution boundarie
 The N4 core design is fixed. New work can focus on applications consuming these
 interfaces; use the [application guide](../docs/analysis-core/application-development.md).
 
+For identified point/ray sets, diagnostic-map selection and separately traced
+compact magnetic lines, use the optional `simesh.applications` namespace.
+See [application interfaces](docs/applications.md). QSL/twist calculations do
+not save trajectories; selected points are explicitly traced afterward.
+
+Standard helpers provide magnitude, gradient, divergence, dot products and
+explicitly normalized magnetic current/pressure/energy. Surface diagnostics can
+compute Q, twist or both; twist-only requests skip Q work. See
+[standard applications and the complete example](docs/standard-applications.md).
+
 The package imports as `simesh`. Install it in its own environment: the existing
 package in the parent repository uses the same import name. Runtime code and
 build inputs live entirely in this directory; no historical `simesh_rewrite`

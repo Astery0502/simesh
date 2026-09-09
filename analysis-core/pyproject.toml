@@ -15,6 +15,7 @@ dependencies = ["numpy>=1.23.5,<3"]
 [project.optional-dependencies]
 test = ["pytest>=8"]
 fft = ["scipy>=1.10"]
+plot = ["matplotlib>=3.7"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

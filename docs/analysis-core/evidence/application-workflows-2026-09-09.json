@@ -1,0 +1,289 @@
+{
+  "revision": "2e101e0",
+  "platform": "macOS-26.5.2-arm64-arm-64bit",
+  "fixture": {
+    "leaves": 9,
+    "block_shape": [
+      16,
+      16,
+      16
+    ],
+    "field": "linear force-free arcade",
+    "alpha": 0.6,
+    "map_shape": [
+      32,
+      24
+    ],
+    "uniform_shape": [
+      96,
+      96,
+      96
+    ],
+    "file_bytes": 885440
+  },
+  "timings": {
+    "prepare_coordinate": {
+      "1": {
+        "median_seconds": 0.001198458019644022,
+        "runs_seconds": [
+          0.0008040841203182936,
+          0.001198458019644022,
+          0.0013643328566104174
+        ],
+        "speedup_vs_one": 1.0
+      },
+      "2": {
+        "median_seconds": 0.001290332991629839,
+        "runs_seconds": [
+          0.0010944579262286425,
+          0.001290332991629839,
+          0.0013702500145882368
+        ],
+        "speedup_vs_one": 0.9287974712095299
+      },
+      "4": {
+        "median_seconds": 0.0012514160480350256,
+        "runs_seconds": [
+          0.001681499881669879,
+          0.0012514160480350256,
+          0.0010915419552475214
+        ],
+        "speedup_vs_one": 0.9576815172906258
+      }
+    },
+    "uniform_96_cube": {
+      "1": {
+        "median_seconds": 0.04329975019209087,
+        "runs_seconds": [
+          0.043641540920361876,
+          0.04329975019209087,
+          0.043263542000204325
+        ],
+        "speedup_vs_one": 1.0
+      },
+      "2": {
+        "median_seconds": 0.038443417055532336,
+        "runs_seconds": [
+          0.03672387497499585,
+          0.038443417055532336,
+          0.041219416772946715
+        ],
+        "speedup_vs_one": 1.1263241800161379
+      },
+      "4": {
+        "median_seconds": 0.034841459011659026,
+        "runs_seconds": [
+          0.036032750038430095,
+          0.034841459011659026,
+          0.034131500171497464
+        ],
+        "speedup_vs_one": 1.2427651258117933
+      }
+    },
+    "curl": {
+      "1": {
+        "median_seconds": 0.0005027500446885824,
+        "runs_seconds": [
+          0.0005027500446885824,
+          0.0005356669425964355,
+          0.0004840409383177757
+        ],
+        "speedup_vs_one": 1.0
+      },
+      "2": {
+        "median_seconds": 0.00047262501902878284,
+        "runs_seconds": [
+          0.0004906249232590199,
+          0.00047262501902878284,
+          0.0004338750150054693
+        ],
+        "speedup_vs_one": 1.0637398031143268
+      },
+      "4": {
+        "median_seconds": 0.00047254213131964207,
+        "runs_seconds": [
+          0.0004813750274479389,
+          0.0004680419806391001,
+          0.00047254213131964207
+        ],
+        "speedup_vs_one": 1.0639263916734374
+      }
+    },
+    "derive_b_squared": {
+      "1": {
+        "median_seconds": 0.00023720785975456238,
+        "runs_seconds": [
+          0.00023720785975456238,
+          0.00026616593822836876,
+          0.00022754189558327198
+        ],
+        "speedup_vs_one": 1.0
+      }
+    },
+    "qsl_bottom_map": {
+      "1": {
+        "median_seconds": 0.5480903331190348,
+        "runs_seconds": [
+          0.5480903331190348,
+          0.5831060840282589,
+          0.5447992919944227
+        ],
+        "speedup_vs_one": 1.0
+      },
+      "2": {
+        "median_seconds": 0.38004629081115127,
+        "runs_seconds": [
+          0.3792641668114811,
+          0.38004629081115127,
+          0.38103633280843496
+        ],
+        "speedup_vs_one": 1.4421673000655235
+      },
+      "4": {
+        "median_seconds": 0.26509499992243946,
+        "runs_seconds": [
+          0.2675784579478204,
+          0.26382012479007244,
+          0.26509499992243946
+        ],
+        "speedup_vs_one": 2.0675242206733175
+      }
+    },
+    "trace_selected_default": {
+      "1": {
+        "median_seconds": 0.008206333965063095,
+        "runs_seconds": [
+          0.007657791953533888,
+          0.009331499924883246,
+          0.008206333965063095
+        ],
+        "speedup_vs_one": 1.0
+      },
+      "2": {
+        "median_seconds": 0.007764332927763462,
+        "runs_seconds": [
+          0.0077149588614702225,
+          0.007898291107267141,
+          0.007764332927763462
+        ],
+        "speedup_vs_one": 1.05692711034056
+      },
+      "4": {
+        "median_seconds": 0.004927125060930848,
+        "runs_seconds": [
+          0.004927125060930848,
+          0.005039917072281241,
+          0.004888999974355102
+        ],
+        "speedup_vs_one": 1.6655420480666119
+      }
+    },
+    "trace_selected_inward": {
+      "1": {
+        "median_seconds": 0.013945332961156964,
+        "runs_seconds": [
+          0.013805832946673036,
+          0.014244583202525973,
+          0.013945332961156964
+        ],
+        "speedup_vs_one": 1.0
+      },
+      "2": {
+        "median_seconds": 0.008753333007916808,
+        "runs_seconds": [
+          0.01027945801615715,
+          0.008753333007916808,
+          0.008528875187039375
+        ],
+        "speedup_vs_one": 1.593145485101999
+      },
+      "4": {
+        "median_seconds": 0.005570791894569993,
+        "runs_seconds": [
+          0.005898582981899381,
+          0.005570791894569993,
+          0.005557333817705512
+        ],
+        "speedup_vs_one": 2.5032945450268698
+      }
+    }
+  },
+  "checks": {
+    "exact_phase_workers_4": {
+      "type": "ValueError",
+      "message": "exact-phase preparation currently executes with one worker"
+    },
+    "expired_borrow": {
+      "type": "RuntimeError",
+      "message": "prepared batch borrow has expired"
+    },
+    "uniform_valid_samples": 884736,
+    "halo_chain": [
+      2,
+      2,
+      1,
+      0
+    ],
+    "sample_after_two_derivatives": {
+      "type": "ValueError",
+      "message": "consumer requires at least 1 valid halo layers"
+    },
+    "parallel_outputs_equal": true,
+    "qsl_complete": 768,
+    "qsl_valid": 768,
+    "qsl_termination": {
+      "3": 1536
+    },
+    "closed_bottom_lines": 752,
+    "closed_q_expected": 3.333333333333333,
+    "closed_q_max_relative_error": 1.4210850352247562e-05,
+    "twist_vs_alpha_length_max_absolute_error": 6.0523218132227385e-05,
+    "selection": {
+      "count": 96,
+      "log10_q_threshold": 0.6020599913279624,
+      "abs_twist_threshold": 0.09,
+      "high_q_count": 16,
+      "high_twist_count": 92,
+      "positive_bz": 48,
+      "negative_bz": 48,
+      "default_zero_step_lines": 48,
+      "allocated_path_bytes": 9218304,
+      "accepted_path_bytes": 594288
+    },
+    "qsl_to_retrace": {
+      "type": "AttributeError",
+      "message": "'QSLResult' object has no attribute 'seed_ids'"
+    },
+    "inward_grouped_trace": {
+      "1": {
+        "seeds": 48,
+        "zero_step_lines": 0,
+        "domain_exits": 48,
+        "max_distance_to_qsl_endpoint": 0.003507291274935782
+      },
+      "-1": {
+        "seeds": 48,
+        "zero_step_lines": 0,
+        "domain_exits": 48,
+        "max_distance_to_qsl_endpoint": 0.0035075453170072685
+      }
+    },
+    "inward_paths_allocated_bytes": 9218304,
+    "inward_paths_accepted_bytes": 1186272,
+    "upper_face_trace_status": 6,
+    "missing_qsl_coverage": [
+      [
+        3,
+        7
+      ]
+    ],
+    "memory_limit_refusal": {
+      "type": "MemoryError",
+      "message": "retained outputs needs at most 513 controlled bytes; limit 1"
+    },
+    "openmp_build": {
+      "enabled": false,
+      "openmp_version": 0
+    }
+  }
+}

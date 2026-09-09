@@ -276,13 +276,18 @@ def _native_los(fields,plane,direction,near,far,subdivisions,max_samples,
                 wait(futures)
 
 
-def _physical_result(result, length_unit_cm, quadrature, thermodynamics, model):
+def _scale_thermal_values(values, status, valid, length_unit_cm):
     with np.errstate(over="ignore", invalid="ignore"):
-        values = result.values*length_unit_cm
-    status = result.status.copy()
-    bad = result.valid & ~np.isfinite(values)
+        values = values*length_unit_cm
+    status = status.copy()
+    bad = valid & ~np.isfinite(values)
     status[bad] = LOSStatus.UNREPRESENTABLE_INTEGRAL
     values[bad] = np.nan
+    return values,status
+
+
+def _physical_result(result, length_unit_cm, quadrature, thermodynamics, model):
+    values,status = _scale_thermal_values(result.values,result.status,result.valid,length_unit_cm)
     result = replace(result, values=values, status=status,
                      scalar_units="DN s^-1 pixel^-1", quadrature=quadrature)
     return ThermalLOSResult(**vars(result), model=model.identity,

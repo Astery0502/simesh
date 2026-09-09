@@ -33,6 +33,12 @@ Seeds on either side of the closed physical box are accepted. The field group
 contains three ordered magnetic components with common units. Labels do not
 convert units or normalize current.
 
+For twist without Q, `line_diagnostics(..., quantities=("twist",))` and its
+iterator reuse the central integration with no Q neighbors or unit-vector
+gradients. Q arrays are then None and `valid` means complete finite twist.
+The `qsl` and `iter_qsl` interfaces still always compute Q. See
+[standard applications](standard-applications.md) for surface and bottom helpers.
+
 ## Methods and normalization
 
 The default `method="finite-difference"` traces the central line and four nearby

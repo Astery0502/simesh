@@ -18,11 +18,14 @@ from .bounded import iter_prepared, global_curl
 from .operators.sampling import sample
 from .operators.derivatives import derivative, curl
 from .operators.derived import derive, DerivedContext
-from .connectivity import qsl, iter_qsl, QSLResult, Boundary, ConnectivityTermination
+from .connectivity import qsl, iter_qsl, line_diagnostics, iter_line_diagnostics, QSLResult, Boundary, ConnectivityTermination
+from .diagnostics import (magnitude, dot, gradient, divergence, MagneticUnits,
+                          current_density, magnetic_pressure, magnetic_energy_density)
 from .slices import Plane, SliceResult, sample_plane, iter_uniform
 from .tracing import Termination, TraceResult, trace, iter_traces, retrace
 from .projection import LOSResult, LOSStatus, integrate_los, integrate_los_views, orthographic_plane
 from .physics.thermal import AIA171, CoronalComposition, ThermalLOSResult, thermal_fields, emissivity_fields, integrate_thermal_los
+from .geometry import PointSet, RaySet, LineSet
 
 __all__ = ["FieldDefinition", "Fields", "Mesh", "Selection", "mesh_from_forest", "select_region",
            "Source", "source_from_arrays", "read_fields", "open_amrvac", "prepare", "iter_prepared",
@@ -35,4 +38,7 @@ __all__ += ["cache_source", "FillPlan", "plan_preparation", "global_curl", "glob
 __all__ += ["source_from_dataset", "write_amrvac"]
 __all__ += ["derive", "DerivedContext"]
 __all__ += ["qsl", "iter_qsl", "QSLResult", "Boundary", "ConnectivityTermination"]
+__all__ += ["PointSet", "RaySet", "LineSet"]
+__all__ += ["line_diagnostics","iter_line_diagnostics","magnitude","dot","gradient","divergence",
+            "MagneticUnits","current_density","magnetic_pressure","magnetic_energy_density"]
 __version__ = "0.2.0.dev0"

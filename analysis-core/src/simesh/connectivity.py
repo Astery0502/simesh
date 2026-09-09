@@ -51,10 +51,10 @@ class QSLResult:
     """
 
     seeds: np.ndarray
-    q: np.ndarray
-    log10_q: np.ndarray
-    q_perp: np.ndarray
-    log10_q_perp: np.ndarray
+    q: np.ndarray | None
+    log10_q: np.ndarray | None
+    q_perp: np.ndarray | None
+    log10_q_perp: np.ndarray | None
     twist: np.ndarray | None
     length: np.ndarray
     footpoints: np.ndarray
@@ -104,11 +104,13 @@ def _unit_gradient(fields, memory_limit):
 
 def _controls(fields, seeds, bounds, step_fraction, step, max_steps, max_length,
               null_threshold, boundary_tolerance, local_radius, normalization, workers, twist,
-              method, delta):
+              method, delta, compute_q=True):
     _validate_vector(fields)
     if method not in ("variational", "finite-difference"):
         raise ValueError("method must be 'variational' or 'finite-difference'")
-    if method == "variational":
+    if not compute_q and delta is not None:
+        raise ValueError("delta only applies when Q is requested")
+    if compute_q and method == "variational":
         require_fields(fields, halo=2)
         if delta is not None:
             raise ValueError("delta only applies to finite-difference mapping")
@@ -249,11 +251,20 @@ def _stencil(fields, seeds, lo, hi, tolerance, delta, radius):
     return np.ascontiguousarray((seeds[:,None,:]+offsets).reshape(-1,3)), distances, seed_normal_field, valid
 
 
-def _batch(fields, gradient, companion, seeds, lo, hi, tolerance, *, normalization, method, delta, **controls):
+def _batch(fields, gradient, companion, seeds, lo, hi, tolerance, *, normalization, method, delta,
+           compute_q=True, **controls):
     positions, vectors, scales, magnetic, normals, lengths, twists, steps, status, faces = _trace_arrays(
         fields, gradient, companion, seeds, lo, hi, tolerance, **controls)
     complete = np.all(np.isin(status, (3,12)), axis=1)
     regular = np.all(np.isin(status, (1,2,3,12)), axis=1)
+    total_twist = None if companion is None else twists.sum(axis=1)
+    if total_twist is not None:
+        total_twist[~regular] = np.nan
+    if not compute_q:
+        valid = complete & np.isfinite(total_twist)
+        return QSLResult(seeds.copy(),None,None,None,None,total_twist,lengths.sum(axis=1),
+                         positions,magnetic,faces,status,steps,complete,valid,normalization,
+                         controls["local_radius"],"twist-only",np.zeros(len(seeds),dtype=bool))
     stencil_valid = np.ones(len(seeds), dtype=bool)
     if method == "finite-difference":
         launches, distances, seed_strength, stencil_valid = _stencil(
@@ -283,19 +294,16 @@ def _batch(fields, gradient, companion, seeds, lo, hi, tolerance, *, normalizati
     valid = complete & stencil_valid & np.all(np.isin(faces, (1,2,3,4,5,6,9)), axis=1) & ~np.isnan(logq)
     q[~valid], logq[~valid] = np.nan, np.nan
     qp[~regular | ~stencil_valid], logqp[~regular | ~stencil_valid] = np.nan, np.nan
-    total_twist = None if companion is None else twists.sum(axis=1)
-    if total_twist is not None:
-        total_twist[~regular] = np.nan
     return QSLResult(seeds.copy(), q, logq, qp, logqp, total_twist, lengths.sum(axis=1),
                      positions, magnetic, faces, status, steps, complete, valid,
                      normalization, controls["local_radius"], method, stencil_valid)
 
 
-def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
+def _iter_diagnostics(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
              max_steps=10000, max_length=np.inf, null_threshold=0.,
              boundary_tolerance=None, local_radius=None, normalization="mapping",
              method="finite-difference", delta=None, twist=True, curl_field=None,
-             workers=1, seed_batch=256, memory_limit=None):
+             workers=1, seed_batch=256, memory_limit=None, compute_q=True):
     """Yield owned squashing/twist results from completed Cartesian 3D Fields.
 
     RK4 steps are capped by step_fraction times local AMR spacing (and step,
@@ -310,16 +318,16 @@ def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
     """
     seeds, lo, hi, tolerance = _controls(fields, seeds, bounds, step_fraction, step,
         max_steps, max_length, null_threshold, boundary_tolerance, local_radius,
-        normalization, workers, twist, method, delta)
+        normalization, workers, twist, method, delta, compute_q)
     if type(seed_batch) is not int or seed_batch < 1:
         raise ValueError("seed_batch must be a positive integer")
-    reserve = seeds.nbytes + min(seed_batch,len(seeds))*8192 + workers*8192
+    reserve = seeds.nbytes + min(seed_batch,len(seeds))*(8192 if compute_q else 2048) + workers*8192
     limit = remaining(memory_limit, reserve)
     if not len(seeds):
         return
     companion = _resolve_curl(fields, curl_field, twist, limit)
     gradient = (_unit_gradient(fields, remaining(limit, 0 if companion is None else companion.nbytes))
-                if method == "variational" else None)
+                if compute_q and method == "variational" else None)
     inputs = [value for value in (fields, gradient, companion) if value is not None]
     required = fields.mesh.nbytes + array_bytes(array for value in inputs
         for array in (value.values, value.leaf_ids, value.slot_of_leaf)) + reserve
@@ -331,7 +339,35 @@ def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
                          step_fraction=step_fraction, step=step, max_steps=max_steps,
                          max_length=max_length, null_threshold=null_threshold, local_radius=local_radius,
                          normalization=normalization, method=method, delta=delta, workers=workers,
-                         executor=executor)
+                         executor=executor,compute_q=compute_q)
+
+
+def _quantities(quantities):
+    names = (quantities,) if isinstance(quantities,str) else tuple(quantities)
+    if not names or len(set(names)) != len(names) or any(name not in ("q","twist") for name in names):
+        raise ValueError("quantities must select q, twist, or both without duplicates")
+    return names
+
+
+def iter_line_diagnostics(fields, seeds, *, quantities=("q","twist"), **controls):
+    """Compute only requested diagnostics; twist-only skips Q transport/stencils."""
+    names = _quantities(quantities)
+    if "twist" in controls or "compute_q" in controls:
+        raise ValueError("use quantities to select diagnostics")
+    return _iter_diagnostics(fields,seeds,twist="twist" in names,compute_q="q" in names,**controls)
+
+
+def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
+             max_steps=10000, max_length=np.inf, null_threshold=0.,
+             boundary_tolerance=None, local_radius=None, normalization="mapping",
+             method="finite-difference", delta=None, twist=True, curl_field=None,
+             workers=1, seed_batch=256, memory_limit=None):
+    """Yield QSL batches, with optional twist. Existing controls are unchanged."""
+    return _iter_diagnostics(fields,seeds,bounds=bounds,step_fraction=step_fraction,step=step,
+        max_steps=max_steps,max_length=max_length,null_threshold=null_threshold,
+        boundary_tolerance=boundary_tolerance,local_radius=local_radius,normalization=normalization,
+        method=method,delta=delta,twist=twist,curl_field=curl_field,workers=workers,
+        seed_batch=seed_batch,memory_limit=memory_limit)
 
 
 def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
@@ -340,21 +376,35 @@ def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
         method="finite-difference", delta=None, twist=True, curl_field=None,
         workers=1, seed_batch=256, memory_limit=None):
     """Collect QSL batches; use iter_qsl for outputs too large to retain."""
-    seeds = np.ascontiguousarray(seeds, dtype=float)
-    output_reserve = len(seeds)*512
-    batches = iter_qsl(fields, seeds, bounds=bounds, step_fraction=step_fraction, step=step,
+    if type(twist) is not bool:
+        raise ValueError("twist must be boolean")
+    return line_diagnostics(fields,seeds,quantities=("q","twist") if twist else ("q",),
+        bounds=bounds, step_fraction=step_fraction, step=step,
         max_steps=max_steps, max_length=max_length, null_threshold=null_threshold,
         boundary_tolerance=boundary_tolerance, local_radius=local_radius, normalization=normalization,
-        method=method, delta=delta, twist=twist, curl_field=curl_field, workers=workers,
-        seed_batch=seed_batch, memory_limit=remaining(memory_limit, output_reserve))
+        method=method, delta=delta, curl_field=curl_field, workers=workers,
+        seed_batch=seed_batch, memory_limit=memory_limit)
+
+
+def line_diagnostics(fields, seeds, *, quantities=("q","twist"), memory_limit=None, **controls):
+    """Collect identified diagnostic arrays without retaining integration paths.
+
+    Q-related arrays are None for a twist-only request; valid then identifies
+    complete finite twist. With Q requested, valid retains the Q mapping meaning.
+    """
+    names = _quantities(quantities)
+    seeds = np.ascontiguousarray(seeds,dtype=float)
+    batches = iter_line_diagnostics(fields,seeds,quantities=names,
+        memory_limit=remaining(memory_limit,len(seeds)*512),**controls)
     first = next(batches, None)
     if first is None:
         empty = np.empty(0)
-        return QSLResult(seeds.copy(), empty.copy(), empty.copy(), empty.copy(), empty.copy(),
-            empty.copy() if twist else None, empty.copy(),
+        return QSLResult(seeds.copy(),*(empty.copy() if "q" in names else None for _ in range(4)),
+            empty.copy() if "twist" in names else None, empty.copy(),
             np.empty((0,2,3)), np.empty((0,2,3)), np.empty((0,2),np.int64),
             np.empty((0,2),np.int64), np.empty((0,2),np.int64), np.empty(0,bool), np.empty(0,bool),
-            normalization, local_radius, method, np.empty(0,bool))
+            controls.get("normalization","mapping"),controls.get("local_radius"),
+            controls.get("method","finite-difference") if "q" in names else "twist-only", np.empty(0,bool))
     try:
         arrays = {name: np.empty((len(seeds), *value.shape[1:]), dtype=value.dtype)
                   for name,value in vars(first).items() if isinstance(value,np.ndarray)}

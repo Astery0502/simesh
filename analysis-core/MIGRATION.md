@@ -7,6 +7,11 @@ available for rollback. No runtime imports need either source tree.
 
 ## Choose the data model
 
+`PointSet`, `RaySet` and `simesh.applications` add optional geometry/result
+associations over native Fields. General array-based calls retain their existing
+interfaces. See [application interfaces](docs/applications.md) for selection,
+separate trajectory computation and LOS ray IDs.
+
 | Work | Interface in this distribution | Ownership and scope |
 | --- | --- | --- |
 | Prepare once for sampling, derivatives, tracing or LOS | Top-level `simesh` functions | Immutable Source and independent Fields; nonperiodic Cartesian 3D v5 ordinary values |

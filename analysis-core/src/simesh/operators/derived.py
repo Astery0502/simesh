@@ -18,12 +18,16 @@ class DerivedContext:
         self._bindings, self._leaf = bindings, leaf
 
     def field(self, name, *, group=None):
-        """Select a named component; group is required for multiple inputs."""
+        """Select a name or component index; multiple inputs require group."""
         if group is None:
             if len(self._bindings) != 1:
                 raise ValueError("select group explicitly for multiple input groups")
             group = next(iter(self._bindings))
         fields, box, columns = self._bindings[group]
+        if type(name) is int or isinstance(name,np.integer):
+            if not 0 <= name < len(fields.fields):
+                raise ValueError("component index outside the field group")
+            return fields.values[(fields.slot_of_leaf[self._leaf], *box, int(name))]
         if name not in columns:
             columns[name] = _field_index(fields.fields, name)
         return fields.values[(fields.slot_of_leaf[self._leaf], *box, columns[name])]

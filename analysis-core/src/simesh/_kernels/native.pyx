@@ -339,44 +339,52 @@ cdef inline bint interpolate_scalar(
     return True
 
 
+cdef inline void _initialize_ray(
+    const double[::1] lo, const double[::1] hi, const double* origin,
+    const double* direction, double near, double far,
+    double* start, double* end, int64_t* status,
+) noexcept nogil:
+    cdef int a
+    cdef double first = near, last = far, left, right, temp
+    cdef bint empty = False
+    for a in range(3):
+        if direction[a] == 0.:
+            if origin[a] < lo[a] or origin[a] >= hi[a]:
+                empty = True
+            continue
+        left = (lo[a]-origin[a])/direction[a]
+        right = (hi[a]-origin[a])/direction[a]
+        if left > right:
+            temp = left
+            left = right
+            right = temp
+        if left > first:
+            first = left
+        if right < last:
+            last = right
+    if empty or first >= last:
+        start[0] = end[0] = 0.
+        status[0] = 2
+        return
+    if not isfinite(first) or not isfinite(last):
+        start[0] = end[0] = NAN
+        status[0] = 5
+        return
+    start[0],end[0] = first,last
+    status[0] = 0
+
+
 cpdef void initialize_rays(
     const double[::1] lo, const double[::1] hi, const double[:, ::1] origins,
     const double[::1] direction, const double[::1] near, const double[::1] far,
     double[::1] starts, double[::1] ends,
     int64_t[::1] status,
 ):
-    cdef int64_t ray,a
-    cdef double first,last,left,right,temp
-    cdef bint empty
+    cdef int64_t ray
     with nogil:
         for ray in range(origins.shape[0]):
-            first,last = near[ray],far[ray]
-            empty = False
-            for a in range(3):
-                if direction[a] == 0.:
-                    if origins[ray,a] < lo[a] or origins[ray,a] >= hi[a]:
-                        empty = True
-                    continue
-                left = (lo[a]-origins[ray,a])/direction[a]
-                right = (hi[a]-origins[ray,a])/direction[a]
-                if left > right:
-                    temp = left
-                    left = right
-                    right = temp
-                if left > first:
-                    first = left
-                if right < last:
-                    last = right
-            if empty or first >= last:
-                starts[ray] = ends[ray] = 0.
-                status[ray] = 2
-                continue
-            if not isfinite(first) or not isfinite(last):
-                starts[ray] = ends[ray] = NAN
-                status[ray] = 5
-                continue
-            starts[ray],ends[ray] = first,last
-            status[ray] = 0
+            _initialize_ray(lo,hi,&origins[ray,0],&direction[0],near[ray],far[ray],
+                            &starts[ray],&ends[ray],&status[ray])
 
 
 cdef inline bint ray_after_face(double origin,double direction,double t,double face) noexcept nogil:
@@ -385,6 +393,53 @@ cdef inline bint ray_after_face(double origin,double direction,double t,double f
     if direction < 0.:
         return t < (face-origin)/direction
     return origin >= face
+
+
+cpdef void initialize_ray_set(
+    const double[::1] lo, const double[::1] hi, const double[:, ::1] origins,
+    const double[:, ::1] directions, const double[::1] near, const double[::1] far,
+    double[::1] starts, double[::1] ends, int64_t[::1] status,
+):
+    cdef int64_t ray
+    with nogil:
+        for ray in range(origins.shape[0]):
+            _initialize_ray(lo,hi,&origins[ray,0],&directions[ray,0],near[ray],far[ray],
+                            &starts[ray],&ends[ray],&status[ray])
+
+
+cpdef void integrate_ray_set(
+    const double[::1] lo, const double[::1] hi,
+    const int64_t[:, :, ::1] roots, const int64_t[:, ::1] children,
+    const int64_t[::1] leaves, const double[:, ::1] nlo, const double[:, ::1] nhi,
+    const double[:, :, ::1] bounds, const double[:, ::1] spacing,
+    const int64_t[::1] slots, const double[:, :, :, :, ::1] data, int halo,
+    const double[:, ::1] origins, const double[:, ::1] directions,
+    const double[::1] near, const double[::1] far, int64_t component,
+    double step_fraction, int quadrature, int64_t max_samples,
+    double[::1] values, double[::1] starts, double[::1] ends,
+    int64_t[::1] status, int64_t[::1] samples, int64_t[::1] misses,
+):
+    import numpy as np
+    cdef int64_t ray, count = origins.shape[0]
+    cdef double[::1] progress = np.empty(count)
+    cdef int64_t[::1] requested = np.full(count,-1,dtype=np.int64)
+    cdef bint stalled = False
+    initialize_ray_set(lo,hi,origins,directions,near,far,starts,ends,status)
+    with nogil:
+        for ray in range(count):
+            progress[ray] = starts[ray]
+            values[ray] = NAN if status[ray] >= 3 else 0.
+            samples[ray] = misses[ray] = 0
+            _advance_ray_range(ray,ray+1,lo,hi,roots,children,leaves,nlo,nhi,bounds,spacing,
+                slots,data,halo,component,origins,directions[ray],progress,ends,
+                step_fraction,quadrature,max_samples,values,status,requested,samples,misses)
+            if status[ray] == 0:
+                if requested[ray] < 0:
+                    stalled = True
+                status[ray] = 3
+                values[ray] = NAN
+    if stalled:
+        raise RuntimeError("LOS made no progress without a preparation request")
 
 
 cdef int64_t ray_owner(

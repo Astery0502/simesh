@@ -60,17 +60,21 @@ def derivative(fields, terms, definitions, *, workers=1, memory_limit=None):
                    fields.scheme+"/centered-extended", fields.source)
 
 
+def _curl_terms(components):
+    x,y,z = components
+    return (((z, 1, 1.), (y, 2, -1.)), ((x, 2, 1.), (z, 0, -1.)),
+            ((y, 0, 1.), (x, 1, -1.)))
+
+
 def curl(fields, components=(0, 1, 2), *, workers=1, memory_limit=None):
     fields = require_fields(fields, halo=1)
     components = indices(components, len(fields.fields), "components")
     if len(components) != 3:
         raise ValueError("curl requires three ordered vector components")
-    x, y, z = components
     units = {fields.fields[i].units for i in components}
     if len(units) != 1:
         raise ValueError("curl components must use common units")
-    terms = (((z, 1, 1.), (y, 2, -1.)), ((x, 2, 1.), (z, 0, -1.)),
-             ((y, 0, 1.), (x, 1, -1.)))
+    terms = _curl_terms(components)
     definitions = tuple(FieldDefinition("curl_"+axis, next(iter(units))+" / coordinate-length",
                                         "centered-derivative") for axis in "xyz")
     result = derivative(fields, terms, definitions, workers=workers, memory_limit=memory_limit)

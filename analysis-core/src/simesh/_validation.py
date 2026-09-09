@@ -27,6 +27,17 @@ def workers_count(workers):
     return workers
 
 
+def identifiers(value, count):
+    if value is None:
+        return np.arange(count, dtype=np.int64)
+    array = np.asarray(value)
+    if (array.shape != (count,) or array.dtype.kind not in "iu" or
+            (array.dtype.kind == "u" and np.any(array > np.iinfo(np.int64).max)) or
+            len(np.unique(array)) != count):
+        raise ValueError("identifiers must be unique representable integers matching the point count")
+    return np.ascontiguousarray(array,dtype=np.int64)
+
+
 def admit(required, memory_limit, operation):
     if memory_limit is not None:
         if type(memory_limit) is not int or memory_limit < 1:
