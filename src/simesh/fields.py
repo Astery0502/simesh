@@ -59,7 +59,8 @@ class Fields:
     storage_halo : int
         Interior offset within allocated storage.
     valid_halo : int
-        Complete surrounding layers, independent of allocated padding.
+        Complete surrounding layers, independent of allocated padding. May be one
+        after differentiation; this does not request ghost exchange.
     scheme : str
         Preparation/derivation description.
     source, value_identity, derivation : object

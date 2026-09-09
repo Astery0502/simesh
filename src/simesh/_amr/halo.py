@@ -26,6 +26,7 @@ from simesh._amr.physical_widening import _validate_physical_widening
 from simesh._amr.prolongation import prolong_cartesian_2to1_into
 from simesh._amr.relations import RELATION_COARSER, RELATION_FINER, RELATION_PHYSICAL, RELATION_SAME
 from simesh._amr.same_level_boxes import fill_same_level_source_boxes
+from simesh._amr.halos import _require_exchange_widths
 
 
 _DIRECTION_COUNT = 26
@@ -693,6 +694,7 @@ def _prepare_refined_halo_chunk(
     *,
     validate_actions: bool,
 ) -> tuple[int, int]:
+    _require_exchange_widths(lower_halo, interior_upper, workspace.payload.shape[2:])
     candidate_count = int(candidates.shape[0])
     fill_balanced_refined_relations_unchecked(
         root_shape,

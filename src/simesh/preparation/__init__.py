@@ -69,6 +69,8 @@ def prepare(source, fields=None, *, region=None, leaf_ids=None, scheme,
 
     Notes
     -----
+    Ghost exchange requires at least two layers; both schemes prepare two. Derived
+    fields may retain one valid layer for consumption without further exchange.
     Region support is read from the original Mesh; a region edge is not a physical
     boundary.
     """

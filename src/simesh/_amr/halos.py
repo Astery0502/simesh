@@ -1,4 +1,8 @@
-"""Validated non-periodic level-1 halo provision."""
+"""Validated non-periodic level-1 halo provision.
+
+Each exchanged side needs at least two layers; zero-width sides do not exchange.
+This restriction does not apply to one-layer support retained by derivatives.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +29,11 @@ class BoundaryMode(IntEnum):
 
 
 _INDEX_MAX = int(np.iinfo(np.int64).max)
+
+
+def _require_exchange_widths(interior_lower, interior_upper, spatial_shape):
+    if np.any(interior_lower == 1) or np.any(np.asarray(spatial_shape)-interior_upper == 1):
+        raise ValueError("ghost exchange requires at least two layers on each padded side")
 
 
 def _require_index_vector(name: str, value: np.ndarray) -> np.ndarray:
@@ -78,6 +87,7 @@ def _validate_configuration(
         raise ValueError("interior must be a nonempty nonnegative box")
     if np.any(interior_upper > spatial_shape):
         raise ValueError("interior exceeds payload spatial shape")
+    _require_exchange_widths(interior_lower, interior_upper, spatial_shape)
     invalid_block = int(
         validate_indices_unchecked(block_ids, face_neighbor_ids.shape[0])
     )
