@@ -31,6 +31,7 @@ The scales are teaching values, not simulation calibration.
 | [Magnetic applications](../../examples/standard_applications.py) | Synthetic AMR arcade, Q/twist, paths and LOS; custom NumPy archive |
 | [Uniform export](../../examples/uniform_export.py) | AMRVAC fields to NumPy memory maps or uniform VTK using explicit reconstruction |
 | [MHD analysis](../../examples/recovered_state_analysis.py) | Analytic recovered state, reductions, profiles and result files |
+| [Root-subtree crop](../../examples/root_crop.py) | Mixed-level AMR snapshot, root-aligned regional export and integral comparison |
 
 Exact API text is generated when
 building the documentation; GitHub Markdown displays the object directives.
@@ -50,6 +51,30 @@ block_values = section.values[0]
 
 The [API reference](api.md) describes block layout, interface-side selection,
 coverage and ownership. Geometry and values are independent of plotting tools.
+
+## Root-aligned AMR output
+
+Keep complete refined subtrees using integer root-block bounds:
+
+```python
+box = ((1, 1, 0), (4, 3, 2))
+sm.crop_amrvac("snapshot.dat", "crop.dat", root_bounds=box, fields=("rho", "b3"))
+```
+
+For repeated analysis or derived-field export, retain the original Mesh in memory:
+
+```python
+with sm.open_amrvac("snapshot.dat") as source:
+    selection = sm.select_roots(source.mesh, box)
+    fields = sm.read_fields(source, ("rho", "b3"), region=selection)
+    metadata = source.metadata
+sm.write_amrvac("crop.dat", fields, metadata=metadata, root_bounds=box)
+```
+
+The [API reference](api.md) specifies indexing, coverage, bounded payload storage
+and output boundary semantics. A crop retains original refinement and values;
+it does not create a level-1 uniform grid. Field units and crop provenance belong
+in a separate description, as illustrated by the executable example.
 
 ## Uniform output
 

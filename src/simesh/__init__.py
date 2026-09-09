@@ -6,11 +6,11 @@ scope and docs/user/api.md for supported interfaces.
 """
 
 from .fields import FieldDefinition, Fields
-from .mesh import Mesh, Selection, mesh_from_forest, select_region
+from .mesh import Mesh, Selection, mesh_from_forest, select_region, select_roots
 from .io.source import Source, source_from_arrays, read_fields, select_source
 from .io.amrvac import open_amrvac
 from .io.metadata import SnapshotMetadata
-from .io.products import write_amrvac
+from .io.products import write_amrvac, crop_amrvac
 from .io.cache import cache_source
 from .io.uniform import export_uniform, export_uniform_vtk
 from .io.vtk import write_uniform_vtk
@@ -59,3 +59,4 @@ __version__ = "0.2.0rc1"
 
 from .result_shards import ResultShards, save_result_shards, open_result_shards
 __all__ += ["iter_line_profiles", "ResultShards", "save_result_shards", "open_result_shards"]
+__all__ += ["select_roots", "crop_amrvac"]

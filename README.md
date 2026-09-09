@@ -17,7 +17,7 @@ See the [documentation map](docs/index.md) for the full structure.
 - CGS ideal-MHD recovery with `MHDUnits.solar()`, AMR integrals/statistics and rectangular surface flux
 - Scalar and historical AIA171 thermal LOS
 - Identified lines/profiles, result save/load and incremental output shards
-- AMRVAC v5 ordinary-field input and complete-mesh `.dat` export
+- AMRVAC v5 ordinary-field input and complete-mesh or root-aligned `.dat` export
 - Uniform-volume VTK export from sampled results or directly from AMRVAC files
 
 Native analysis accepts balanced, nonperiodic Cartesian 3D AMRVAC v5 ordinary

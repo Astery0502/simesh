@@ -11,6 +11,10 @@ Core object contracts are in the [developer API](../dev/api.md).
 
 ::: simesh.read_fields
 
+::: simesh.select_roots
+
+::: simesh.crop_amrvac
+
 ::: simesh.prepare
 
 ::: simesh.select_fields

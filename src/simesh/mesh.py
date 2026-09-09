@@ -206,6 +206,64 @@ def select_region(mesh, bounds):
     return Selection(mesh, ids, box)
 
 
+def _root_bounds(mesh, root_bounds):
+    box = np.asarray(root_bounds)
+    if (box.shape != (2, 3) or box.dtype.kind not in "iu" or
+            np.any(box[0] < 0) or np.any(box[0] >= box[1]) or
+            np.any(box[1] > mesh.root_shape)):
+        raise ValueError("root_bounds must be a nonempty zero-based integer (2, 3) box inside root_shape")
+    return np.array(box, dtype=np.int64, copy=True)
+
+
+def _root_spans(mesh, box):
+    """Node and leaf half-open spans in the output's local Morton root order."""
+    if np.all(box[0] == 0) and np.array_equal(box[1], mesh.root_shape):
+        return np.array([[0, len(mesh.node_leaves), 0, mesh.leaf_count]], dtype=np.int64)
+    _, coordinates = level1_morton(np.ascontiguousarray(box[1] - box[0]))
+    coordinates += box[0]
+    ranks = mesh.coord_to_rank[tuple(coordinates.T)]
+    roots = mesh.forest.root_node_ids
+    starts = roots[ranks]
+    stops = roots[np.minimum(ranks + 1, len(roots) - 1)]
+    stops[ranks == len(roots) - 1] = len(mesh.node_leaves)
+    first = np.searchsorted(mesh.leaf_nodes, starts)
+    last = np.searchsorted(mesh.leaf_nodes, stops)
+    return np.column_stack((starts, stops, first, last))
+
+
+def _root_physical_bounds(mesh, box):
+    bounds = mesh.lower + box * ((mesh.upper - mesh.lower) / mesh.root_shape)
+    return np.where(box == mesh.root_shape, mesh.upper, bounds)
+
+
+def select_roots(mesh, root_bounds):
+    """Select complete root subtrees while retaining the original Mesh.
+
+    Parameters
+    ----------
+    mesh : Mesh
+        Original validated Cartesian 3D geometry.
+    root_bounds : array-like
+        Integer (2, 3) lower/upper root-block coordinates; zero-based, upper
+        exclusive, nonempty and contained in mesh.root_shape.
+
+    Returns
+    -------
+    Selection
+        Original leaf IDs in the cropped domain's Morton order, with its physical
+        bounds. Pass as read_fields/prepare region; edges remain regional boundaries.
+    """
+    box = _root_bounds(mesh, root_bounds)
+    spans = _root_spans(mesh, box)
+    ids = np.empty(int(np.sum(spans[:, 3] - spans[:, 2])), dtype=np.int64)
+    offset = 0
+    for _, _, first, last in spans:
+        count = last - first
+        ids[offset:offset+count] = np.arange(first, last)
+        offset += count
+    return Selection(mesh, ids, _root_physical_bounds(mesh, box))
+
+
 def resolve_selection(mesh, region=None, leaf_ids=None):
     if region is not None and leaf_ids is not None:
         raise ValueError("choose region or leaf_ids")

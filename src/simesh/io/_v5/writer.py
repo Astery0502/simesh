@@ -33,6 +33,8 @@ def _header_bytes(header):
     header["offset_blocks"] = (header["offset_tree"]
                                + 4*(header["nleafs"] + header["nparents"])
                                + 24*header["nleafs"])
+    if header["offset_blocks"] > np.iinfo(np.int32).max:
+        raise ValueError("AMRVAC tree/header offsets exceed the signed 32-bit representation")
     fixed = _FIXED_HEADER.pack(
         5, header["offset_tree"], header["offset_blocks"], header["nw"],
         header["ndir"], 3, header["levmax"], header["nleafs"], header["nparents"],
@@ -65,6 +67,15 @@ def write_datfile_from_sfc(stream, data, header, is_leaf, tree):
     ``tree`` contains the leaf levels and one-based three-dimensional coordinates.
     The returned header owns its calculated offsets; caller metadata is unchanged.
     """
+    return write_datfile_from_batches(stream, (data,), header, is_leaf, tree)
+
+
+def write_datfile_from_batches(stream, batches, header, is_leaf, tree):
+    """Serialize ordered field-major batches, checking the declared total coverage.
+
+    Batches may reuse their backing after consumption. At most one block's disk
+    layout copy is retained; the caller owns publication and batch storage.
+    """
     if header.get("staggered", False):
         raise ValueError("ordinary-field writer does not serialize staggered face values")
     if (header.get("datfile_version") != 5 or header.get("ndim") != 3
@@ -72,11 +83,8 @@ def write_datfile_from_sfc(stream, data, header, is_leaf, tree):
             or np.any(header.get("periodic", True))):
         raise ValueError("writer requires nonperiodic Cartesian 3D v5 data")
     leaves, fields = header["nleafs"], header["nw"]
-    if (not isinstance(data, np.ndarray) or data.dtype != np.float64
-            or not data.flags.c_contiguous or leaves < 1 or fields < 1
-            or data.shape != (leaves, fields, *header["block_nx"])
-            or len(header["w_names"]) != fields):
-        raise ValueError("SFC data and field names must match the header shape")
+    if leaves < 1 or fields < 1 or len(header["w_names"]) != fields:
+        raise ValueError("nonempty blocks and field names must match the header")
     if not isinstance(tree, tuple) or len(tree) != 2:
         raise ValueError("tree must contain block levels and coordinates")
     flags = np.asarray(is_leaf, dtype="=i4")
@@ -88,12 +96,26 @@ def write_datfile_from_sfc(stream, data, header, is_leaf, tree):
         raise ValueError("forest and one-based block metadata must match the header")
     written = header.copy()
     encoded_header = _header_bytes(written)
-    record_bytes = len(_GHOST_HEADER) + data[0].nbytes
+    record_bytes = len(_GHOST_HEADER) + 8*fields*int(np.prod(header["block_nx"]))
+    if written["offset_blocks"] + leaves*record_bytes > np.iinfo(np.int64).max:
+        raise ValueError("AMRVAC block offsets exceed the signed 64-bit representation")
     offsets = written["offset_blocks"] + np.arange(leaves, dtype="=i8")*record_bytes
     stream.write(encoded_header)
     _check_position(stream, written["offset_tree"])
     for array in (flags, levels, coordinates, offsets):
         stream.write(memoryview(np.ascontiguousarray(array)).cast("B"))
     _check_position(stream, written["offset_blocks"])
-    _write_blocks(stream, data)
+    del flags, levels, coordinates, offsets, array
+    count = 0
+    for data in batches:
+        if (not isinstance(data, np.ndarray) or data.dtype != np.float64 or
+                not data.flags.c_contiguous or data.ndim != 5 or
+                data.shape[1:] != (fields, *header["block_nx"]) or
+                not len(data) or count + len(data) > leaves):
+            raise ValueError("SFC batches must match the declared block shape and count")
+        _write_blocks(stream, data)
+        count += len(data)
+    if count != leaves:
+        raise ValueError("SFC batches do not cover all declared blocks")
+    _check_position(stream, written["offset_blocks"] + leaves*record_bytes)
     return written
