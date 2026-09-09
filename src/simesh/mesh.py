@@ -12,7 +12,17 @@ from ._amr.balance import validate_refined_all_touch_2to1
 
 @dataclass(frozen=True, eq=False)
 class Selection:
-    """Ordered complete target leaves and the optional requested physical box."""
+    """Ordered complete target leaves and an optional requested physical box.
+
+    Attributes
+    ----------
+    mesh : Mesh
+        Original geometry; region edges are not physical boundaries.
+    leaf_ids : ndarray
+        Ordered original leaf IDs, not storage rows.
+    requested_bounds : ndarray, optional
+        Finite (2, 3) box remembered for cell-overlap reductions.
+    """
 
     mesh: "Mesh"
     leaf_ids: np.ndarray
@@ -30,7 +40,24 @@ class Selection:
 
 @dataclass(frozen=True, eq=False)
 class Mesh:
-    """Validated Cartesian 3D mesh; construct through the public factories."""
+    """Immutable Cartesian 3D topology and geometry, without field values.
+
+    Construct with mesh_from_forest or obtain source.mesh.
+
+    Attributes
+    ----------
+    lower, upper : ndarray
+        Original physical domain bounds (3,).
+    block_shape, root_shape : sequence of int
+        Interior cells per leaf and root-block counts.
+    bounds, spacing : ndarray
+        Per-leaf physical bounds (leaf, 2, 3) and cell spacing (leaf, 3).
+
+    Notes
+    -----
+    Native ownership uses half-open bounds. Region selection retains the original
+    Mesh; its edges are not physical boundaries.
+    """
 
     lower: np.ndarray
     upper: np.ndarray
@@ -46,25 +73,32 @@ class Mesh:
 
     @property
     def children(self):
+        """Child-node directory for the immutable forest."""
         return self.forest.child_node_ids
 
     @property
     def node_leaves(self):
+        """Node to original leaf ID mapping; parent nodes have no leaf ID."""
         return self.forest.node_leaf_ids
 
     @property
     def leaf_nodes(self):
+        """Original leaf ID to tree-node mapping."""
         return self.forest.leaf_node_ids
 
     @property
     def leaf_count(self):
+        """Number of original leaf blocks."""
         return len(self.leaf_nodes)
 
     @property
     def nbytes(self):
+        """Accounted immutable topology and geometry arrays in bytes."""
         return array_bytes((*vars(self).values(), *self.forest))
 
     def locate(self, points):
+        """Return original owner leaf IDs for (n, 3) points; outside owners are -1.
+        """
         from ._kernels.native import locate
         points = np.ascontiguousarray(points, dtype=float)
         if points.ndim != 2 or points.shape[1] != 3:
@@ -75,6 +109,8 @@ class Mesh:
         return owners
 
     def descendants(self, node):
+        """Return a Selection of all leaves descended from an original tree node.
+        """
         if not isinstance(node, (int, np.integer)) or not 0 <= node < len(self.children):
             raise ValueError("node outside forest")
         pending, leaves = [int(node)], []

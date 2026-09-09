@@ -17,9 +17,23 @@ from .._validation import admit
 def source_from_dataset(dataset, fields=None, *, units=None, memory_limit=None):
     """Snapshot loaded 3D Dataset interiors into an independent immutable Source.
 
-    Field names address loaded columns, including materialized derived columns.
-    No ghost values or mutable Dataset/AMRMesh references cross this boundary.
-    Load the desired original fields first; this adapter performs no file reads.
+    Parameters
+    ----------
+    dataset : AMRVACDataSet
+        Nonperiodic Cartesian 3D Dataset with the requested columns already loaded; no
+        extra file reads occur.
+    fields : str or sequence of str, optional
+        Distinct loaded names, including materialized derived fields.
+    units : str or mapping, optional
+        Field unit labels, without numerical scaling.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    Source
+        Independent interior copy; ghosts and mutable Dataset/AMRMesh references are
+        excluded.
     """
     from ..amrvac.amrvac_dataset import AMRVACDataSet
 
@@ -65,17 +79,31 @@ def source_from_dataset(dataset, fields=None, *, units=None, memory_limit=None):
 def write_amrvac(path, fields, *, metadata, overwrite=False, memory_limit=None):
     """Export full-mesh Fields interiors using explicit AMRVAC v5 metadata.
 
-    The output stores ordinary cell-centered values in original SFC order;
-    ghost layers and CT face values are not serialized. Unit labels, derivation
-    provenance and preparation schemes are not representable in the dat header.
-    Metadata is a SnapshotMetadata or header dictionary describing the physical
-    model/time and must match the mesh geometry.
-    This is a data product, not certification of a solver restart state.
+    Parameters
+    ----------
+    path : str or Path
+        Destination file or directory; its parent must exist.
+    fields : Fields
+        Complete original-mesh coverage; ordinary interiors are serialized in SFC order,
+        without halo or CT values.
+    metadata : SnapshotMetadata or dict
+        Explicit model/time header matching the complete original Mesh.
+    overwrite : bool
+        Allow replacing an existing destination; otherwise an existing file is refused.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
 
-    One field-major interior copy is admitted explicitly. A temporary sibling
-    file is published only after serialization succeeds; overwrite=False also
-    refuses destinations created concurrently. The temporary file is removed on
-    failure, leaving an existing destination intact.
+    Returns
+    -------
+    dict
+        Written header. Publication is atomic and failures retain an existing
+        destination; the memory estimate includes an interior conversion copy.
+
+    Notes
+    -----
+    The file cannot encode field-unit labels, preparation schemes or derivation
+    provenance; record these separately. Export is not certification of a solver
+    restart state.
     """
     require_fields(fields)
     if type(overwrite) is not bool or not isinstance(metadata, (SnapshotMetadata, dict)):

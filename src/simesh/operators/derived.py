@@ -8,10 +8,12 @@ from ..fields import FieldDefinition, Fields, publish, require_fields, _field_in
 
 
 class DerivedContext:
-    """Read-only arrays for one leaf, including common valid support.
+    """Read-only arrays for one leaf and the common valid support of all input groups.
 
-    Recipes must be pointwise: no spatial shifts, differentiation, reductions
-    over spatial axes, or mutation. Use derivative() for spatial operations.
+    Notes
+    -----
+    Callbacks must be pointwise: no mutation, spatial shifts, differentiation or
+    reduction over spatial axes. Use derivative or reduction APIs for spatial work.
     """
 
     def __init__(self, bindings, leaf):
@@ -36,14 +38,29 @@ class DerivedContext:
 def derive(inputs, name, func, *, units="code", memory_limit=None):
     """Evaluate a pointwise recipe on Fields or a mapping of named Fields.
 
-    The callback receives a DerivedContext once per leaf and returns a scalar
-    or an array matching that leaf's interior plus common valid halo. All input
-    groups must share the same Mesh and leaf coverage; slot order may differ.
-    Their physical meaning and units must be compatible by caller choice.
+    Parameters
+    ----------
+    inputs : Fields or mapping of str to Fields
+        One group or named groups sharing Mesh identity and leaf coverage; slot order
+        may differ.
+    name : str
+        Output field name.
+    func : callable
+        Called once per leaf with [DerivedContext][simesh.DerivedContext]; return a scalar or array matching its
+        interior plus common valid halo.
+    units : str
+        Unit label for the returned values, without automatic conversion.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
 
-    Output owns its values and retains no input arrays or callback. The budget
-    includes inputs, output and two float64 result blocks, but cannot bound
-    arbitrary allocations inside user callbacks. Nonfinite values propagate.
+    Returns
+    -------
+    Fields
+        Independent pointwise outputs using common valid support; inputs/callback are not retained.
+
+    Notes
+    -----
+    Callback allocations beyond the accounted output blocks remain the caller's responsibility; nonfinite recipe values propagate.
     """
     definition = FieldDefinition(name, units, "pointwise-derived")
     if not callable(func):
@@ -55,16 +72,29 @@ def derive(inputs, name, func, *, units="code", memory_limit=None):
 def derive_many(inputs, definitions, func, *, memory_limit=None):
     """Evaluate one pointwise callback per leaf for multiple named outputs.
 
-    Definitions is an ordered mapping of output names to unit labels, or a
-    sequence of FieldDefinition objects. The callback returns a mapping with
-    exactly these names; each value is a scalar or a same-shaped leaf array.
-    Mapping order in the callback does not affect component order. Definitions
-    supplied as a mapping receive the interpretation ``pointwise-derived``.
+    Parameters
+    ----------
+    inputs : Fields or mapping of str to Fields
+        One group or named groups sharing Mesh identity and leaf coverage; slot order
+        may differ.
+    definitions : mapping or sequence of FieldDefinition
+        Ordered names/units or definitions; this order determines output columns. A
+        mapping uses pointwise-derived interpretation.
+    func : callable
+        Called once per leaf with [DerivedContext][simesh.DerivedContext]; return exactly the defined names, each
+        mapped to a scalar or matching leaf array. Dictionary order does not change
+        output order.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
 
-    Inputs, spatial semantics, common support and ownership follow derive().
-    The budget includes input backing, output, all returned float64 blocks and
-    one conversion block. Other callback allocations are the caller's concern.
-    The callback and input Fields are not retained in the completed result.
+    Returns
+    -------
+    Fields
+        Independent pointwise outputs using common valid support; inputs/callback are not retained.
+
+    Notes
+    -----
+    Callback allocations beyond the accounted output blocks remain the caller's responsibility; nonfinite recipe values propagate.
     """
     if isinstance(inputs, Fields):
         groups = {"input": inputs}

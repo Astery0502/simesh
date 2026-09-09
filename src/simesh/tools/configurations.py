@@ -269,6 +269,8 @@ def fan_Bvec(coordinates:np.ndarray, poses:np.ndarray, m:np.ndarray):
 def fan_slab(xmin:np.ndarray, xmax:np.ndarray, domain_nx:np.ndarray, poses:np.ndarray, m:np.ndarray):
 
     # Ensure inputs are numpy arrays
+    """Build a uniform fan magnetic field from explicit dipole positions and moments.
+    """
     xmin = np.asarray(xmin)
     xmax = np.asarray(xmax)
     domain_nx = np.asarray(domain_nx)

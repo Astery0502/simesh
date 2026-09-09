@@ -95,6 +95,8 @@ def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
 
 def trace_bounded(pool, seeds, *, max_steps=1000, trajectories=False, twist=False,
                   memory_limit=None, **kwargs):
+    """Collect raw TraceResult batches from an open PreparedPool; controls follow iter_traces_bounded.
+    """
     from .tracing import _collect
     from ._validation import remaining
     if type(max_steps) is not int or max_steps<0 or type(trajectories) is not bool or type(twist) is not bool:
@@ -106,6 +108,8 @@ def trace_bounded(pool, seeds, *, max_steps=1000, trajectories=False, twist=Fals
 
 
 def retrace_bounded(pool,result,selected_seed_ids,**kwargs):
+    """Reintegrate selected original seed IDs; controls follow trace_bounded, without checkpoint resume.
+    """
     from .tracing import _retrace_inputs
     seeds,ids,limit=_retrace_inputs(result,selected_seed_ids,kwargs.pop('memory_limit',None))
     kwargs.pop('trajectories',None)
@@ -130,6 +134,11 @@ def _tile_los(pool,origins,direction,near,far,component,step_fraction,quadrature
 
 
 def integrate_los_views_bounded(pool,planes,directions,**kwargs):
+    """Integrate equal-shaped scalar views through an open PreparedPool.
+
+    Controls follow [integrate_los_views][simesh.integrate_los_views], except capacity
+    is supplied by the pool; input preparation remains explicitly coordinated.
+    """
     from .projection import _integrate_views
     if not isinstance(pool,PreparedPool) or pool._closed:
         raise ValueError("bounded LOS requires an open PreparedPool")
@@ -138,6 +147,10 @@ def integrate_los_views_bounded(pool,planes,directions,**kwargs):
 
 
 def integrate_los_bounded(pool,plane,direction,**kwargs):
+    """Return one raw LOSResult through an open PreparedPool.
+
+    Controls follow [integrate_los_views_bounded][simesh.bounded.integrate_los_views_bounded].
+    """
     return integrate_los_views_bounded(pool,[plane],[direction],**kwargs)[0]
 
 
@@ -164,6 +177,8 @@ def _sample_pool(pool,points,workers,executor):
 
 
 def sample_plane_bounded(pool,plane,*,tile_rows=64,workers=1,memory_limit=None):
+    """Sample all pool components on a pixel-center Plane, returning a raw SliceResult.
+    """
     from .slices import _plane_result
     from ._execution import worker_context
     if not isinstance(pool,PreparedPool) or pool._closed:
@@ -175,6 +190,8 @@ def sample_plane_bounded(pool,plane,*,tile_rows=64,workers=1,memory_limit=None):
 
 
 def iter_uniform_bounded(pool,resolution,*,bounds=None,tile_rows=64,workers=1,memory_limit=None):
+    """Yield owned (z_index, SliceResult) outputs while bounding prepared input slots.
+    """
     from .slices import _uniform_geometry,_plane_result,Plane
     from ._validation import remaining
     from ._execution import worker_context

@@ -54,6 +54,7 @@ class ResultFile:
 
     @property
     def source_verification(self):
+        """unspecified without a source description; unverified when one was supplied."""
         return "unspecified" if self.source is None else "unverified"
 
 
@@ -437,18 +438,32 @@ def _write_archive(stream, arrays):
 def save_result(path, result, *, metadata=None, source=None, overwrite=False):
     """Save one supported object to a versioned NPZ file and return its Path.
 
-    Metadata and optional source descriptions must contain finite JSON values.
-    Tuples become lists. Supply calculation controls, units absent from the
-    result, and model assumptions explicitly; source_identity is never saved.
-    Existing files are refused unless overwrite=True. Publication follows the
-    temporary-sibling/link-or-replace protocol of io.products.write_amrvac.
+    Parameters
+    ----------
+    path : str or Path
+        Destination NPZ file; its parent must exist.
+    result : object
+        Registered geometry/application result; not arbitrary Fields, raw trace/LOS or
+        reduction objects.
+    metadata : dict, optional
+        Finite JSON values recording controls, units and model assumptions absent from
+        the result; tuples become lists.
+    source : dict, optional
+        Finite JSON source description; not a verified file identity.
+    overwrite : bool
+        Allow replacing an existing destination; otherwise an existing file is refused.
 
-    Writable outputs and arrays with potentially writable aliases are snapshotted.
-    Constructor-owned, read-only PointSet/RaySet/Plane geometry is borrowed until
-    the call returns; do not replace it or change its write protection during a
-    save. Concurrent mutation during snapshot capture is not supported. Keeping
-    snapshots and validating the complete result still requires memory; only
-    compression input is processed in bounded chunks.
+    Returns
+    -------
+    Path
+        Atomically published version-1 result file; existing destinations are retained
+        on write failure. In-memory source identity is not serialized.
+
+    Notes
+    -----
+    - Keep inputs and geometry write protection unchanged throughout saving.
+    - Potentially aliased arrays are snapshotted; owned read-only geometry may be
+      borrowed until return. Whole-result saving has no bounded-memory guarantee.
     """
     _require(type(overwrite) is bool, "overwrite must be boolean")
     destination = Path(path)
@@ -493,10 +508,27 @@ def _unique_object(pairs):
 def load_result(path):
     """Load and validate a result without pickle or source reconstruction.
 
-    Return ResultFile; access its .result to use the ordinary application API.
-    Malformed/unsupported files raise ResultFileError; filesystem errors such as
-    missing files or denied access remain OSError. Arrays are owned/read-only.
-    This whole-result format has no streaming or bounded-memory guarantee.
+    Parameters
+    ----------
+    path : str or Path
+        Existing result file.
+
+    Returns
+    -------
+    ResultFile
+        Validated result with owned read-only arrays, caller metadata and unverified
+        provenance; access .result for the application object.
+
+    Raises
+    ------
+    ResultFileError
+        Malformed or unsupported result representation.
+    OSError
+        Filesystem access fails.
+
+    Notes
+    -----
+    Whole-result loading is not a streaming or bounded-memory operation.
     """
     try:
         # Validate ZIP names before NumPy strips .npy suffixes, preventing

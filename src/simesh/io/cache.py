@@ -98,10 +98,27 @@ class InteriorValueCache:
 def cache_source(source, *, capacity, fields=None, memory_limit=None):
     """Explicit raw-value cache borrowing an immutable source and its Mesh.
 
-    Closing this adapter releases its cache, not the parent source. Parent close
-    or mutation invalidates reads, including hits. A new ordered field request
-    rebinds the cache and discards its previous keys. Optional fields restricts
-    the component directory before allocating cache slots, without copying values.
+    Parameters
+    ----------
+    source : Source
+        Open immutable input; field selectors address its current directory.
+    capacity : int
+        Maximum cached raw leaves.
+    fields : str or sequence, optional
+        Names or local Source indices of stored fields; integers must be supplied as a
+        sequence.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    Source
+        Raw-value cache borrowing its parent; closing it releases the cache, not the
+        parent. Source lifetime rules apply to cache hits as well as reads.
+
+    Notes
+    -----
+    A different ordered field request discards previous cache keys.
     """
     from .source import Source
     from .._validation import admit

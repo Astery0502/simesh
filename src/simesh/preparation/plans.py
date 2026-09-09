@@ -93,6 +93,17 @@ def _execute(actions, payload, coarse, lo, hi, modes, normals):
 
 @dataclass(frozen=True,eq=False)
 class FillPlan:
+    """Reusable field-independent exact-phase geometry for a fixed Mesh/selection.
+
+    Attributes
+    ----------
+    mesh, selection : object
+        Exact Mesh identity and complete target leaves.
+    capacity, nbytes : int
+        Support capacity and retained plan bytes.
+    build_seconds, scheme : object
+        Plan construction observation and exact-phase scheme.
+    """
     mesh: object
     selection: object
     order: np.ndarray
@@ -103,6 +114,8 @@ class FillPlan:
     scheme: str = exact.SCHEME
 
     def prepare(self,source,fields=None,*,memory_limit=None):
+        """Read fresh values and limiter state using this plan; Source must share the exact Mesh object.
+        """
         if source.mesh is not self.mesh:
             raise ValueError("plan belongs to a different immutable Mesh")
         source.validate()

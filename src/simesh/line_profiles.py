@@ -27,6 +27,18 @@ class LineProfile:
     display uses negative/positive distances for the against/along branches.
     Both copies of the seed are retained. Termination always has both statuses.
     Arrays are read-only; branch arrays may share the parent result's backing.
+
+    Attributes
+    ----------
+    seed_id, positions, arclength : object
+        Original ID, coordinate positions and branch/display arc lengths.
+    values, valid, finite, boundary_adjusted : ndarray
+        Per-component values, per-point coverage, per-component finiteness and
+        upper-face sampling adjustments.
+    point_indices, directions, termination : ndarray
+        Packed parent indices, branch directions and both original stop codes.
+    definitions, length_units, scheme, boundary : object
+        Component meanings, arc-length conversion and sampling conventions.
     """
 
     seed_id: int
@@ -55,11 +67,30 @@ class LineProfile:
 
 @dataclass(frozen=True, eq=False)
 class LineProfiles:
-    """Owned profile arrays aligned exactly with a shared read-only LineSet.
+    """Owned sampled arrays aligned with shared read-only LineSet geometry.
 
-    source_identity identifies sampled values; line_source_identity identifies
-    the field used to trace the geometry. They need not be equal. Neither token
-    retains Fields or a Source. Unit conversion affects arclength only.
+    Attributes
+    ----------
+    lines : LineSet
+        Shared read-only packed geometry and tracing statuses.
+    values : ndarray
+        Sampled values (total_points, components), aligned with lines.positions.
+    arclength, owners, valid, boundary_adjusted : ndarray
+        Polyline arc length from each seed, original owner IDs, coverage and
+        upper-face sampling adjustments per point; this is not travel time.
+    finite : ndarray
+        Per-component finiteness; usable combines this with coverage.
+    definitions, component_indices : tuple
+        Output meanings and selected input components.
+    source_identity : object
+        Sampled-value identity, distinct from the traced-line identity.
+    length_units, scheme, boundary : object
+        Conversion affects arc length only; stored positions remain in coordinate
+        units. Boundary adjustment affects sampling only and is recorded separately.
+
+    Notes
+    -----
+    Sampled and traced value identities may differ and retain no Source/Fields arrays. The caller establishes compatible snapshot time, coordinates and physical units.
     """
 
     lines: LineSet
@@ -78,18 +109,22 @@ class LineProfiles:
 
     @property
     def line_source_identity(self):
+        """Identity of the traced values; may differ from the sampled-value identity."""
         return self.lines.source_identity
 
     @property
     def offsets(self):
+        """Packed branch offsets, shared with the stored LineSet."""
         return self.lines.offsets
 
     @property
     def seed_ids(self):
+        """Original seed IDs, shared with the stored LineSet."""
         return self.lines.seeds.ids
 
     @property
     def termination(self):
+        """Both original tracing termination codes for each seed."""
         return self.lines.termination
 
     @property
@@ -99,6 +134,7 @@ class LineProfiles:
 
     @property
     def nbytes(self):
+        """Accounted profile arrays and shared LineSet geometry in bytes."""
         return self.lines.nbytes + array_bytes((self.arclength, self.values,
             self.owners, self.valid, self.finite, self.boundary_adjusted))
 
@@ -165,19 +201,33 @@ def sample_line_profiles(fields, lines, components=None, *, point_batch=4096,
                          memory_limit=None):
     """Sample selected components at every stored LineSet point, in bounded batches.
 
-    Names and indices can be mixed; ordering and individual unit labels survive.
-    Each branch arclength starts at zero and is the cumulative geometric length
-    of its stored polyline, NOT the tracer's ODE length or a time coordinate.
-    Optional LengthUnits explicitly scales these distances, not positions.
+    Parameters
+    ----------
+    fields : Fields
+        Continuous selected components with at least one valid halo.
+    lines : LineSet
+        Stored geometry; follow the coordinate/time compatibility contract of
+        LineProfiles.
+    components : str or int or sequence, optional
+        Names or local component indices, in output order.
+    point_batch : int
+        Maximum stored curve points sampled per batch.
+    workers : int
+        Number of workers over disjoint ranges.
+    length_units : LengthUnits, optional
+        Arc-length conversion only; positions keep coordinate units.
+    boundary : str
+        interior samples exact upper domain faces at the nearest interior coordinate and
+        records boundary_adjusted; native retains half-open ownership. Stored positions
+        are unchanged.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
 
-    boundary='interior' samples exact upper physical faces at the nearest
-    representable interior coordinate, only for points in the closed domain.
-    boundary='native' retains the sampler's half-open domain. Original positions
-    are never changed; boundary_adjusted records each adjusted point.
-
-    Geometry can originate from another field or caller-supplied curves encoded
-    as LineSet. The caller establishes compatible spatial coordinates and times;
-    value identities are recorded separately, never required to match.
+    Returns
+    -------
+    LineProfiles
+        Owned profile values and validity aligned with shared LineSet; the result type
+        defines arc length, boundary adjustment and separate line/value identities.
     """
     fields = require_fields(fields, halo=1)
     if not isinstance(lines, LineSet):
@@ -250,7 +300,26 @@ def sample_line_profiles(fields, lines, components=None, *, point_batch=4096,
 
 
 def iter_line_profiles(fields, line_batches, components=None, *, memory_limit=None, **controls):
-    """Sample each LineSet shard independently; no cross-shard concatenation."""
+    """Sample each LineSet shard independently; no cross-shard concatenation.
+
+    Parameters
+    ----------
+    fields : Fields
+        Completed input fields; see the operation-specific support requirement.
+    line_batches : iterable of LineSet
+        Ordered owned line batches.
+    components : str or int or sequence, optional
+        Names or local component indices, in output order.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    **controls : object
+        Controls forwarded to simesh.sample_line_profiles.
+
+    Returns
+    -------
+    iterator of LineProfiles
+        Owned sampled arrays aligned with shared read-only LineSet geometry.
+    """
     from ._validation import remaining
     selected = require_continuous(fields, components, operation="line profiles")
     previous = 0

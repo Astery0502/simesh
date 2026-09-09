@@ -59,14 +59,22 @@ def _definitions(definitions, names):
 def select_fields(fields, components=None, *, names=None, memory_limit=None):
     """Copy an ordered component subset into compact, independently owned Fields.
 
-    Select unique names, zero-based indices, or a mixture; a scalar selector is
-    also accepted. None selects all components. Empty or repeated selections
-    are rejected. Optional names replaces all selected names in output order;
-    units and interpretations are preserved without conversion.
+    Parameters
+    ----------
+    fields : Fields
+        Completed input fields; see the operation-specific support requirement.
+    components : str or int or sequence, optional
+        Names or local component indices, in output order.
+    names : sequence of str, optional
+        Distinct output names in component order.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
 
-    Only valid halo is copied. Results have a fresh value identity and no curl
-    derivation certificate, even for an identity selection; compute curl on the
-    resulting vector group before passing a retained curl to tracing or QSL.
+    Returns
+    -------
+    Fields
+        Independent compact copy, even for a full selection or rename. For one-time
+        sampling, consumer components avoid this field copy.
     """
     fields = require_fields(fields)
     selected = _component_indices(fields, components)
@@ -84,15 +92,27 @@ def select_fields(fields, components=None, *, names=None, memory_limit=None):
 def merge_fields(inputs, *, names=None, memory_limit=None):
     """Copy an ordered sequence of groups into one independently owned Fields.
 
-    Inputs must share Mesh identity and complete leaf coverage, but may differ
-    in physical slot order, selection order, units and preparation scheme.
-    Components follow group order and then each group's component order. Names
-    must be unique; explicitly rename inputs or supply all output names to
-    resolve collisions. Physical compatibility is the caller's responsibility.
+    Parameters
+    ----------
+    inputs : sequence of Fields
+        Groups sharing Mesh identity and leaf coverage; slot order may differ.
+        Components follow group order, then each group's component order.
+    names : sequence of str, optional
+        Distinct output names in concatenation order; supply them to resolve name
+        collisions.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
 
-    Output follows the first selection, packs its slots, and retains only the
-    common valid halo. Source tokens are kept in input order, without retaining
-    input Fields. A fresh identity invalidates any input curl certificate.
+    Returns
+    -------
+    Fields
+        Independent concatenation packed in the first group's leaf order, with common
+        valid halo. Inputs are not retained; the new value identity does not preserve
+        input curl certificates.
+
+    Notes
+    -----
+    Physical compatibility of units and preparation schemes remains the caller's responsibility.
     """
     if isinstance(inputs, Mapping):
         raise TypeError("inputs must be an ordered sequence of Fields")

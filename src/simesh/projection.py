@@ -11,6 +11,8 @@ from ._validation import admit, workers_count
 from ._execution import worker_context, run_ranges, native_dispatch
 
 class LOSStatus(IntEnum):
+    """Ray states. COMPLETE and EMPTY are valid; missing coverage, sample limits and numerical failures are not.
+    """
     RUNNING = 0
     COMPLETE = 1
     EMPTY = 2
@@ -24,6 +26,19 @@ class LOSStatus(IntEnum):
 
 @dataclass(frozen=True)
 class LOSResult:
+    """Raw plane LOS product; use application LOS for save_result support.
+
+    Attributes
+    ----------
+    plane, direction : object
+        Sampling geometry and normalized direction.
+    values, entry, exit : ndarray
+        Image-shaped integrals and coordinate clipping depths.
+    status, samples, misses : ndarray
+        LOSStatus codes and diagnostic counts.
+    scalar_units, quadrature : str
+        Field units times coordinate length, and integration method.
+    """
     plane: Plane
     direction: np.ndarray
     values: np.ndarray
@@ -37,19 +52,39 @@ class LOSResult:
 
     @property
     def depth(self):
+        """Clipped coordinate-distance interval length for each ray."""
         return self.exit-self.entry
 
     @property
     def valid(self):
+        """Coverage/status mask accepting COMPLETE and EMPTY rays."""
         return (self.status==LOSStatus.COMPLETE)|(self.status==LOSStatus.EMPTY)
 
     @property
     def complete(self):
+        """Whether every ray is valid, including empty rays."""
         return bool(self.valid.all())
 
 
 def orthographic_plane(lower,upper,direction,shape):
-    """Enclose the projection of the entire physical box in a perpendicular Plane."""
+    """Enclose the projection of the entire physical box in a perpendicular Plane.
+
+    Parameters
+    ----------
+    lower : array-like
+        Finite domain lower bounds (3,).
+    upper : array-like
+        Finite strictly ordered upper bounds (3,).
+    direction : array-like
+        Finite nonzero viewing direction (3,).
+    shape : tuple of int
+        Positive plane pixel counts.
+
+    Returns
+    -------
+    Plane
+        Plane enclosing the projection of the whole box, perpendicular to the direction.
+    """
     lower,upper = np.asarray(lower,dtype=float),np.asarray(upper,dtype=float)
     d = np.asarray(direction,dtype=float)
     if (lower.shape!=(3,) or upper.shape!=(3,) or not np.isfinite([lower,upper]).all() or
@@ -195,8 +230,48 @@ def _integrate_views(planes,directions,definitions,footprint,runner,*,component=
 def integrate_los_views(fields,planes,directions,**kwargs):
     """Integrate retained scalar fields over requested equal-shaped views.
 
-    Gaussian quadrature splits at interpolation knots and block boundaries.
-    Midpoint quadrature uses the explicitly requested step_fraction instead.
+    Parameters
+    ----------
+    fields : Fields
+        Selected continuous scalar component with at least one valid halo.
+    planes : sequence of Plane
+        One or more equal-shaped planes.
+    directions : array-like
+        One finite nonzero (3,) vector per plane.
+    **kwargs : object
+        Forwarded keyword controls listed below.
+
+    Other Parameters
+    ----------------
+    component : int
+        Local scalar column (default 0).
+    near, far : float or array-like
+        Nonnegative plane-shaped clipping distances (defaults 0 and infinity).
+    quadrature : str
+        gauss2 splits at interpolation knots/block boundaries; midpoint uses
+        step_fraction (default gauss2).
+    step_fraction : float
+        Positive midpoint step fraction (default 0.5).
+    max_samples : int
+        Per-ray limit (default 1000000).
+    workers : int
+        Worker count (default 1).
+    tile_shape : tuple of int
+        Image tile dimensions (default (16, 16)).
+    backend, schedule : str
+        threadpool/openmp and static/dynamic (defaults threadpool and static).
+    view_order : str
+        tile or view traversal (default tile).
+    memory_limit : int, optional
+        Per-call accounted-array budget, not a process RSS cap.
+    capacity : int, optional
+        Optional cap on tile positions; bounded consumers supply their pool capacity.
+
+    Returns
+    -------
+    list of LOSResult
+        One raw result per equal-shaped plane, in field units times coordinate length;
+        LOSResult defines validity and completion.
     """
     require_continuous(fields, (kwargs.get("component", 0),), operation="LOS")
     return _integrate_views(planes,directions,fields.fields,fields.nbytes+fields.mesh.nbytes,
@@ -204,5 +279,22 @@ def integrate_los_views(fields,planes,directions,**kwargs):
 
 
 def integrate_los(fields,plane,direction,**kwargs):
-    """Integrate a supplied scalar along clipped, pixel-owned rays."""
+    """Integrate a supplied scalar along clipped, pixel-owned rays.
+
+    Parameters
+    ----------
+    fields : Fields
+        Completed input fields; see the operation-specific support requirement.
+    plane : Plane
+        Pixel-center sampling plane.
+    direction : array-like
+        Finite nonzero viewing direction (3,).
+    **kwargs : object
+        Forwarded controls listed in [integrate_los_views][simesh.integrate_los_views].
+
+    Returns
+    -------
+    LOSResult
+        One raw plane result; use valid/status as well as values.
+    """
     return integrate_los_views(fields,[plane],[direction],**kwargs)[0]

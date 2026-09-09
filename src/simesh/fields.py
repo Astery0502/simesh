@@ -9,6 +9,17 @@ from .mesh import Mesh, Selection
 
 @dataclass(frozen=True)
 class FieldDefinition:
+    """Describe a component's name, unit label and numerical interpretation.
+
+    Parameters
+    ----------
+    name : str
+        Nonempty component name; name-based selection requires a unique match.
+    units : str
+        Unit label, without automatic numerical conversion.
+    interpretation : str
+        Meaning of the values; categorical prefixes prohibit interpolation.
+    """
     name: str
     units: str = "code"
     interpretation: str = "cell-average"
@@ -29,11 +40,40 @@ class _Lease:
 
 @dataclass(frozen=True, eq=False)
 class Fields:
-    """Readonly fields on complete leaves, owned or explicitly batch-borrowed.
+    """Completed read-only fields on complete original leaves.
 
-    ``storage_halo`` locates interiors in the backing. ``valid_halo`` states
-    which surrounding values are complete, independently of allocated padding.
-    Factories publish this descriptor only after all requested writes succeed.
+    Obtain fields through read_fields, prepare or scientific producers.
+
+    Attributes
+    ----------
+    mesh : Mesh
+        Shared immutable original geometry.
+    values : ndarray
+        Read-only float64 storage (slot, x, y, z, component), including allocated halo.
+    selection : Selection
+        Ordered complete leaves, optionally remembering a requested box.
+    fields : tuple of FieldDefinition
+        Component definitions in value-array order.
+    slot_of_leaf : ndarray
+        Original leaf ID to storage slot; -1 marks absent coverage.
+    storage_halo : int
+        Interior offset within allocated storage.
+    valid_halo : int
+        Complete surrounding layers, independent of allocated padding.
+    scheme : str
+        Preparation/derivation description.
+    source, value_identity, derivation : object
+        In-memory value association, not a content digest or persistent proof.
+    preparation_stats : dict
+        Operation-specific resource/diagnostic observations.
+
+    Notes
+    -----
+    - Ordinary read/preparation results outlive their Source; iterator/pool views
+      expire on advance or lease exit, including previously extracted NumPy views.
+    - Keep external writable aliases unchanged while consuming returned fields.
+    - Consumers use only valid support and never fill missing coverage; a first
+      derivative consumes one valid halo layer.
     """
 
     mesh: Mesh
@@ -79,19 +119,37 @@ class Fields:
 
     @property
     def values(self):
+        """Return component-last storage, including allocated halo; check the borrow lease.
+        """
         self._check()
         return self._values
 
     @property
     def leaf_ids(self):
+        """Original leaf IDs in Selection order; these are not necessarily storage rows.
+        """
         return self.selection.leaf_ids
 
     @property
     def nbytes(self):
+        """Accounted field arrays in bytes, excluding the shared Mesh.
+        """
         self._check()
         return array_bytes((self._values, self.leaf_ids, self.slot_of_leaf))
 
     def interior(self):
+        """Return an interior view when slots are packed in Selection order.
+
+        Returns
+        -------
+        ndarray
+            (leaf, x, y, z, component) view without halo.
+
+        Raises
+        ------
+        ValueError
+            Nonpacked storage requires per-leaf window access instead.
+        """
         self._check()
         if (len(self._values) != len(self.leaf_ids) or
                 not np.array_equal(self.slot_of_leaf[self.leaf_ids], np.arange(len(self.leaf_ids)))):
@@ -101,6 +159,22 @@ class Fields:
                             h:h+self.mesh.block_shape[2], :]
 
     def window(self, leaf, lower, upper, *, support=0):
+        """Borrow a checked window from one covered original leaf.
+
+        Parameters
+        ----------
+        leaf : int
+            Original leaf ID, not a storage row.
+        lower, upper : sequence of int
+            Integer interior-cell bounds (3,), with exclusive upper bounds.
+        support : int
+            Extend all sides by at most valid_halo layers.
+
+        Returns
+        -------
+        ndarray
+            Read-only (x, y, z, component) view with the parent's lifetime.
+        """
         self._check()
         leaf = int(indices([leaf], self.mesh.leaf_count)[0])
         lo, hi = np.asarray(lower), np.asarray(upper)

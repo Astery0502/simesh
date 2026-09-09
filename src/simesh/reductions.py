@@ -1,7 +1,7 @@
 """Quantitative reductions of native leaf interiors, without halo preparation.
 
 All integrals use a piecewise-constant representation of the supplied interior
-values. See docs/application-guide.md for coverage, weight and surface-side semantics.
+values. Each operation documents its coverage, weight and surface-side semantics.
 """
 
 from dataclasses import dataclass
@@ -64,7 +64,21 @@ class AxisAlignedSurface:
 
 @dataclass(frozen=True)
 class Coverage:
-    """Geometric measures, all in units; coverage does not depend on weight size."""
+    """Geometric coverage, independent of statistical weight magnitude.
+
+    Attributes
+    ----------
+    requested_measure, domain_measure, available_measure, valid_measure : float
+        Requested, in-domain, supplied and finite-contributing volume or area.
+    units : str
+        Unit of the reported geometric measures.
+    cell_count, valid_cell_count : int
+        Intersecting supplied cells and finite contributing cells.
+    complete : bool
+        Whether the whole requested measure contributed valid values.
+    missing, nonfinite : str
+        Rejection or omission policies used for this result.
+    """
 
     requested_measure: float
     domain_measure: float
@@ -79,23 +93,40 @@ class Coverage:
 
     @property
     def outside_measure(self):
+        """Requested measure outside the original physical domain."""
         return max(0., self.requested_measure - self.domain_measure)
 
     @property
     def missing_measure(self):
+        """In-domain requested measure absent from supplied field coverage."""
         return max(0., self.domain_measure - self.available_measure)
 
     @property
     def invalid_measure(self):
+        """Available requested measure excluded by nonfinite input values."""
         return max(0., self.available_measure - self.valid_measure)
 
     @property
     def fraction(self):
+        """Valid measure divided by requested measure; zero for a zero requested measure."""
         return self.valid_measure / self.requested_measure if self.requested_measure else 0.
 
 
 @dataclass(frozen=True)
 class ScalarResult:
+    """Native-cell integral or mean with physical coverage.
+
+    Attributes
+    ----------
+    value, units : object
+        Scalar value and resulting unit label.
+    coverage : Coverage
+        Geometric measures, omission policies and completion.
+    field : FieldDefinition
+        Analyzed component.
+    weight_sum, weight_units, weight_field, weight_mode : object
+        Weight normalization and interpretation, when applicable.
+    """
     value: float
     units: str
     coverage: Coverage
@@ -120,6 +151,17 @@ class Extremum:
 
 @dataclass(frozen=True)
 class ExtremaResult:
+    """Native-cell extrema with coverage and component interpretation.
+
+    Attributes
+    ----------
+    minimum, maximum : Extremum
+        Value/location records. The producer rejects a region without finite covered cells.
+    coverage : Coverage
+        Geometric completion and omission policies.
+    field : FieldDefinition
+        Analyzed component.
+    """
     minimum: Extremum
     maximum: Extremum
     units: str
@@ -131,6 +173,21 @@ class ExtremaResult:
 
 @dataclass(frozen=True)
 class HistogramResult:
+    """Weighted native-cell histogram retaining tails and coverage.
+
+    Attributes
+    ----------
+    edges, bin_weights : ndarray
+        Bin boundaries and accumulated bin weights.
+    underflow, overflow, total_weight : float
+        Below-range, above-range and all included weights.
+    value_units, weight_units : str
+        Units of sample values and accumulated weights.
+    coverage : Coverage
+        Geometric completion and omission policies.
+    field, weight_field, weight_mode : object
+        Component and weight interpretation.
+    """
     edges: np.ndarray
     bin_weights: np.ndarray
     underflow: float
@@ -391,8 +448,26 @@ def volume_integral(fields, component=0, *, region=None, units=None,
                     missing="raise", nonfinite="raise"):
     """Sum value times the exact cell/box intersection volume.
 
-    region defaults to fields.selection, including its requested bounds. Pass
-    mesh bounds explicitly to require full-domain coverage of partial Fields.
+    Parameters
+    ----------
+    fields : Fields
+        Native cell interiors; halos are not used. Values have a piecewise-constant
+        representation.
+    component : str or int
+        Name or local index of the scalar component.
+    region : Selection or array-like, optional
+        Requested physical (2, 3) box or Selection; contributions use cell-overlap measures.
+    units : LengthUnits, optional
+        Isotropic physical length conversion; omission retains coordinate units.
+    missing : str
+        raise rejects missing coverage; omit retains only covered contributions.
+    nonfinite : str
+        raise rejects nonfinite values; omit excludes them from the result.
+
+    Returns
+    -------
+    ScalarResult
+        Values and units with explicit geometric coverage and omission policies.
     """
     reduction = _Reduction(fields, component, region, units, missing, nonfinite)
     totals = [_weighted_sum(values, measure) for *_, values, measure in reduction.pieces()]
@@ -405,8 +480,33 @@ def weighted_mean(fields, component=0, *, weights=None, weight_component=0,
                   missing="raise", nonfinite="raise"):
     """Volume mean, or mean with explicit nonnegative weights on the same Mesh.
 
-    density weights multiply intersection volume; cell-total weights multiply
-    the fraction of each cell retained by the region. A zero denominator raises.
+    Parameters
+    ----------
+    fields : Fields
+        Native cell interiors; halos are not used. Values have a piecewise-constant
+        representation.
+    component : str or int
+        Name or local index of the scalar component.
+    weights : Fields, optional
+        Finite nonnegative weights on the same Mesh and coverage; omission uses volume
+        weights.
+    weight_component : str or int
+        Weight component name or local index.
+    weight_mode : str
+        density multiplies weights by volume; cell-total apportions cell weights by overlap.
+    region : Selection or array-like, optional
+        Requested physical (2, 3) box or Selection; contributions use cell-overlap measures.
+    units : LengthUnits, optional
+        Isotropic physical length conversion; omission retains coordinate units.
+    missing : str
+        raise rejects missing coverage; omit retains only covered contributions.
+    nonfinite : str
+        raise rejects nonfinite values; omit excludes them from the result.
+
+    Returns
+    -------
+    ScalarResult
+        Values and units with explicit geometric coverage and omission policies.
     """
     reduction = _Reduction(fields, component, region, units, missing, nonfinite,
                            weights, weight_component, weight_mode)
@@ -428,8 +528,31 @@ def extrema(fields, component=0, *, region=None, units=None,
             missing="raise", nonfinite="raise"):
     """Finite extrema and clipped-cell positions; ties use leaf ID then XYZ index.
 
-    Only positive-volume intersections contribute. Positions stay in mesh
-    coordinates even if units converts the reported coverage volumes.
+    Parameters
+    ----------
+    fields : Fields
+        Native cell interiors; halos are not used. Values have a piecewise-constant
+        representation.
+    component : str or int
+        Name or local index of the scalar component.
+    region : Selection or array-like, optional
+        Requested physical (2, 3) box or Selection; contributions use cell-overlap measures.
+    units : LengthUnits, optional
+        Isotropic physical length conversion; omission retains coordinate units.
+    missing : str
+        raise rejects missing coverage; omit retains only covered contributions.
+    nonfinite : str
+        raise rejects nonfinite values; omit excludes them from the result.
+
+    Returns
+    -------
+    ExtremaResult
+        Values and units with explicit geometric coverage and omission policies.
+
+    Raises
+    ------
+    ValueError
+        No finite covered cell contributes to the requested region.
     """
     reduction = _Reduction(fields, component, region, units, missing, nonfinite)
     minimum = maximum = None
@@ -461,8 +584,34 @@ def histogram(fields, edges, component=0, *, weights=None, weight_component=0,
               missing="raise", nonfinite="raise"):
     """Weighted histogram with explicit finite edges; the last bin includes its right edge.
 
-    Weights default to intersection volume. Finite values outside the edges are
-    reported as underflow/overflow and still contribute to valid coverage.
+    Parameters
+    ----------
+    fields : Fields
+        Native cell interiors; halos are not used. Values have a piecewise-constant
+        representation.
+    edges : array-like
+        Strictly increasing finite histogram edges.
+    component : str or int
+        Name or local index of the scalar component.
+    weights : Fields, optional
+        Weights on the same Mesh and leaf coverage; omission uses volume weights.
+    weight_component : str or int
+        Weight component name or local index.
+    weight_mode : str
+        density multiplies weights by volume; cell-total apportions cell weights by overlap.
+    region : Selection or array-like, optional
+        Requested physical (2, 3) box or Selection; contributions use cell-overlap measures.
+    units : LengthUnits, optional
+        Isotropic physical length conversion; omission retains coordinate units.
+    missing : str
+        raise rejects missing coverage; omit retains only covered contributions.
+    nonfinite : str
+        raise rejects nonfinite values; omit excludes them from the result.
+
+    Returns
+    -------
+    HistogramResult
+        Values and units with explicit geometric coverage and omission policies.
     """
     edges = np.asarray(edges, dtype=float)
     if (edges.ndim != 1 or len(edges) < 2 or not np.isfinite(edges).all()
@@ -494,8 +643,31 @@ def surface_flux(fields, surface, component=0, *, units=None,
                  missing="raise", nonfinite="raise"):
     """Integrate the explicitly selected coordinate-normal component over a rectangle.
 
-    Select Bx for an x rectangle, By for y, or Bz for z; the function applies
-    surface.normal. This is a one-sided cell-interior trace, not CT face flux.
+    Parameters
+    ----------
+    fields : Fields
+        Native cell interiors; halos are not used. Values have a piecewise-constant
+        representation.
+    surface : AxisAlignedSurface
+        Oriented rectangle with its explicit adjacent-cell choice; component must be the
+        field's normal component.
+    component : str or int
+        Name or local index of the scalar component.
+    units : LengthUnits, optional
+        Isotropic physical length conversion; omission retains coordinate units.
+    missing : str
+        raise rejects missing coverage; omit retains only covered contributions.
+    nonfinite : str
+        raise rejects nonfinite values; omit excludes them from the result.
+
+    Returns
+    -------
+    ScalarResult
+        Values and units with explicit geometric coverage and omission policies.
+
+    Notes
+    -----
+    Cell-centered one-sided flux is not CT face flux and does not guarantee coarse/fine flux continuity.
     """
     if not isinstance(surface, AxisAlignedSurface):
         raise TypeError("surface must be an AxisAlignedSurface")

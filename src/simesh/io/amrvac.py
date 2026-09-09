@@ -14,9 +14,24 @@ from .._validation import admit, array_bytes
 def open_amrvac(path, *, fields=None, units=None, memory_limit=None):
     """Open immutable nonperiodic Cartesian 3D v5 ordinary fields.
 
-    Use as a context manager or explicitly close the returned Source. Saved
-    ghost extents, record lengths and staggered tails are checked by the reader;
-    CT values are not exposed. No field payload or halo workspace is loaded here.
+    Parameters
+    ----------
+    path : str or Path
+        Ordinary nonperiodic Cartesian 3D AMRVAC v5 snapshot; CT face values are not
+        exposed.
+    fields : str or sequence, optional
+        Names or local Source indices of stored fields; integers must be supplied as a
+        sequence.
+    units : str or mapping, optional
+        Field unit labels, without numerical scaling.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    Source
+        Metadata/index input without loaded field payload or halos; use its
+        context-manager lifetime.
     """
     fd = os.open(os.fspath(path), os.O_RDONLY)
     try:

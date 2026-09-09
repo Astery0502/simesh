@@ -18,6 +18,17 @@ def _transverse_basis(direction):
 
 @dataclass(frozen=True)
 class Plane:
+    """Own a pixel-center sampling plane.
+
+    Parameters
+    ----------
+    origin : array-like
+        Physical corner (3,); sampling uses pixel centers within the span vectors.
+    u, v : array-like
+        Independent full-image span vectors (3,); not per-pixel spacing.
+    shape : tuple of int
+        Positive pixel counts along u and v.
+    """
     origin: np.ndarray
     u: np.ndarray
     v: np.ndarray
@@ -39,6 +50,17 @@ class Plane:
 
 @dataclass(frozen=True)
 class SliceResult:
+    """Raw plane samples; not directly accepted by save_result.
+
+    Attributes
+    ----------
+    plane : Plane
+        Sampling geometry.
+    values : ndarray
+        Component-last image values (*plane.shape, k).
+    valid, owners : ndarray
+        Image-shaped coverage mask and original owner IDs.
+    """
     plane: Plane
     values: np.ndarray
     valid: np.ndarray
@@ -72,7 +94,31 @@ def _plane_result(plane,count,footprint,sampler,*,tile_rows,workers,executor,mem
 
 
 def sample_plane(fields,plane,*,components=None,output=None,tile_rows=64,workers=1,memory_limit=None):
-    """Sample a plane directly; no input preparation or source access occurs."""
+    """Sample a plane directly; no input preparation or source access occurs.
+
+    Parameters
+    ----------
+    fields : Fields
+        Continuous selected components with at least one valid halo.
+    plane : Plane
+        Pixel-center sampling plane.
+    components : str or int or sequence, optional
+        Names or local component indices, in output order.
+    output : tuple of ndarray, optional
+        Writable contiguous (values, owners, valid) on plane.shape, with component-last
+        values; no input aliases. Failure may leave partial writes.
+    tile_rows : int
+        Maximum rows sampled per tile; collected output still occupies memory.
+    workers : int
+        Number of workers over disjoint ranges.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    SliceResult
+        Pixel-center values, original owner IDs and coverage on the plane layout.
+    """
     selected=np.asarray(require_continuous(fields,components,operation="sample_plane"),dtype=np.int64)
     if not isinstance(plane,Plane):
         raise TypeError("plane must be Plane")
@@ -104,7 +150,31 @@ def _uniform_geometry(mesh,resolution,bounds):
 
 
 def iter_uniform(fields,resolution,*,components=None,bounds=None,tile_rows=64,workers=1,memory_limit=None):
-    """Yield owned (z index, SliceResult) slabs without materializing a volume."""
+    """Yield owned (z index, SliceResult) slabs without materializing a volume.
+
+    Parameters
+    ----------
+    fields : Fields
+        Continuous selected components with at least one valid halo.
+    resolution : sequence of int
+        Positive uniform-grid cell counts (nx, ny, nz).
+    components : str or int or sequence, optional
+        Names or local component indices, in output order.
+    bounds : array-like, optional
+        Lower and upper physical bounds; defaults to the original domain.
+    tile_rows : int
+        Maximum rows sampled per tile; collected output still occupies memory.
+    workers : int
+        Number of workers over disjoint ranges.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    iterator of tuple
+        Owned (z_index, SliceResult) XY slices in z order; input Fields remain resident
+        and no complete volume is collected.
+    """
     from ._validation import remaining
     selected=np.asarray(require_continuous(fields,components,operation="iter_uniform"),dtype=np.int64)
     (nx,ny,nz),lower,upper=_uniform_geometry(fields.mesh,resolution,bounds)

@@ -2,7 +2,7 @@
 
 The delivered profiles supply explicit sources, regional and whole-domain fields,
 scientific consumers and opt-in bounded workflows. See the README for numerical
-scope and MIGRATION.md for retained Dataset interfaces and moved imports.
+scope and docs/user/api.md for retained Dataset interfaces.
 """
 
 from .fields import FieldDefinition, Fields

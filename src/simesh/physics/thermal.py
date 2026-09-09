@@ -18,6 +18,17 @@ _RESPONSE_SLOPES = frozen_array(np.diff(_LOG_RESPONSE)/np.diff(_RESPONSE_GRID), 
 
 @dataclass(frozen=True)
 class ThermalLOSResult(LOSResult):
+    """Raw thermal LOSResult with explicit model and physical length scale.
+
+    Attributes
+    ----------
+    model : object
+        Historical response identity.
+    temperature_label : str
+        Temperature provenance.
+    density_unit_g_cm3, length_unit_cm : float
+        Physical conversion factors used for this product.
+    """
     model: str
     temperature_label: str
     density_unit_g_cm3: float
@@ -25,6 +36,7 @@ class ThermalLOSResult(LOSResult):
 
     @property
     def depth_cm(self):
+        """Physical clipped depth in centimeters, using the recorded coordinate scale."""
         return self.depth*self.length_unit_cm
 
 
@@ -38,6 +50,7 @@ class CoronalComposition:
             raise ValueError("helium abundance must be finite and nonnegative")
 
     def number_density(self, mass_density_cgs, *, convention="electron"):
+        """Convert mass density in g/cm³ to electron or amrvac-hydrogen number density in cm^-3."""
         rho = np.asarray(mass_density_cgs, dtype=float)
         if not np.isfinite(rho).all() or np.any(rho < 0):
             raise ValueError("mass density must be finite and nonnegative")
@@ -74,9 +87,11 @@ class AIA171:
 
     @property
     def identity(self):
+        """Response, density-convention and composition identity used to check compatible thermal fields."""
         return f"amrvac-{UPSTREAM_COMMIT}-171-{self.density_convention}-He{self.composition.helium_abundance:g}"
 
     def response(self, temperature_k):
+        """Interpolate the historical response in log temperature/response; zero outside the table."""
         t = np.asarray(temperature_k, dtype=float)
         if not np.isfinite(t).all() or np.any(t <= 0):
             raise ValueError("temperature must be finite and positive in kelvin")
@@ -85,10 +100,12 @@ class AIA171:
         return np.where((logt >= LOG_T[0]) & (logt <= LOG_T[-1]), 10.**log_response, 0.)
 
     def emissivity(self, mass_density_cgs, temperature_k):
+        """Evaluate emission from mass density in g/cm³ and positive kelvin temperature."""
         n = self.composition.number_density(mass_density_cgs, convention=self.density_convention)
         return self.from_number_density(n, temperature_k)
 
     def from_number_density(self, number_density_cm3, temperature_k):
+        """Evaluate n² R(T) for number density in cm^-3 under this model convention."""
         n = np.asarray(number_density_cm3, dtype=float)
         if not np.isfinite(n).all() or np.any(n < 0):
             raise ValueError("number density must be finite and nonnegative")
@@ -139,14 +156,50 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
                           backend="threadpool", schedule="dynamic"):
     """Full box LOS of the explicitly selected nonlinear thermal reconstruction.
 
-    thermodynamics-first samples n,T then evaluates n^2 R(T). Composite Gauss2
-    is a convergent approximation, NEVER an exact nonlinear-response integral.
-    emissivity-first computes prepared-node emissivity then uses scalar gauss2.
-    native reuses AMR-tree interval ownership and compiled interpolation, with
-    independent rays dispatched through one parallel layer. The default uses
-    GIL-free Python workers; OpenMP is explicit and optional. reference retains the
-    original Python/all-leaf oracle and requires one worker. Both keep the same
-    nonlinear reconstruction and quadrature; per-pixel limits fail closed.
+    Parameters
+    ----------
+    thermodynamics : Fields
+        Matching number-density/kelvin fields from thermal_fields, with valid
+        interpolation support.
+    plane : Plane
+        Pixel-center sampling plane.
+    direction : array-like
+        Finite nonzero viewing direction (3,).
+    length_unit_cm : float
+        Centimeters per coordinate-length unit.
+    model : AIA171
+        Response matching the thermal fields.
+    order : str
+        thermodynamics-first interpolates n,T before n²R(T); emissivity-first applies
+        response at nodes before interpolation.
+    subdivisions : int
+        Composite Gauss2 subdivisions for nonlinear thermal response integration.
+    near : float or array-like
+        Nonnegative ray entry clipping in coordinate-length units.
+    far : float or array-like
+        Ray exit clipping, at least near; positive infinity is allowed.
+    max_samples : int
+        Per-ray sampling limit; reaching the limit is not a complete integral.
+    workers : int
+        Number of workers over disjoint ranges.
+    implementation : str
+        native for compiled integration; reference for the single-worker reference
+        calculation.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    backend : str
+        Execution backend: threadpool or explicitly built openmp.
+    schedule : str
+        Native scheduling policy: static or dynamic.
+
+    Returns
+    -------
+    ThermalLOSResult
+        Plane brightness and statuses with explicit thermal model and physical depth scale.
+
+    Notes
+    -----
+    These orders define different reconstructions. Composite Gauss2 for nonlinear response is an approximation; check convergence and result status.
     """
     _check_thermal(thermodynamics, model)
     if type(workers) is not int or workers < 1:
@@ -302,8 +355,29 @@ def thermal_fields(density,temperature,*,density_unit_g_cm3,model=AIA171(),densi
                    temperature_component=0,temperature_label,memory_limit=None):
     """Detach number-density and kelvin nodes using the common valid input support.
 
-    External temperature is explicit: a positive scalar or a prepared kelvin
-    field on the same Mesh. No energy-to-temperature guess is made here.
+    Parameters
+    ----------
+    density : Fields
+        Mass-density values with explicit physical conversion.
+    temperature : float or Fields
+        Positive kelvin scalar or kelvin field covering density on the same Mesh.
+    density_unit_g_cm3 : float
+        Grams per cubic centimeter per stored mass-density value.
+    model : AIA171
+        Selected historical response, composition and number-density convention.
+    density_component : int
+        Local mass-density component index.
+    temperature_component : int
+        Local kelvin temperature component index.
+    temperature_label : str
+        Explicit provenance/interpretation of the kelvin temperature input.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    Fields
+        Independent number-density (cm^-3) and temperature (K) with common valid support.
     """
     require_fields(density)
     if (not isinstance(temperature_label,str) or not temperature_label.strip() or
@@ -368,7 +442,26 @@ def _check_thermal(fields,model,*,halo=1):
 
 
 def emissivity_fields(thermodynamics,*,model=AIA171(),memory_limit=None):
-    """Apply response to prepared nodes before interpolation, retaining that order."""
+    """Apply response to prepared nodes before interpolation, retaining that order.
+
+    Parameters
+    ----------
+    thermodynamics : Fields
+        Number-density and kelvin fields produced by thermal_fields with the same model.
+    model : AIA171
+        Response matching the supplied thermal fields.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    Fields
+        Node emissivity in DN s^-1 pixel^-1 cm^-1, preserving valid support.
+
+    Notes
+    -----
+    Response-before-interpolation defines emissivity-first reconstruction; it is not interchangeable with thermodynamics-first.
+    """
     _check_thermal(thermodynamics,model,halo=0)
     h=thermodynamics.valid_halo
     block=thermodynamics.mesh.block_shape

@@ -46,6 +46,13 @@ class SnapshotMetadata:
     not the selected or derived field directory. It infers no units or EOS.
     ``file_identity`` records device, inode, size, mtime_ns and ctime_ns when read;
     it is not a content digest or a verified association with any later Fields.
+
+    Attributes
+    ----------
+    header : Mapping
+        Detached immutable snapshot header; units/EOS are not inferred.
+    path, byte_order, file_identity : object
+        Optional source observations, retained after Source closure.
     """
 
     header: Mapping
@@ -85,22 +92,27 @@ class SnapshotMetadata:
 
     @property
     def time(self):
+        """Snapshot time in its original simulation convention."""
         return self.header["time"]
 
     @property
     def iteration(self):
+        """Recorded simulation iteration."""
         return self.header["it"]
 
     @property
     def physics_type(self):
+        """Original header physics identifier; not an automatically selected analysis model."""
         return self.header["physics_type"]
 
     @property
     def field_names(self):
+        """Original snapshot field names, before any Source restriction."""
         return self.header["w_names"]
 
     @property
     def parameters(self):
+        """Read-only named physical parameters; duplicate names require the ordered header arrays."""
         names = self.header["param_names"]
         if len(set(names)) != len(names):
             raise ValueError("duplicate parameter names; use the ordered header parameter arrays")

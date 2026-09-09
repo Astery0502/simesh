@@ -22,6 +22,21 @@ def _unit_vectors(value, count, label):
 
 @dataclass(frozen=True, eq=False)
 class PointSet:
+    """Own finite sampling positions, stable IDs and an optional image layout.
+
+    Parameters
+    ----------
+    positions : array-like
+        Finite physical positions (n, 3), copied into read-only storage.
+    ids : array-like, optional
+        Unique integer IDs; omission allocates consecutive IDs.
+    shape : tuple of int, optional
+        Layout containing exactly n positions; omission gives (n,).
+    normals : array-like, optional
+        One (3,) or n nonzero normals, normalized by construction.
+    plane : Plane, optional
+        Parent sampling surface; selection retains this association.
+    """
     positions: np.ndarray
     ids: np.ndarray | None = None
     shape: tuple | None = None
@@ -51,11 +66,14 @@ class PointSet:
 
     @property
     def nbytes(self):
+        """Accounted geometry arrays in bytes, including the optional plane."""
         plane_arrays = () if self.plane is None else (self.plane.origin,self.plane.u,self.plane.v)
         return array_bytes((self.positions,self.ids,self.normals,*plane_arrays))
 
     @classmethod
     def from_plane(cls, plane, *, ids=None, memory_limit=None):
+        """Copy all plane pixel centers with optional IDs and image layout.
+        """
         if not isinstance(plane,Plane):
             raise TypeError("a Plane is required")
         admit(math.prod(plane.shape)*128+512,memory_limit,"plane points")
@@ -82,6 +100,8 @@ class PointSet:
 
     @classmethod
     def boundary(cls, mesh, face, shape, *, ids=None, memory_limit=None):
+        """Place pixel centers on xmin/xmax/ymin/ymax/zmin/zmax with outward normals.
+        """
         faces = {"xmin":(0,-1),"xmax":(0,1),"ymin":(1,-1),"ymax":(1,1),"zmin":(2,-1),"zmax":(2,1)}
         if face not in faces:
             raise ValueError("face must be xmin/xmax/ymin/ymax/zmin/zmax")
@@ -102,6 +122,8 @@ class PointSet:
         return np.flatnonzero(mask.ravel())
 
     def select(self, mask):
+        """Return an owned flat PointSet selected by a matching boolean mask; preserve IDs.
+        """
         rows = self.rows(mask)
         normals = self.normals
         if normals is not None and normals.ndim == 2:
@@ -109,6 +131,8 @@ class PointSet:
         return PointSet(self.positions[rows],self.ids[rows],normals=normals,plane=self.plane)
 
     def reshape(self, values):
+        """Reshape arrays whose first axis matches the points into the stored layout.
+        """
         values = np.asarray(values)
         if values.ndim == 0 or values.shape[0] != len(self):
             raise ValueError("values must have one row per point")
@@ -117,6 +141,18 @@ class PointSet:
 
 @dataclass(frozen=True, eq=False)
 class RaySet:
+    """Associate identified origins with normalized rays and depth clipping.
+
+    Parameters
+    ----------
+    origins : PointSet
+        Identified ray origins and their output layout.
+    directions : array-like
+        Shared (3,) or per-ray (n, 3) finite nonzero directions; normalized on copy.
+    near, far : float or array-like
+        Nonnegative coordinate-distance limits broadcast to the origin layout.
+        near is finite; far is at least near and may be infinity.
+    """
     origins: PointSet
     directions: np.ndarray
     near: object = 0.
@@ -137,6 +173,8 @@ class RaySet:
 
     @classmethod
     def from_plane(cls, plane, direction, *, near=0., far=np.inf, ids=None, memory_limit=None):
+        """Construct identified parallel rays from a plane and coordinate-depth limits.
+        """
         if not isinstance(plane,Plane):
             raise TypeError("a Plane is required")
         admit(math.prod(plane.shape)*160+1024,memory_limit,"plane rays")
@@ -144,9 +182,12 @@ class RaySet:
 
     @property
     def nbytes(self):
+        """Accounted origin geometry, directions and clipping arrays in bytes."""
         return self.origins.nbytes+array_bytes((self.directions,self.near,self.far))
 
     def select(self, mask):
+        """Return selected ray geometry, preserving IDs and clipping distances.
+        """
         rows = self.origins.rows(mask)
         direction = self.directions if self.directions.ndim == 1 else self.directions[rows]
         result = RaySet(self.origins.select(mask),direction,self.near[rows],self.far[rows])
@@ -157,10 +198,25 @@ class RaySet:
 
 @dataclass(frozen=True, eq=False)
 class LineSet:
-    """Packed branches, each stored from seed to endpoint, with stable seed IDs.
+    """Packed identified trajectories with two branch slots per seed.
 
-    offsets has 2*n+1 entries. Branches 2*i and 2*i+1 are against and along B.
-    Arrays supplied by internal factories are independently owned.
+    Attributes
+    ----------
+    seeds : PointSet
+        Original identified seeds.
+    positions : ndarray
+        Packed float64 coordinates (total_points, 3).
+    offsets : ndarray
+        Branch offsets (2*n+1,); negative branch precedes positive branch.
+    termination : ndarray
+        Termination codes (n, 2), plus NOT_REQUESTED=-1 and TANGENT_SEED=-2.
+    source_identity : object
+        In-memory traced-field identity; not verified after file loading.
+
+    Notes
+    -----
+    Direct construction marks arrays read-only but does not remove external
+    writable aliases. Keep any such alias unchanged during use and saving.
     """
     NOT_REQUESTED: ClassVar[int] = -1
     TANGENT_SEED: ClassVar[int] = -2
@@ -187,9 +243,12 @@ class LineSet:
 
     @property
     def nbytes(self):
+        """Accounted seed geometry and packed path arrays in bytes."""
         return self.seeds.nbytes+array_bytes((self.positions,self.offsets,self.termination))
 
     def branch(self, seed_id, direction):
+        """Return the seed-to-endpoint coordinate view for seed_id and direction -1/+1.
+        """
         matches = np.flatnonzero(self.seeds.ids == seed_id)
         if len(matches) != 1 or direction not in (-1,1):
             raise ValueError("select an existing seed ID and direction -1 or 1")
@@ -197,5 +256,7 @@ class LineSet:
         return self.positions[self.offsets[index]:self.offsets[index+1]]
 
     def line(self, seed_id):
+        """Join against/along branches for display, omitting the duplicated seed.
+        """
         negative,positive = self.branch(seed_id,-1),self.branch(seed_id,1)
         return np.concatenate((negative[::-1],positive[1:] if len(negative) else positive))

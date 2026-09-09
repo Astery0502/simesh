@@ -2,7 +2,7 @@
 
 Energy is a density per volume, selected as total (internal + kinetic +
 magnetic) or internal. No file name, field label or metadata selects the EOS,
-energy definition, composition or normalization. See docs/application-guide.md.
+energy definition, composition or normalization.
 """
 
 from dataclasses import dataclass
@@ -229,31 +229,51 @@ def mhd_fields(conserved, *, model, magnetic=None, density="rho",
                invalid="raise", memory_limit=None):
     """Recover selected MHD quantities as independently owned Fields.
 
-    Input selectors accept names or component indices. ``magnetic=None`` selects
-    B from ``conserved``; a separate group must have the same Mesh and leaf set.
-    Slot order may differ. Output follows conserved selection order, retaining
-    the minimum valid halo and evaluating only that support. It neither fills
-    halos nor changes coverage. Prepared-node recovery precedes any sampling.
+    Parameters
+    ----------
+    conserved : Fields
+        Conserved variables on complete leaves; prepare first if outputs will be
+        interpolated.
+    model : IdealMHD
+        Explicit gamma, total/internal energy convention, fully ionized H/He composition and
+        SI scales.
+    magnetic : Fields, optional
+        Separate magnetic group sharing Mesh identity and leaf coverage; slot order may
+        differ. None selects B from conserved.
+    density : str or int
+        Density component.
+    momentum : sequence
+        Three classical momentum rho*v components.
+    energy : str or int
+        Energy component matching model.energy_kind.
+    magnetic_components : sequence
+        Three ordered magnetic components.
+    outputs : str or sequence of str
+        Groups: density, velocity (vx/vy/vz), speed, internal_energy, pressure,
+        temperature, beta, sound_speed, alfven_speed, sonic_mach, alfven_mach, status.
+        Diagnostics and dependencies are evaluated on demand; status requests all
+        diagnostics.
+    invalid : str
+        raise reports the first invalid physical state as MHDStateError; nan marks
+        invalid physical outputs. Neither applies positivity floors.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
 
-    ``outputs="velocity"`` gives exactly vx, vy, vz for trace(). Other output
-    keys are density, speed, internal_energy, pressure, temperature, beta,
-    sound_speed, alfven_speed, sonic_mach, alfven_mach, status. Every call checks
-    the complete physical state, even when requesting only velocity or status.
+    Returns
+    -------
+    Fields
+        Independent selected SI quantities and optional categorical status, in conserved
+        leaf order with common valid halo. preparation_stats records
+        evaluated_diagnostics and interior/all-node flag counts (not volumes); unchecked
+        diagnostic counts are None, not zero.
 
-    ``invalid="raise"`` fails on the first invalid state; ``"nan"`` marks all
-    its physical outputs NaN. No positivity floors are applied. Zero B is a
-    valid state with beta/Alfven Mach undefined (NaN); unrepresentable diagnostic
-    ratios/speeds are also NaN. Both conditions have nonfatal status bits.
-    Include status to compute and locate every diagnostic flag. Otherwise only
-    requested diagnostics and their speed dependencies are evaluated. Statistics
-    record evaluated_diagnostics; an unchecked diagnostic counter is None, not
-    zero. State flags are always counted over interiors and all evaluated nodes
-    separately. These are node counts, not volumes. Status fields are categorical
-    and must not be interpolated.
-
-    The memory admission includes input arrays, output, mapping, mesh and a
-    conservative fixed scratch allowance per supported block; no input arrays
-    or batch lease are retained by the result.
+    Notes
+    -----
+    - Every call checks the complete physical state, regardless of requested outputs.
+    - Zero B is valid but leaves beta/Alfven Mach undefined; these and unrepresentable
+      diagnostics are NaN with nonfatal flags.
+    - Recovery is pointwise on supplied nodes, before any sampling. Select continuous
+      outputs when interpolating; status columns are categorical.
     """
     if not isinstance(model, IdealMHD):
         raise TypeError("model must be an explicit IdealMHD configuration")

@@ -14,6 +14,8 @@ from ._execution import worker_context, run_ranges
 
 
 class Boundary(IntEnum):
+    """Localized endpoint surface identifiers, including local spheres and edges.
+    """
     NONE = 0
     ZMIN = 1
     ZMAX = 2
@@ -26,6 +28,8 @@ class Boundary(IntEnum):
 
 
 class ConnectivityTermination(IntEnum):
+    """Connectivity stop reasons, extending native tracing with local exit and step underflow.
+    """
     MAX_STEPS = Termination.MAX_STEPS
     MAX_LENGTH = Termination.MAX_LENGTH
     DOMAIN_EXIT = Termination.DOMAIN_EXIT
@@ -42,12 +46,29 @@ class ConnectivityTermination(IntEnum):
 
 @dataclass(frozen=True)
 class QSLResult:
-    """Owned per-seed results. Endpoint axis order is against/along B.
+    """Owned per-seed diagnostics with against/along endpoint order.
 
-    Q needs two localized, transverse target surfaces. Q_perp and twist may
-    describe a finite accepted segment when a step/length limit is reached;
-    inspect complete and the two termination codes before treating it as a
-    whole field line. With local_radius, Q describes the local sphere/box map.
+    Attributes
+    ----------
+    seeds : ndarray
+        Seed coordinates (n, 3).
+    q, log10_q, q_perp, log10_q_perp, twist : ndarray, optional
+        Per-seed diagnostics; unrequested quantities are None. Finite Q-perpendicular
+        or twist can describe an incomplete accepted segment; inspect complete and
+        both termination codes.
+    length, complete, valid, stencil_valid : ndarray
+        Coordinate length, whole-line completion, Q validity and stencil flags.
+    footpoints, endpoint_fields : ndarray
+        Localized positions and endpoint fields (n, 2, 3), against/along order.
+    boundary, termination, steps : ndarray
+        Per-branch surface IDs, stop reasons and accepted step counts (n, 2).
+    normalization, method, local_radius : object
+        Numerical definition of the requested map.
+
+    Notes
+    -----
+    Mapping Q requires two localized transverse target surfaces. With local_radius,
+    Q describes the local sphere/box map.
     """
 
     seeds: np.ndarray
@@ -71,6 +92,7 @@ class QSLResult:
 
     @property
     def q_local(self):
+        """Local mapping Q when local_radius was requested; otherwise None."""
         return self.q if self.local_radius is not None else None
 
 
@@ -361,7 +383,26 @@ def _quantities(quantities):
 
 
 def iter_line_diagnostics(fields, seeds, *, quantities=("q","twist"), **controls):
-    """Compute only requested diagnostics; twist-only skips Q transport/stencils."""
+    """Compute only requested diagnostics; twist-only skips Q transport/stencils.
+
+    Parameters
+    ----------
+    fields : Fields
+        Exactly three continuous vector components with common units and valid support.
+    seeds : array-like
+        Seed positions with shape (n, 3).
+    quantities : sequence of str
+        q, twist, or both; twist-only skips Q stencils/transport.
+    **controls : object
+        Controls from [qsl][simesh.qsl], except quantities selects diagnostics;
+        backend/schedule are not accepted.
+
+    Returns
+    -------
+    iterator of QSLResult
+        Owned requested diagnostics and per-branch endpoints/statuses; QSLResult defines
+        completion and validity.
+    """
     names = _quantities(quantities)
     if "twist" in controls or "compute_q" in controls:
         raise ValueError("use quantities to select diagnostics")
@@ -373,7 +414,60 @@ def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
              boundary_tolerance=None, local_radius=None, normalization="mapping",
              method="finite-difference", delta=None, twist=True, curl_field=None,
              workers=1, seed_batch=256, memory_limit=None):
-    """Yield QSL batches, with optional twist. Existing controls are unchanged."""
+    """Yield QSL batches, with optional twist. Existing controls are unchanged.
+
+    Parameters
+    ----------
+    fields : Fields
+        Exactly three continuous vector components with common units and valid support.
+    seeds : array-like
+        Seed positions with shape (n, 3).
+    bounds : array-like, optional
+        Lower and upper physical bounds; defaults to the original domain.
+    step_fraction : float
+        Positive local step fraction; its role depends on the selected integration method.
+    step : float, optional
+        Explicit positive coordinate step, constrained by the local step_fraction.
+    max_steps : int
+        Maximum accepted integration steps per branch.
+    max_length : float
+        Maximum integrated coordinate length per branch.
+    null_threshold : float
+        Vector norm at or below which tracing reports a null field.
+    boundary_tolerance : float, optional
+        Positive physical distance for endpoint localization; default is mesh/step
+        dependent.
+    local_radius : float, optional
+        Positive radius for local sphere/box mapping.
+    normalization : str
+        mapping uses mapped area; flux uses the magnetic-flux relation. These definitions
+        can differ.
+    method : str
+        finite-difference uses neighbor-seed footpoints; variational uses unit-vector
+        gradients and needs two halo layers.
+    delta : float, optional
+        Positive neighbor-seed perturbation distance, only for finite-difference Q.
+    twist : bool
+        Compute twist; automatic curl preparation requires two primary halo layers.
+    curl_field : Fields, optional
+        Matching raw curl result with valid interpolation support and derivation identity.
+    workers : int
+        Number of workers over disjoint ranges.
+    seed_batch : int
+        Maximum seeds in a computation/output batch; input fields remain resident.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    iterator of QSLResult
+        Owned requested diagnostics and per-branch endpoints/statuses; QSLResult defines
+        completion and validity.
+
+    Notes
+    -----
+    The variational method requires two primary halo layers. With automatic curl, twist also requires two; a supplied matching curl needs interpolation support.
+    """
     return _iter_diagnostics(fields,seeds,bounds=bounds,step_fraction=step_fraction,step=step,
         max_steps=max_steps,max_length=max_length,null_threshold=null_threshold,
         boundary_tolerance=boundary_tolerance,local_radius=local_radius,normalization=normalization,
@@ -386,7 +480,60 @@ def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
         boundary_tolerance=None, local_radius=None, normalization="mapping",
         method="finite-difference", delta=None, twist=True, curl_field=None,
         workers=1, seed_batch=256, memory_limit=None):
-    """Collect QSL batches; use iter_qsl for outputs too large to retain."""
+    """Collect QSL batches; use iter_qsl for outputs too large to retain.
+
+    Parameters
+    ----------
+    fields : Fields
+        Exactly three continuous vector components with common units and valid support.
+    seeds : array-like
+        Seed positions with shape (n, 3).
+    bounds : array-like, optional
+        Lower and upper physical bounds; defaults to the original domain.
+    step_fraction : float
+        Positive local step fraction; its role depends on the selected integration method.
+    step : float, optional
+        Explicit positive coordinate step, constrained by the local step_fraction.
+    max_steps : int
+        Maximum accepted integration steps per branch.
+    max_length : float
+        Maximum integrated coordinate length per branch.
+    null_threshold : float
+        Vector norm at or below which tracing reports a null field.
+    boundary_tolerance : float, optional
+        Positive physical distance for endpoint localization; default is mesh/step
+        dependent.
+    local_radius : float, optional
+        Positive radius for local sphere/box mapping.
+    normalization : str
+        mapping uses mapped area; flux uses the magnetic-flux relation. These definitions
+        can differ.
+    method : str
+        finite-difference uses neighbor-seed footpoints; variational uses unit-vector
+        gradients and needs two halo layers.
+    delta : float, optional
+        Positive neighbor-seed perturbation distance, only for finite-difference Q.
+    twist : bool
+        Compute twist; automatic curl preparation requires two primary halo layers.
+    curl_field : Fields, optional
+        Matching raw curl result with valid interpolation support and derivation identity.
+    workers : int
+        Number of workers over disjoint ranges.
+    seed_batch : int
+        Maximum seeds in a computation/output batch; input fields remain resident.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    QSLResult
+        Owned requested diagnostics and per-branch endpoints/statuses; QSLResult defines
+        completion and validity.
+
+    Notes
+    -----
+    The variational method requires two primary halo layers. With automatic curl, twist also requires two; a supplied matching curl needs interpolation support.
+    """
     if type(twist) is not bool:
         raise ValueError("twist must be boolean")
     return line_diagnostics(fields,seeds,quantities=("q","twist") if twist else ("q",),
@@ -400,8 +547,25 @@ def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
 def line_diagnostics(fields, seeds, *, quantities=("q","twist"), memory_limit=None, **controls):
     """Collect identified diagnostic arrays without retaining integration paths.
 
-    Q-related arrays are None for a twist-only request; valid then identifies
-    complete finite twist. With Q requested, valid retains the Q mapping meaning.
+    Parameters
+    ----------
+    fields : Fields
+        Exactly three continuous vector components with common units and valid support.
+    seeds : array-like
+        Seed positions with shape (n, 3).
+    quantities : sequence of str
+        q, twist, or both; twist-only skips Q stencils/transport.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    **controls : object
+        Controls from [qsl][simesh.qsl], except quantities selects diagnostics;
+        backend/schedule are not accepted.
+
+    Returns
+    -------
+    QSLResult
+        Owned requested diagnostics and per-branch endpoints/statuses; QSLResult defines
+        completion and validity.
     """
     names = _quantities(quantities)
     _require_support(fields,compute_q="q" in names,twist="twist" in names,

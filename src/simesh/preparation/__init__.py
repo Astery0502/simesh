@@ -33,10 +33,44 @@ def prepare(source, fields=None, *, region=None, leaf_ids=None, scheme,
             workers=1, memory_limit=None, support_capacity=128, backend="threadpool", plan=None):
     """Prepare detached two-halo fields over complete selected leaves.
 
-    Region support is read from the original mesh; its edge is not a physical
-    boundary. Field/leaf order is preserved. No product escapes a failed fill.
-    Coordinate-phase requires complete coverage and keeps physical storage in
-    SFC order; the leaf directory addresses other requested target orders.
+    Parameters
+    ----------
+    source : Source
+        Open immutable input; field selectors address its current directory.
+    fields : str or sequence, optional
+        Names or local Source indices of stored fields; integers must be supplied as a
+        sequence.
+    region : Selection or array-like, optional
+        Complete leaves intersecting a physical (2, 3) box, or an existing selection.
+    leaf_ids : sequence of int, optional
+        Ordered original leaf IDs; mutually exclusive with region.
+    scheme : str
+        coordinate-phase requires complete coverage; exact-phase supports regions. These
+        schemes have distinct numerical definitions.
+    workers : int
+        Worker count; exact-phase requires one worker.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    support_capacity : int
+        Preparation support capacity in leaves.
+    backend : str
+        threadpool or built openmp for coordinate-phase; exact-phase requires
+        threadpool.
+    plan : FillPlan, optional
+        Exact-phase plan owning selection; requires one threadpool worker and no region/leaf
+        selectors.
+
+    Returns
+    -------
+    Fields
+        Detached values with two valid halo layers; field/leaf order is preserved.
+        Coordinate-phase may use nonpacked slots: access interiors through Fields.window
+        when needed.
+
+    Notes
+    -----
+    Region support is read from the original Mesh; a region edge is not a physical
+    boundary.
     """
     if plan is not None:
         from .plans import FillPlan

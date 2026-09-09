@@ -11,11 +11,34 @@ from ..fields import FieldDefinition, publish, require_fields, _field_index, req
 def derivative(fields, terms, definitions, *, output=None, workers=1, memory_limit=None):
     """Sum ordered (component, axis, coefficient) terms for each output field.
 
-    Components accept indices or unique field names; axes accept 0/1/2 or
-    "x"/"y"/"z". A derivative consumes one valid layer. Invalid padding is
-    not differentiated. No physical current or unit conversion is inferred.
-    Optional output borrows matching native storage; failure may leave partial
-    writes. Keep its writable alias unchanged while consuming the returned Fields.
+    Parameters
+    ----------
+    fields : Fields
+        Continuous selected components with at least one valid halo.
+    terms : sequence
+        One ordered list of (component, axis, coefficient) terms per output. Components
+        accept names/indices; axes accept x/y/z or 0/1/2.
+    definitions : sequence of FieldDefinition
+        One definition per output. Physical current and unit conversion are not
+        inferred.
+    output : ndarray, optional
+        Writable contiguous float64 result backing, without input aliases. Failure may
+        leave partial writes; keep writable aliases unchanged while consuming returned
+        Fields.
+    workers : int
+        Number of workers over disjoint ranges.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    Fields
+        Independent or caller-backed centered derivatives with input.valid_halo - 1
+        valid layers.
+
+    Notes
+    -----
+    To interpolate the derivative afterward, prepare the original input with two valid halo layers.
     """
     from .._kernels.native import differentiate
     fields = require_fields(fields, halo=1)
@@ -76,6 +99,33 @@ def _curl_terms(components):
 
 
 def curl(fields, components=(0, 1, 2), *, output=None, workers=1, memory_limit=None):
+    """Compute the centered curl of three ordered vector components.
+
+    Parameters
+    ----------
+    fields : Fields
+        Continuous selected components with at least one valid halo.
+    components : sequence of int
+        Exactly three ordered local component indices with common unit labels.
+    output : ndarray, optional
+        Writable contiguous float64 result backing, without input aliases. Failure may
+        leave partial writes; keep writable aliases unchanged while consuming returned
+        Fields.
+    workers : int
+        Number of workers over disjoint ranges.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    Fields
+        Three curl components in field units per coordinate length, with one fewer valid
+        halo. Derivation identity allows use as a matching twist companion.
+
+    Notes
+    -----
+    To interpolate the derivative afterward, prepare the original input with two valid halo layers.
+    """
     fields = require_fields(fields, halo=1)
     components = indices(components, len(fields.fields), "components")
     if len(components) != 3:

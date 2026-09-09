@@ -11,10 +11,28 @@ from .metadata import SnapshotMetadata
 
 
 class Source:
-    """An owned source lifetime, a mesh and a stable directory of stored fields.
+    """Immutable input lifetime and stable stored-field directory.
 
-    Advanced adapters supply a checked block reader. No numerical preparation
-    method, support workspace or cache is attached to the source.
+    Use open_amrvac, source_from_arrays or source_from_dataset.
+
+    Reading is separate from numerical preparation; caching is opt-in.
+
+    Attributes
+    ----------
+    mesh : Mesh
+        Shared original geometry.
+    fields : tuple of FieldDefinition
+        Available stored components; integer selectors are local to this directory.
+    identity : object
+        In-memory source association, not a file hash.
+    io_stats : dict
+        Adapter-specific read/cache observations.
+
+    Notes
+    -----
+    - Use with/close; detached metadata and owned Fields survive closure.
+    - Borrowed adapters must close before their parent. Parent closure or detected
+      input changes invalidate reads, including cache hits.
     """
 
     def __init__(self, mesh, definitions, reader, *, validate=None, close=None,
@@ -50,15 +68,20 @@ class Source:
 
     @property
     def nbytes(self):
+        """Accounted input backing and metadata arrays, excluding the shared Mesh."""
         return array_bytes(self._memory_arrays)
 
     def validate(self):
+        """Reject a closed Source or a change detected by its input adapter.
+        """
         if self._closed:
             raise OSError("source is closed")
         if self._validate is not None:
             self._validate()
 
     def close(self):
+        """Release input resources; detached metadata and completed owned fields survive.
+        """
         if not self._closed:
             self._closed = True
             try:
@@ -86,6 +109,8 @@ class Source:
         self.close()
 
     def field_ids(self, fields=None):
+        """Resolve a name or sequence of names/local integers to stored component IDs.
+        """
         if fields is None:
             return np.arange(len(self.fields), dtype=np.int64)
         selected = (fields,) if isinstance(fields, str) else tuple(fields)
@@ -97,7 +122,10 @@ class Source:
         return indices(selected, len(self.fields), "fields")
 
     def read_into(self, leaf_ids, field_ids, output):
-        """Read ordered native interiors into field-major caller storage."""
+        """Read ordered interiors into writable (leaf, component, x, y, z) float64 storage.
+
+        Failure may leave partial writes; this method does not prepare halos.
+        """
         self.validate()
         ids = indices(leaf_ids, self.mesh.leaf_count)
         fields = indices(field_ids, len(self.fields), "field_ids")
@@ -111,11 +139,10 @@ class Source:
         self.validate()
 
     def read_native_into(self, leaf_ids, field_ids, output, *, storage_halo=0):
-        """Read into final component-last storage; failure may leave partial writes.
+        """Read interiors into component-last float64 caller storage.
 
-        Built-in sources transfer directly. Advanced field-major-only readers
-        use one bounded leaf buffer, never a second full-domain array.
-        Allocated padding remains invalid and is not filled by this operation.
+        Allocated padding remains invalid. Output must not alias input; failure may
+        leave partial writes.
         """
         self.validate()
         ids = indices(leaf_ids, self.mesh.leaf_count)
@@ -164,10 +191,27 @@ def definitions_from_names(names, units=None):
 def source_from_arrays(mesh, values, fields, *, units=None, copy=True, memory_limit=None, metadata=None):
     """Create a source from native float64 (leaf, component, x, y, z) data.
 
-    With ``copy=False``, callers must keep the backing unchanged until close.
-    Detached prepared products do not borrow that input backing.
-    Optional metadata is a caller-supplied description, not verification that
-    these arrays equal a file's values. No snapshot metadata is inferred.
+    Parameters
+    ----------
+    mesh : Mesh
+        Validated nonperiodic Cartesian 3D mesh.
+    values : ndarray
+        C-contiguous float64 array in (leaf, component, x, y, z) order.
+    fields : sequence
+        Field names or FieldDefinition objects.
+    units : str or mapping, optional
+        Labels only; no numerical conversion. Omit with explicit FieldDefinition objects.
+    copy : bool
+        Own a copy, or borrow backing that the caller keeps unchanged until close.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    metadata : SnapshotMetadata, optional
+        Detached description; does not verify the supplied array values.
+
+    Returns
+    -------
+    Source
+        Array-backed immutable input with the supplied Mesh and optional detached metadata.
     """
     definitions = tuple(fields)
     if all(isinstance(f, str) for f in definitions):
@@ -191,7 +235,28 @@ def source_from_arrays(mesh, values, fields, *, units=None, copy=True, memory_li
 
 
 def read_fields(source, fields=None, *, region=None, leaf_ids=None, memory_limit=None):
-    """Publish detached interior fields without constructing halo workspaces."""
+    """Publish detached interior fields without constructing halo workspaces.
+
+    Parameters
+    ----------
+    source : Source
+        Open immutable input; field selectors address its current directory.
+    fields : str or sequence, optional
+        Names or local Source indices of stored fields; integers must be supplied as a
+        sequence.
+    region : Selection or array-like, optional
+        Complete leaves intersecting a physical (2, 3) box, or an existing selection.
+    leaf_ids : sequence of int, optional
+        Ordered original leaf IDs; mutually exclusive with region.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    Fields
+        Detached component-last interiors with zero valid halo. Use prepare before
+        interpolation or derivatives.
+    """
     selection = resolve_selection(source.mesh, region, leaf_ids)
     field_ids = source.field_ids(fields)
     count = len(selection.leaf_ids)
@@ -212,8 +277,19 @@ def read_fields(source, fields=None, *, region=None, leaf_ids=None, memory_limit
 def select_source(source, fields):
     """Borrow an ordered Source subset without copying values.
 
-    Close before the parent. Parent close/mutation invalidates all reads and
-    cache hits. Local component indices map to stable original value identities.
+    Parameters
+    ----------
+    source : Source
+        Open immutable input; field selectors address its current directory.
+    fields : str or sequence, optional
+        Names or local Source indices of stored fields; integers must be supplied as a
+        sequence.
+
+    Returns
+    -------
+    Source
+        Borrowed ordered directory adapter without a value copy; Source lifetime rules
+        apply. Local indices retain their original value association.
     """
     source.validate()
     chosen = source.field_ids(fields)

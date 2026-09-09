@@ -49,11 +49,28 @@ def _seed_ids(result):
 def save_result_shards(path, batches, *, seed_ids, metadata=None, source=None):
     """Consume ordered seed batches, publishing each independently and atomically.
 
-    The new directory must not exist. A failed stream leaves a manifest marked
-    incomplete and its committed shards available for inspection. Version 2
-    stores seed IDs once and publishes one atomic index per shard.
-    Delivery completeness means every requested seed was saved, not successful
-    physical termination: per-seed scientific statuses are always preserved.
+    Parameters
+    ----------
+    path : str or Path
+        New shard directory, which must not exist; its parent must exist.
+    batches : iterable of LineSet or LineProfiles
+        Nonempty batches of one result type, in exact requested ID order.
+    seed_ids : ndarray
+        Unique int64 requested IDs in delivery order.
+    metadata : dict, optional
+        Caller-supplied physical/numerical choices using finite JSON values.
+    source : dict, optional
+        Caller-provided unverified source description.
+
+    Returns
+    -------
+    ResultShards
+        Completed version-2 delivery. ResultShards.complete concerns seed delivery, not
+        scientific termination.
+
+    Notes
+    -----
+    An interrupted stream leaves committed shards inspectable; it does not provide integration checkpoint/resume.
     """
     ids = np.asarray(seed_ids)
     if ids.ndim != 1 or ids.dtype != np.int64 or len(np.unique(ids)) != len(ids):
@@ -94,6 +111,15 @@ def save_result_shards(path, batches, *, seed_ids, metadata=None, source=None):
 
 @dataclass(frozen=True)
 class ResultShards:
+    """Incremental delivery index; load one verified shard at a time.
+
+    Attributes
+    ----------
+    path : Path
+        Shard directory.
+    manifest : dict
+        Version-specific metadata; prefer stable seed_ids/complete accessors.
+    """
     path: Path
     manifest: dict
     _ids: np.ndarray | None = None
@@ -107,9 +133,12 @@ class ResultShards:
 
     @property
     def complete(self):
+        """Whether every requested seed was delivered, independent of scientific termination.
+        """
         return self.manifest['complete']
 
     def __len__(self):
+        """Number of committed shards, not number of requested seeds."""
         return len(self.manifest['shards'])
 
     def load(self, index):
@@ -139,8 +168,16 @@ def _valid_digest(value):
 def open_result_shards(path):
     """Read v1/v2 deliveries, recovering committed indices of incomplete v2 runs.
 
-    Each v2 index is published after its NPZ shard. Temporary files and orphaned
-    NPZ files have no committed index and are not presented as delivered shards.
+    Parameters
+    ----------
+    path : str or Path
+        Existing shard directory.
+
+    Returns
+    -------
+    ResultShards
+        Version-1/2 delivery metadata and on-demand verified loading; orphaned or
+        temporary payloads are excluded from committed shards.
     """
     path = Path(path)
     try:

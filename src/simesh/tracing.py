@@ -11,6 +11,8 @@ from ._execution import worker_context, run_ranges, native_dispatch
 
 
 class Termination(IntEnum):
+    """Native trace stop reasons. MAX_STEPS/MAX_LENGTH describe accepted prefixes; DOMAIN_EXIT is a different outcome.
+    """
     RUNNING = 0
     MAX_STEPS = 1
     MAX_LENGTH = 2
@@ -26,6 +28,25 @@ class Termination(IntEnum):
 
 @dataclass(frozen=True)
 class TraceResult:
+    """Owned raw accepted-prefix tracing result; not a localized footpoint product.
+
+    Attributes
+    ----------
+    seed_ids, seeds : ndarray
+        Input IDs and (n, 3) seed positions.
+    positions, length, steps : ndarray
+        Final accepted positions, coordinate lengths and step counts.
+    termination : ndarray
+        Per-seed Termination codes; limits differ from physical exit.
+    samples, misses : ndarray
+        Sampling and missing-coverage counts.
+    localized_endpoint : bool
+        False for this accepted-prefix tracer.
+    trajectories : ndarray, optional
+        Dense paths; point_counts gives accepted prefixes.
+    twist : ndarray, optional
+        May describe an incomplete prefix; inspect termination.
+    """
     seed_ids: np.ndarray
     seeds: np.ndarray
     positions: np.ndarray
@@ -40,6 +61,7 @@ class TraceResult:
 
     @property
     def point_counts(self):
+        """Accepted trajectory prefix sizes; outside seeds have zero stored points."""
         return np.where(self.termination == Termination.OUTSIDE_SEED, 0, self.steps+1)
 
 
@@ -211,8 +233,46 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_lengt
                 backend="threadpool", schedule="static"):
     """Yield owned results; diagnostic integration uses accepted RK segments.
 
-    No implicit source access occurs. A supplied curl group is checked against
-    the actual primary value group without retaining that group in the result.
+    Parameters
+    ----------
+    fields : Fields
+        Exactly three continuous vector components with common units and one valid halo.
+    seeds : array-like
+        Seed positions with shape (n, 3).
+    seed_ids : array-like, optional
+        Unique seed IDs in input order.
+    step : float
+        Positive integration step in coordinate-length units.
+    max_steps : int
+        Maximum accepted integration steps per branch.
+    max_length : float
+        Maximum integrated coordinate length per branch.
+    null_threshold : float
+        Vector norm at or below which tracing reports a null field.
+    direction : int
+        Trace along (+1) or against (-1) the vector field.
+    workers : int
+        Number of workers over disjoint ranges.
+    seed_batch : int
+        Maximum seeds in a computation/output batch; input fields remain resident.
+    trajectories : bool
+        Retain dense accepted path prefixes; allocated capacity grows with max_steps.
+    twist : bool
+        Compute twist; automatic curl preparation requires two primary halo layers.
+    curl_field : Fields, optional
+        Matching raw curl result with valid interpolation support and derivation identity.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    backend : str
+        Execution backend: threadpool or explicitly built openmp.
+    schedule : str
+        Native scheduling policy: static or dynamic.
+
+    Returns
+    -------
+    iterator of TraceResult
+        Owned accepted-prefix results; inspect TraceResult.termination. Optional
+        trajectories use dense storage.
     """
     _validate_vector(fields)
     seeds, seed_ids = _validate_inputs(seeds,seed_ids,step,max_steps,max_length,
@@ -273,7 +333,49 @@ def trace(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_length=np.i
           null_threshold=0., direction=1, workers=1, seed_batch=256,
           trajectories=False, twist=False, curl_field=None, memory_limit=None,
           backend="threadpool", schedule="static"):
-    """Collect an admitted complete result without a full concatenation copy."""
+    """Collect an admitted complete result without a full concatenation copy.
+
+    Parameters
+    ----------
+    fields : Fields
+        Exactly three continuous vector components with common units and one valid halo.
+    seeds : array-like
+        Seed positions with shape (n, 3).
+    seed_ids : array-like, optional
+        Unique seed IDs in input order.
+    step : float
+        Positive integration step in coordinate-length units.
+    max_steps : int
+        Maximum accepted integration steps per branch.
+    max_length : float
+        Maximum integrated coordinate length per branch.
+    null_threshold : float
+        Vector norm at or below which tracing reports a null field.
+    direction : int
+        Trace along (+1) or against (-1) the vector field.
+    workers : int
+        Number of workers over disjoint ranges.
+    seed_batch : int
+        Maximum seeds in a computation/output batch; input fields remain resident.
+    trajectories : bool
+        Retain dense accepted path prefixes; allocated capacity grows with max_steps.
+    twist : bool
+        Compute twist; automatic curl preparation requires two primary halo layers.
+    curl_field : Fields, optional
+        Matching raw curl result with valid interpolation support and derivation identity.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    backend : str
+        Execution backend: threadpool or explicitly built openmp.
+    schedule : str
+        Native scheduling policy: static or dynamic.
+
+    Returns
+    -------
+    TraceResult
+        Owned accepted-prefix results; inspect TraceResult.termination. Optional
+        trajectories use dense storage.
+    """
     _validate_vector(fields)
     if twist and curl_field is None and max_steps>0 and max_length>0:
         require_fields(fields,halo=2,operation="twist with automatic curl")
@@ -306,7 +408,24 @@ def _retrace_inputs(result, selected_seed_ids, memory_limit):
 
 
 def retrace(fields, result, selected_seed_ids, **kwargs):
-    """Explicitly trace selected original seed IDs again, retaining trajectories."""
+    """Explicitly trace selected original seed IDs again, retaining trajectories.
+
+    Parameters
+    ----------
+    fields : Fields
+        Completed input fields; see the operation-specific support requirement.
+    result : TraceResult
+        Previous raw trace supplying seed positions and IDs.
+    selected_seed_ids : sequence of int
+        Existing seed IDs to integrate again.
+    **kwargs : object
+        Controls forwarded to simesh.trace, including required step.
+
+    Returns
+    -------
+    TraceResult
+        New integration from selected original seeds; not a checkpoint resume.
+    """
     _validate_vector(fields)
     if (kwargs.get("twist",False) and kwargs.get("curl_field") is None and
             kwargs.get("max_steps",1000)>0 and kwargs.get("max_length",np.inf)>0):

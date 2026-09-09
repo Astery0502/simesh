@@ -25,9 +25,11 @@ class PotentialFieldGeometry:
 
     @property
     def spacing(self) -> tuple[float, float, float]:
+        """Uniform cell spacing (dx, dy, dz)."""
         return (self.dx, self.dy, self.dz)
 
     def cell_center_coordinates(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return the three one-dimensional physical cell-center coordinate arrays."""
         nx, ny, nz = self.domain_nx
         x = self.xmin[0] + (np.arange(nx, dtype=np.float64) + 0.5) * self.dx
         y = self.xmin[1] + (np.arange(ny, dtype=np.float64) + 0.5) * self.dy

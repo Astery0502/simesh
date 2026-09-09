@@ -75,6 +75,11 @@ class PreparedPool:
 
     @contextmanager
     def borrow(self, leaf_ids, *, touch=True):
+        """Lease fields on requested leaves; views expire on context exit.
+
+        The Source must remain open. Requests must fit capacity and nested leases are
+        rejected. touch controls LRU aging; no eviction occurs while the lease is active.
+        """
         if self._closed:
             raise RuntimeError("pool is closed")
         if self._active:
@@ -97,11 +102,13 @@ class PreparedPool:
 
     @property
     def resident_leaf_ids(self):
+        """Copy the currently resident original leaf IDs."""
         if self._closed:
             raise RuntimeError("pool is closed")
         return self._leaves[self._leaves>=0].copy()
 
     def clear(self):
+        """Discard resident prepared values; unavailable during an active lease."""
         if self._closed or self._active:
             raise RuntimeError("cannot clear a closed or borrowed pool")
         self._directory.fill(-1)
@@ -109,6 +116,7 @@ class PreparedPool:
         self._age.fill(0)
 
     def close(self):
+        """Release pool arrays without closing the borrowed Source; active leases must finish first."""
         if self._active:
             raise RuntimeError("cannot close a borrowed pool")
         self._closed = True
@@ -146,6 +154,7 @@ class CurlPool:
 
     @contextmanager
     def borrow(self, ids, *, touch=True):
+        """Lease matching primary/curl fields for requested leaves through the shared primary lease."""
         if self._values is None:
             raise RuntimeError("curl pool is closed")
         from .operators.derivatives import curl
@@ -171,11 +180,13 @@ class CurlPool:
             yield primary,companion
 
     def close(self):
+        """Release curl arrays without closing the primary pool."""
         if self.primary._active:
             raise RuntimeError("cannot close a borrowed curl pool")
         self._values = self._keys = None
 
     def clear(self):
+        """Invalidate cached curl values and clear the primary pool."""
         if self._values is None:
             raise RuntimeError("curl pool is closed")
         self.primary.clear()

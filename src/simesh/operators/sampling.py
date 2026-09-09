@@ -30,9 +30,27 @@ def _sample(fields, points, workers, executor, field_positions, output=None):
 def sample(fields, points, *, components=None, output=None, workers=1, memory_limit=None):
     """Return selected (values, original owners, validity); missing values are NaN.
 
-    Components accept names or local indices in output order. Optional output
-    borrows (float64 values, int64 owners, bool valid); failure may leave partial
-    writes. Targets must not alias inputs and may use disjoint positive strides.
+    Parameters
+    ----------
+    fields : Fields
+        Continuous selected components with at least one valid halo.
+    points : array-like
+        Physical coordinates with shape (n, 3).
+    components : str or int or sequence, optional
+        Names or local component indices, in output order.
+    output : tuple of ndarray, optional
+        Writable contiguous (float64 values, int64 owners, bool valid) arrays matching
+        the return shapes; no input aliases. Failure may leave partial writes.
+    workers : int
+        Number of workers over disjoint ranges.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    tuple of ndarray
+        Values (n, k), owner IDs (n,), and coverage mask (n,). Coverage alone does not
+        establish finite values.
     """
     selected = np.asarray(require_continuous(fields, components, operation="sample"),dtype=np.int64)
     points = np.ascontiguousarray(points, dtype=float)

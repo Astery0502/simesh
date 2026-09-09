@@ -32,6 +32,21 @@ def _points(points):
 
 @dataclass(frozen=True)
 class SampledPoints:
+    """Sampled values associated with identified geometry.
+
+    Attributes
+    ----------
+    points : PointSet
+        Original sampling geometry and IDs.
+    values : ndarray
+        Values (n, k); definitions supplies component meanings.
+    owners, valid : ndarray
+        Original owner IDs and coverage mask (n,).
+    definitions : tuple of FieldDefinition
+        Selected component definitions.
+    source_identity : object
+        In-memory value token, not snapshot verification.
+    """
     points: PointSet
     values: np.ndarray
     owners: np.ndarray
@@ -46,32 +61,55 @@ class SampledPoints:
 
     @property
     def image(self):
+        """Return values in the original point/image layout; no invalid values are filled.
+        """
         return self.points.reshape(self.values)
 
     def select(self, mask):
+        """Return selected geometry preserving original IDs, rather than a filtered result object.
+        """
         return self.points.select(mask)
 
 
 @dataclass(frozen=True)
 class ConnectivityMap:
+    """Identified connectivity diagnostics with validity-aware selection.
+
+    Attributes
+    ----------
+    points : PointSet
+        Diagnostic seeds and image layout.
+    data : QSLResult
+        Raw Q/twist, endpoint and termination data.
+    source_identity : object
+        In-memory value association.
+    """
     points: PointSet
     data: QSLResult
     source_identity: object
 
     @property
     def quantities(self):
+        """Names of diagnostics actually present in the result.
+        """
         return tuple(name for name in ("q","twist") if getattr(self.data,name) is not None)
 
     @property
     def q_valid(self):
+        """Q validity mask; all false when Q was not requested.
+        """
         return self.data.valid if self.data.q is not None else np.zeros(len(self.points),dtype=bool)
 
     @property
     def twist_valid(self):
+        """Complete-line and finite-twist mask; all false when twist was not requested.
+        """
         return (self.data.complete & np.isfinite(self.data.twist) if self.data.twist is not None
                 else np.zeros(len(self.points),dtype=bool))
 
     def image(self, name):
+        """Return values in the original point/image layout; no invalid values are filled.
+        """
         if name in ("q_valid","twist_valid"):
             return self.points.reshape(getattr(self,name))
         if name not in ("q","log10_q","q_perp","log10_q_perp","twist","length","valid","complete"):
@@ -82,6 +120,8 @@ class ConnectivityMap:
         return self.points.reshape(values)
 
     def select(self, mask):
+        """Return selected geometry preserving original IDs, rather than a filtered result object.
+        """
         return self.points.select(mask)
 
     def threshold(self, *, q_min=None, abs_twist_min=None, mode="any"):
@@ -106,6 +146,23 @@ class ConnectivityMap:
 
 @dataclass(frozen=True)
 class RayResult:
+    """Identified scalar or thermal ray integrals.
+
+    Attributes
+    ----------
+    rays : RaySet
+        Origin IDs, directions and requested clipping.
+    values, entry, exit : ndarray
+        Per-ray integral and clipped coordinate depths.
+    status, samples, misses : ndarray
+        LOSStatus and diagnostic counts per ray.
+    units, quadrature : str
+        Physical output unit and selected quadrature/reconstruction.
+    metadata : dict
+        Recorded model and physical choices.
+    source_identity : object
+        In-memory value association.
+    """
     rays: RaySet
     values: np.ndarray
     entry: np.ndarray
@@ -120,22 +177,53 @@ class RayResult:
 
     @property
     def valid(self):
+        """Rays with COMPLETE or EMPTY status.
+        """
         return np.isin(self.status,(LOSStatus.COMPLETE,LOSStatus.EMPTY))
 
     @property
     def complete(self):
+        """Whether every ray has a valid COMPLETE or EMPTY status.
+        """
         return bool(self.valid.all())
 
     @property
     def image(self):
+        """Return values in the original point/image layout; no invalid values are filled.
+        """
         return self.rays.origins.reshape(self.values)
 
     def select(self, mask):
+        """Return selected geometry preserving original IDs, rather than a filtered result object.
+        """
         return self.rays.select(mask)
 
 
 def sample(fields, points, *, components=None, output=None, workers=1, memory_limit=None):
-    """Sample physical points and retain their IDs and image layout."""
+    """Sample physical points and retain their IDs and image layout.
+
+    Parameters
+    ----------
+    fields : Fields
+        Continuous selected components with at least one valid halo.
+    points : PointSet
+        Owned finite positions and stable IDs, optionally with a plane/image layout.
+    components : str or int or sequence, optional
+        Names or local component indices, in output order.
+    output : tuple of ndarray, optional
+        Writable contiguous values (n, k), owners (n,) and valid (n,) arrays; no input
+        aliases. Failure may leave partial writes.
+    workers : int
+        Number of workers over disjoint ranges.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    SampledPoints
+        Flat sampled arrays with original geometry, definitions and coverage; image
+        restores the layout and usable also checks finiteness.
+    """
     _points(points)
     selected = require_continuous(fields,components)
     values,owners,valid = sample_values(fields,points.positions,components=selected,output=output,workers=workers,
@@ -153,7 +241,27 @@ def _diagnostic_support(fields, quantities, controls):
 
 
 def connectivity(fields, points, *, quantities=None, memory_limit=None, **controls):
-    """Compute diagnostics without retaining paths; select and trace afterward."""
+    """Compute diagnostics without retaining paths; select and trace afterward.
+
+    Parameters
+    ----------
+    fields : Fields
+        Three-component vector field meeting the [qsl][simesh.qsl] support requirements.
+    points : PointSet
+        Owned finite positions and stable IDs, optionally with a plane/image layout.
+    quantities : sequence of str, optional
+        q, twist, or both. None uses qsl defaults, including Q and default twist.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    **controls : object
+        Forwarded [qsl][simesh.qsl] controls; backend/schedule are not accepted.
+
+    Returns
+    -------
+    ConnectivityMap
+        Identified diagnostics with validity-aware selection; full trajectories are not
+        retained.
+    """
     quantities=_diagnostic_support(fields,quantities,controls)
     _points(points)
     limit = remaining(memory_limit,points.nbytes)
@@ -163,7 +271,29 @@ def connectivity(fields, points, *, quantities=None, memory_limit=None, **contro
 
 
 def iter_connectivity(fields, points, *, quantities=None, seed_batch=256, memory_limit=None, **controls):
-    """Yield owned maps whose point IDs remain global across batches."""
+    """Yield owned maps whose point IDs remain global across batches.
+
+    Parameters
+    ----------
+    fields : Fields
+        Three-component vector field meeting the [qsl][simesh.qsl] support requirements.
+    points : PointSet
+        Owned finite positions and stable IDs, optionally with a plane/image layout.
+    quantities : sequence of str, optional
+        q, twist, or both. None uses qsl defaults, including Q and default twist.
+    seed_batch : int
+        Maximum seeds in a computation/output batch; input fields remain resident.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    **controls : object
+        Forwarded [qsl][simesh.qsl] controls; backend/schedule are not accepted.
+
+    Returns
+    -------
+    iterator of ConnectivityMap
+        Identified diagnostics with validity-aware selection; full trajectories are not
+        retained. Batches own their results, while input fields remain resident.
+    """
     quantities=_diagnostic_support(fields,quantities,controls)
     _points(points)
     reserved = points.nbytes+min(seed_batch,len(points))*64 if type(seed_batch) is int and seed_batch>0 else points.nbytes
@@ -193,13 +323,56 @@ def _surface(fields, surface, memory_limit):
 
 
 def field_map(fields, surface, *, components=None, output=None, workers=1, memory_limit=None):
-    """Sample a field or precomputed diagnostic on a Plane or PointSet."""
+    """Sample a field or precomputed diagnostic on a Plane or PointSet.
+
+    Parameters
+    ----------
+    fields : Fields
+        Continuous selected components with at least one valid halo.
+    surface : Plane or PointSet
+        Pixel-center plane or identified sampling positions.
+    components : str or int or sequence, optional
+        Names or local component indices, in output order.
+    output : tuple of ndarray, optional
+        Writable contiguous values (n, k), owners (n,) and valid (n,) arrays; no input
+        aliases. Failure may leave partial writes.
+    workers : int
+        Number of workers over disjoint ranges.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    SampledPoints
+        Flat sampled arrays with original geometry, definitions and coverage; image
+        restores the layout and usable also checks finiteness.
+    """
     selected=require_continuous(fields,components,operation="field_map")
     return sample(fields,_surface(fields,surface,memory_limit),components=selected,output=output,workers=workers,memory_limit=memory_limit)
 
 
 def surface_diagnostics(fields, surface, *, quantities=("q","twist"), memory_limit=None, **controls):
-    """Compute selected Q/twist products on an arbitrary sampling surface."""
+    """Compute selected Q/twist products on an arbitrary sampling surface.
+
+    Parameters
+    ----------
+    fields : Fields
+        Three-component vector field meeting the [qsl][simesh.qsl] support requirements.
+    surface : Plane or PointSet
+        Surface positions at which to start diagnostics.
+    quantities : sequence of str, optional
+        q, twist, or both. None uses qsl defaults, including Q and default twist.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    **controls : object
+        Forwarded [qsl][simesh.qsl] controls; backend/schedule are not accepted.
+
+    Returns
+    -------
+    ConnectivityMap
+        Identified diagnostics with validity-aware selection; full trajectories are not
+        retained.
+    """
     names=_diagnostic_support(fields,quantities,controls)
     return connectivity(fields,_surface(fields,surface,memory_limit),quantities=names,
                         memory_limit=memory_limit,**controls)
@@ -207,7 +380,29 @@ def surface_diagnostics(fields, surface, *, quantities=("q","twist"), memory_lim
 
 def bottom_diagnostics(fields, shape=(128,128), *, quantities=("q","twist"), ids=None,
                        memory_limit=None, **controls):
-    """Compute diagnostics on the physical z-min face with pixel-center seeds."""
+    """Compute diagnostics on the physical z-min face with pixel-center seeds.
+
+    Parameters
+    ----------
+    fields : Fields
+        Three-component vector field meeting the [qsl][simesh.qsl] support requirements.
+    shape : tuple of int
+        Pixel counts on the physical z-min face.
+    quantities : sequence of str, optional
+        q, twist, or both. None uses qsl defaults, including Q and default twist.
+    ids : array-like, optional
+        Unique IDs for the generated boundary seeds.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    **controls : object
+        Forwarded [qsl][simesh.qsl] controls; backend/schedule are not accepted.
+
+    Returns
+    -------
+    ConnectivityMap
+        Identified diagnostics with validity-aware selection; full trajectories are not
+        retained.
+    """
     names=_diagnostic_support(fields,quantities,controls)
     points = PointSet.boundary(fields.mesh,"zmin",shape,ids=ids,
                               memory_limit=remaining(memory_limit,fields.mesh.nbytes+fields.nbytes))
@@ -216,6 +411,21 @@ def bottom_diagnostics(fields, shape=(128,128), *, quantities=("q","twist"), ids
 
 @dataclass(frozen=True)
 class UniformResult:
+    """Collected cell-center uniform volume with coverage.
+
+    Attributes
+    ----------
+    values : ndarray
+        Float64 values (nx, ny, nz, component).
+    valid : ndarray
+        Coverage mask (nx, ny, nz).
+    lower, upper : ndarray
+        Physical sampling bounds.
+    definitions : tuple of FieldDefinition
+        Output components and units.
+    source_identity : object
+        In-memory value association.
+    """
     values: np.ndarray
     valid: np.ndarray
     lower: np.ndarray
@@ -230,10 +440,14 @@ class UniformResult:
 
     @property
     def spacing(self):
+        """Physical uniform-cell spacing along x, y and z.
+        """
         return (self.upper-self.lower)/np.asarray(self.valid.shape)
 
     @property
     def axes(self):
+        """Cell-center coordinate arrays along x, y and z.
+        """
         return tuple(lo+(np.arange(count)+.5)*step
                      for lo,count,step in zip(self.lower,self.valid.shape,self.spacing))
 
@@ -242,8 +456,31 @@ def uniform_grid(fields, resolution, *, components=None, output=None, bounds=Non
                  workers=1, tile_rows=64, memory_limit=None):
     """Write a sampled volume directly to final arrays, optionally caller-owned.
 
-    output=(values, valid) must match the contiguous volume layout. Failure may
-    leave partial writes; only a successful return publishes a UniformResult.
+    Parameters
+    ----------
+    fields : Fields
+        Continuous selected components with at least one valid halo.
+    resolution : sequence of int
+        Positive uniform-grid cell counts (nx, ny, nz).
+    components : str or int or sequence, optional
+        Names or local component indices, in output order.
+    output : tuple of ndarray, optional
+        Writable contiguous float64 values (nx, ny, nz, k) and bool valid (nx, ny, nz);
+        no input aliases. Failure may leave partial writes.
+    bounds : array-like, optional
+        Lower and upper physical bounds; defaults to the original domain.
+    workers : int
+        Number of workers over disjoint ranges.
+    tile_rows : int
+        Maximum rows sampled per tile; collected output still occupies memory.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    UniformResult
+        Complete cell-center volume with component definitions and coverage, even when
+        computation is tiled.
     """
     from .operators.sampling import _sample
     from ._execution import worker_context
@@ -291,11 +528,43 @@ def trace(fields, points, *, direction="both", step, max_steps=1000, max_length=
           seed_batch=128, memory_limit=None):
     """Trace selected points into compact branches, preserving IDs.
 
-    Direction is both/along/against/inward. Inward is defined only on a single
-    physical box face per seed. Status -1 denotes an unrequested branch; -2 a
-    tangent seed for which inward is undefined. Other statuses are Termination.
-    Upper-face seeds enter via the nearest interior representable coordinate;
-    displayed initial points keep the caller's exact boundary positions.
+    Parameters
+    ----------
+    fields : Fields
+        Exactly three ordered continuous vector components with common units and one valid halo.
+    points : PointSet
+        Owned finite positions and stable IDs, optionally with a plane/image layout.
+    direction : str
+        both, along, against or inward; inward needs seeds on exactly one physical domain
+        face.
+    step : float
+        Positive integration step in coordinate-length units.
+    max_steps : int
+        Maximum accepted integration steps per branch.
+    max_length : float
+        Maximum integrated coordinate length per branch.
+    null_threshold : float
+        Vector norm at or below which tracing reports a null field.
+    workers : int
+        Number of workers over disjoint ranges.
+    backend : str
+        Execution backend: threadpool or explicitly built openmp.
+    schedule : str
+        Native scheduling policy: static or dynamic.
+    seed_batch : int
+        Maximum seeds in a computation/output batch; input fields remain resident.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    LineSet
+        Compact against/along branches; LineSet defines unrequested/tangent codes and
+        tracing termination.
+
+    Notes
+    -----
+    Exact upper-face seeds are evaluated at the nearest interior representable coordinate; stored initial positions remain unchanged.
     """
     _points(points)
     _validate_vector(fields)
@@ -379,7 +648,35 @@ def trace(fields, points, *, direction="both", step, max_steps=1000, max_length=
 
 def los(fields, rays, *, component=0, quadrature="gauss2", step_fraction=.5,
         max_samples=1000000, workers=1, ray_batch=4096, memory_limit=None):
-    """Integrate identified rays with shared or per-ray directions."""
+    """Integrate identified rays with shared or per-ray directions.
+
+    Parameters
+    ----------
+    fields : Fields
+        Selected continuous scalar component with at least one valid halo.
+    rays : RaySet
+        Identified origins, normalized shared/per-ray directions and near/far distances.
+    component : int
+        Local continuous scalar component index.
+    quadrature : str
+        gauss2 splits at interpolation knots; midpoint uses step_fraction.
+    step_fraction : float
+        Positive local step fraction; its role depends on the selected integration method.
+    max_samples : int
+        Per-ray sampling limit; reaching the limit is not a complete integral.
+    workers : int
+        Number of workers over disjoint ranges.
+    ray_batch : int
+        Maximum rays per computation batch; input fields remain resident.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    RayResult
+        Identified values and clipping intervals in field units times coordinate length;
+        RayResult.valid interprets COMPLETE/EMPTY statuses.
+    """
     from ._kernels.native import integrate_ray_set
     require_continuous(fields,(component,),operation="LOS")
     if not isinstance(rays,RaySet):
@@ -415,7 +712,42 @@ def los(fields, rays, *, component=0, quadrature="gauss2", step_fraction=.5,
 def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
                 order="thermodynamics-first", subdivisions=4, max_samples=1000000,
                 workers=1, ray_batch=4096, memory_limit=None):
-    """Apply the existing native AIA171 reconstruction to identified rays."""
+    """Apply the existing native AIA171 reconstruction to identified rays.
+
+    Parameters
+    ----------
+    thermodynamics : Fields
+        Matching number-density/kelvin fields from thermal_fields, with valid
+        interpolation support.
+    rays : RaySet
+        Identified rays and coordinate-distance clipping.
+    length_unit_cm : float
+        Centimeters per coordinate-length unit.
+    model : AIA171, optional
+        Model matching the thermal fields; None selects the default AIA171 model.
+    order : str
+        thermodynamics-first interpolates n,T before n²R(T); emissivity-first applies
+        response at nodes before interpolation.
+    subdivisions : int
+        Composite Gauss2 subdivisions for nonlinear thermal response integration.
+    max_samples : int
+        Per-ray sampling limit; reaching the limit is not a complete integral.
+    workers : int
+        Number of workers over disjoint ranges.
+    ray_batch : int
+        Maximum rays per computation batch; input fields remain resident.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    Returns
+    -------
+    RayResult
+        Historical AIA171 brightness in DN s^-1 pixel^-1, with identified rays and status.
+
+    Notes
+    -----
+    These orders define different reconstructions. Composite Gauss2 for nonlinear response is an approximation; check convergence and result status.
+    """
     from dataclasses import replace
     from .physics.thermal import (AIA171, _check_thermal, emissivity_fields,
                                   _RESPONSE_GRID, _LOG_RESPONSE, _RESPONSE_SLOPES, _scale_thermal_values)
@@ -473,7 +805,26 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
 
 
 def iter_lines(fields, points, *, seed_batch=128, memory_limit=None, **controls):
-    """Yield compact LineSet shards in input order, preserving global seed IDs."""
+    """Yield compact LineSet shards in input order, preserving global seed IDs.
+
+    Parameters
+    ----------
+    fields : Fields
+        Completed input fields; see the operation-specific support requirement.
+    points : PointSet
+        Owned finite positions and stable IDs, optionally with a plane/image layout.
+    seed_batch : int
+        Maximum seeds in a computation/output batch; input fields remain resident.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    **controls : object
+        Forwarded controls from simesh.applications.trace, including required step.
+
+    Returns
+    -------
+    iterator of LineSet
+        Owned compact seed batches with global IDs; input fields remain resident.
+    """
     _validate_vector(fields)
     _points(points)
     if type(seed_batch) is not int or seed_batch<1:
