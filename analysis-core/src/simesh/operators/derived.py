@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 import numpy as np
 
-from .._validation import admit, array_bytes
+from ..field_ops import _aligned_inputs, _layout, _admit_output
 from ..fields import FieldDefinition, Fields, publish, require_fields, _field_index
 
 
@@ -42,8 +42,29 @@ def derive(inputs, name, func, *, units="code", memory_limit=None):
     Their physical meaning and units must be compatible by caller choice.
 
     Output owns its values and retains no input arrays or callback. The budget
-    includes inputs, output and one float64 result block, but cannot bound
+    includes inputs, output and two float64 result blocks, but cannot bound
     arbitrary allocations inside user callbacks. Nonfinite values propagate.
+    """
+    definition = FieldDefinition(name, units, "pointwise-derived")
+    if not callable(func):
+        raise TypeError("func must be a pointwise callable")
+    return derive_many(inputs, (definition,), lambda ctx: {name: func(ctx)},
+                       memory_limit=memory_limit)
+
+
+def derive_many(inputs, definitions, func, *, memory_limit=None):
+    """Evaluate one pointwise callback per leaf for multiple named outputs.
+
+    Definitions is an ordered mapping of output names to unit labels, or a
+    sequence of FieldDefinition objects. The callback returns a mapping with
+    exactly these names; each value is a scalar or a same-shaped leaf array.
+    Mapping order in the callback does not affect component order. Definitions
+    supplied as a mapping receive the interpretation ``pointwise-derived``.
+
+    Inputs, spatial semantics, common support and ownership follow derive().
+    The budget includes input backing, output, all returned float64 blocks and
+    one conversion block. Other callback allocations are the caller's concern.
+    The callback and input Fields are not retained in the completed result.
     """
     if isinstance(inputs, Fields):
         groups = {"input": inputs}
@@ -55,35 +76,41 @@ def derive(inputs, name, func, *, units="code", memory_limit=None):
         raise ValueError("input group names must be nonempty strings")
     if not callable(func):
         raise TypeError("func must be a pointwise callable")
-    definition = FieldDefinition(name, units, "pointwise-derived")
-    fields = [require_fields(value) for value in groups.values()]
+    if isinstance(definitions, Mapping):
+        definitions = tuple(FieldDefinition(name, units, "pointwise-derived")
+                            for name, units in definitions.items())
+    else:
+        definitions = tuple(definitions)
+    if not definitions or not all(isinstance(value, FieldDefinition) for value in definitions):
+        raise ValueError("provide nonempty output FieldDefinitions or a name-to-units mapping")
+    names = tuple(value.name for value in definitions)
+    if len(set(names)) != len(names):
+        raise ValueError("duplicate output field names")
+    fields = _aligned_inputs(groups.values())
     first = fields[0]
-    for value in fields[1:]:
-        if (value.mesh is not first.mesh or len(value.leaf_ids) != len(first.leaf_ids) or
-                np.any(value.slot_of_leaf[first.leaf_ids] < 0)):
-            raise ValueError("derived inputs must share the same Mesh and leaf coverage")
-    halo = min(value.valid_halo for value in fields)
-    block_shape = tuple(n + 2*halo for n in first.mesh.block_shape)
+    halo, block_shape, boxes = _layout(fields)
     block_bytes = 8*int(np.prod(block_shape))
-    input_bytes = array_bytes(array for value in fields
-                              for array in (value.values, value.leaf_ids, value.slot_of_leaf))
-    required = (first.mesh.nbytes + input_bytes +
-                (len(first.leaf_ids)+1)*block_bytes + first.mesh.leaf_count*8)
-    admit(required, memory_limit, "derive")
+    _admit_output(fields, block_shape, len(definitions), memory_limit, "derive",
+                  scratch=(len(definitions)+1)*block_bytes)
     # Geometry is invariant across callbacks; field names are resolved only on
     # first use, while values access still checks any borrowed input lifetime.
-    bindings = {
-        key: (value, tuple(slice(value.storage_halo-halo, value.storage_halo+n+halo)
-                           for n in value.mesh.block_shape), {})
-        for key, value in groups.items()
-    }
-    output = np.empty((len(first.leaf_ids), *block_shape, 1), dtype=np.float64)
+    bindings = {key: (value, box, {}) for (key, value), box in zip(groups.items(), boxes)}
+    output = np.empty((len(first.leaf_ids), *block_shape, len(definitions)), dtype=np.float64)
     for slot, leaf in enumerate(first.leaf_ids):
-        result = np.asarray(func(DerivedContext(bindings, leaf)), dtype=np.float64)
-        if result.shape not in ((), block_shape):
-            raise ValueError(f"recipe must return a scalar or block shape {block_shape}, got {result.shape}")
-        output[slot, ..., 0] = result
-        del result
-    return publish(first.mesh, output, first.selection, (definition,), halo, halo,
+        results = func(DerivedContext(bindings, leaf))
+        for value in fields:
+            require_fields(value)
+        if not isinstance(results, Mapping) or set(results) != set(names):
+            raise ValueError("recipe must return a mapping with exactly the defined output names")
+        for column, name in enumerate(names):
+            result = np.asarray(results[name], dtype=np.float64)
+            if result.shape not in ((), block_shape):
+                raise ValueError(f"recipe must return a scalar or block shape {block_shape}, got {result.shape}")
+            output[slot, ..., column] = result
+            del result
+        del results
+    for value in fields:
+        require_fields(value)
+    return publish(first.mesh, output, first.selection, definitions, halo, halo,
                    "pointwise(" + ",".join(value.scheme for value in fields) + ")",
                    tuple(value.source for value in fields))
