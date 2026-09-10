@@ -40,6 +40,10 @@ def assert_equivalent(original, restored):
                 assert restored.source_identity is None
             else:
                 assert_equivalent(getattr(original, member.name), getattr(restored, member.name))
+    elif isinstance(original, (tuple, list)):
+        assert len(original) == len(restored)
+        for left, right in zip(original, restored):
+            assert_equivalent(left, right)
     else:
         assert original == restored
 

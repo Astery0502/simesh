@@ -1,6 +1,6 @@
 """Versioned, pickle-free files for owned application geometry and results.
 
-Import explicitly from ``simesh.results_io``. A loaded ``ResultFile`` separates
+Use save_result/load_result from simesh. A loaded ``ResultFile`` separates
 caller metadata and unverified provenance from the reconstructed result.
 """
 
@@ -21,9 +21,11 @@ from .connectivity import QSLResult, Boundary, ConnectivityTermination
 from .fields import FieldDefinition
 from .geometry import PointSet, RaySet, LineSet
 from .line_profiles import LineProfiles
-from .reductions import LengthUnits
+from .reductions import (LengthUnits, AxisAlignedSurface, Coverage, ScalarResult,
+                         Extremum, ExtremaResult, HistogramResult, REPRESENTATION)
+from .mesh import Mesh, mesh_from_forest
 from .projection import LOSStatus
-from .slices import Plane
+from .slices import Plane, AxisSlice, AMRSliceResult
 from .tracing import Termination
 
 __all__ = ["save_result", "load_result", "ResultFile", "ResultFileError", "SCHEMA_VERSION"]
@@ -76,21 +78,51 @@ _ARRAYS = {
                    "finite":"?", "boundary_adjusted":"?"},
     LineSet: {"positions": "f8", "offsets": "i8", "termination": "i8"},
     UniformResult: {"values": "f8", "valid": "?", "lower": "f8", "upper": "f8"},
+    Mesh: {"lower": "f8", "upper": "f8", "root_shape": "i8", "leaf_flags": "?"},
+    AxisSlice: {},
+    AMRSliceResult: {"values": "f8", "valid": "?"},
+    FieldDefinition: {},
+    Coverage: {},
+    AxisAlignedSurface: {"bounds": "f8"},
+    ScalarResult: {},
+    Extremum: {},
+    ExtremaResult: {},
+    HistogramResult: {"edges": "f8", "bin_weights": "f8"},
 }
 _CHILDREN = {
     LineProfiles: {"lines":LineSet},
     PointSet: {"plane": Plane}, RaySet: {"origins": PointSet},
     SampledPoints: {"points": PointSet}, ConnectivityMap: {"points": PointSet, "data": QSLResult},
     RayResult: {"rays": RaySet}, LineSet: {"seeds": PointSet},
+    AxisSlice: {"mesh": Mesh}, AMRSliceResult: {"geometry": AxisSlice},
+    ScalarResult: {"coverage": Coverage, "field": FieldDefinition,
+                   "weight_field": FieldDefinition, "surface": AxisAlignedSurface},
+    ExtremaResult: {"minimum": Extremum, "maximum": Extremum,
+                    "coverage": Coverage, "field": FieldDefinition},
+    HistogramResult: {"coverage": Coverage, "field": FieldDefinition, "weight_field": FieldDefinition},
 }
 _PROPERTIES = {
     LineProfiles: ("definitions", "component_indices", "scheme", "length_units", "boundary"),
     Plane: ("shape",), PointSet: ("shape",), SampledPoints: ("definitions",),
     QSLResult: ("normalization", "local_radius", "method"),
     RayResult: ("units", "quadrature", "metadata"), UniformResult: ("definitions",),
+    Mesh: ("block_shape",), AxisSlice: ("axis", "coordinate", "side"),
+    AMRSliceResult: ("definitions", "representation"),
+    FieldDefinition: ("name", "units", "interpretation"),
+    Coverage: ("requested_measure", "domain_measure", "available_measure", "valid_measure",
+               "units", "cell_count", "valid_cell_count", "complete", "missing", "nonfinite"),
+    AxisAlignedSurface: ("axis", "coordinate", "normal", "side"),
+    ScalarResult: ("value", "units", "weight_sum", "weight_units", "weight_mode", "representation"),
+    Extremum: ("value", "position", "leaf_id", "cell_index"),
+    ExtremaResult: ("units", "position_units", "representation"),
+    HistogramResult: ("underflow", "overflow", "total_weight", "value_units", "weight_units",
+                      "weight_mode", "representation"),
 }
 _OPTIONAL = {PointSet: {"normals"}, QSLResult: {"q", "log10_q", "q_perp", "log10_q_perp", "twist"}}
-_IDENTIFIED = {LineProfiles, SampledPoints, ConnectivityMap, RayResult, LineSet, UniformResult}
+_OPTIONAL_CHILDREN = {PointSet: {"plane"}, ScalarResult: {"weight_field", "surface"},
+                      HistogramResult: {"weight_field"}}
+_IDENTIFIED = {LineProfiles, SampledPoints, ConnectivityMap, RayResult, LineSet, UniformResult, AMRSliceResult}
+_RESULT_TYPES = _IDENTIFIED | {PointSet, RaySet, QSLResult, ScalarResult, ExtremaResult, HistogramResult}
 _TYPES = {cls.__name__: cls for cls in _ARRAYS}
 
 
@@ -156,6 +188,75 @@ def _codes(array, enum, label, extra=()):
     _require(np.isin(array, [int(code) for code in enum] + list(extra)).all(), f"unknown {label} code")
 
 
+def _number(value, label, *, nonnegative=False):
+    _require(type(value) in (int, float) and math.isfinite(value) and
+             (not nonnegative or value >= 0), f"invalid {label}")
+
+
+def _validate_reduction(cls, data):
+    if cls is FieldDefinition:
+        for name in _PROPERTIES[cls]:
+            _text(data[name], name)
+    elif cls is Coverage:
+        measures = [data[name] for name in
+                    ("requested_measure", "domain_measure", "available_measure", "valid_measure")]
+        for value in measures:
+            _number(value, "coverage measure", nonnegative=True)
+        tolerance = 64*np.finfo(float).eps*max(measures)
+        _require(all(b <= a+tolerance for a, b in zip(measures, measures[1:])),
+                 "coverage measures must be nested")
+        for name in ("cell_count", "valid_cell_count"):
+            _require(type(data[name]) is int and data[name] >= 0, "invalid coverage cell count")
+        _require(data["valid_cell_count"] <= data["cell_count"], "invalid covered cell count")
+        _require(type(data["complete"]) is bool, "invalid coverage completion")
+        if data["complete"]:
+            _require(measures[0]-measures[-1] <= tolerance and
+                     data["cell_count"] == data["valid_cell_count"], "inconsistent complete coverage")
+        _require(data["missing"] in ("raise", "omit") and data["nonfinite"] in ("raise", "omit"),
+                 "invalid coverage policies")
+        _text(data["units"], "coverage units")
+    elif cls is Extremum:
+        _number(data["value"], "extremum value")
+        position, index = data["position"], data["cell_index"]
+        _require(type(position) in (list, tuple) and len(position) == 3, "invalid extremum position")
+        for value in position:
+            _number(value, "extremum coordinate")
+        _require(type(index) in (list, tuple) and len(index) == 3 and
+                 all(type(i) is int and i >= 0 for i in index), "invalid extremum cell index")
+        _require(type(data["leaf_id"]) is int and data["leaf_id"] >= 0, "invalid extremum leaf ID")
+        data["position"], data["cell_index"] = tuple(position), tuple(index)
+    else:
+        _require(data["representation"] == REPRESENTATION, "unknown reduction representation")
+        if cls is ScalarResult:
+            _number(data["value"], "scalar value")
+            _text(data["units"], "scalar units")
+            if data["weight_sum"] is None:
+                _require(all(data[name] is None for name in ("weight_units", "weight_field", "weight_mode")),
+                         "unweighted integral cannot have weight metadata")
+            else:
+                _number(data["weight_sum"], "weight sum", nonnegative=True)
+                _require(data["weight_sum"] > 0 and data["surface"] is None, "invalid weighted mean")
+                _text(data["weight_units"], "weight units")
+        elif cls is ExtremaResult:
+            _require(data["minimum"].value <= data["maximum"].value, "unordered extrema")
+            _text(data["units"], "extrema units")
+            _text(data["position_units"], "position units")
+        elif cls is HistogramResult:
+            edges, weights = data["edges"], data["bin_weights"]
+            _require(edges.ndim == 1 and len(edges) >= 2 and np.isfinite(edges).all() and
+                     np.all(edges[1:] > edges[:-1]), "invalid histogram edges")
+            _array_shape(weights, (len(edges)-1,), "histogram weights", finite=True)
+            _require(np.all(weights >= 0), "negative histogram weights")
+            for name in ("underflow", "overflow", "total_weight"):
+                _number(data[name], name, nonnegative=True)
+            for name in ("value_units", "weight_units"):
+                _text(data[name], name)
+        if cls is HistogramResult or (cls is ScalarResult and data["weight_sum"] is not None):
+            mode = data["weight_mode"]
+            _require(mode in ("volume", "density", "cell-total"), "invalid weight mode")
+            _require((data["weight_field"] is None) == (mode == "volume"), "inconsistent weight field")
+
+
 def _definitions(value):
     _require(type(value) is list and bool(value), "definitions must be a nonempty list")
     definitions = []
@@ -167,7 +268,35 @@ def _definitions(value):
 
 def _validate(cls, data):
     """Validate structural and status invariants before constructing objects."""
-    if cls is Plane:
+    if cls in (FieldDefinition, Coverage, Extremum, ScalarResult, ExtremaResult, HistogramResult):
+        _validate_reduction(cls, data)
+    elif cls is Mesh:
+        for name in ("lower", "upper"):
+            _array_shape(data[name], (3,), name, finite=True)
+        _require(np.all(data["lower"] < data["upper"]), "invalid mesh bounds")
+        _array_shape(data["root_shape"], (3,), "root shape")
+        roots = data["root_shape"]
+        flags = data["leaf_flags"]
+        _require(np.all(roots > 0) and flags.ndim == 1 and
+                 len(flags) >= math.prod(map(int, roots)), "invalid root forest size")
+        data["block_shape"] = _shape(data["block_shape"], dimensions=3, positive=True)
+    elif cls in (AxisSlice, AxisAlignedSurface):
+        _require(type(data["axis"]) is int and 0 <= data["axis"] < 3, "invalid surface axis")
+        _number(data["coordinate"], "surface coordinate")
+        _require(data["side"] in ("positive", "negative"), "invalid surface side")
+        if cls is AxisAlignedSurface:
+            _array_shape(data["bounds"], (2, 2), "surface bounds", finite=True)
+            _require(np.all(data["bounds"][1] > data["bounds"][0]), "invalid surface bounds")
+            _number(data["normal"], "surface normal")
+            _require(data["normal"] in (-1, 1), "invalid surface normal")
+    elif cls is AMRSliceResult:
+        geometry = data["geometry"]
+        n = len(geometry.leaf_ids)
+        _array_shape(data["values"], (n, *geometry.block_shape, len(data["definitions"])), "AMR slice values")
+        _array_shape(data["valid"], (n,), "AMR slice coverage")
+        _require(np.isnan(data["values"][~data["valid"]]).all(), "missing slice blocks must contain NaN")
+        _require(data["representation"] == REPRESENTATION, "unknown AMR slice representation")
+    elif cls is Plane:
         for name in ("origin", "u", "v"):
             _array_shape(data[name], (3,), name, finite=True)
         _shape(data["shape"], dimensions=2, positive=True)
@@ -304,7 +433,7 @@ class _Encoder:
         _require(cls in _ARRAYS, "unsupported result type")
         node = {"type": cls.__name__}
         for name, dtype in _ARRAYS[cls].items():
-            array = getattr(result, name)
+            array = result.node_leaves >= 0 if cls is Mesh and name == "leaf_flags" else getattr(result, name)
             if array is None:
                 _require(name in _OPTIONAL.get(cls, ()), f"{name} cannot be None")
                 node[name] = None
@@ -327,6 +456,9 @@ class _Encoder:
             node[name] = None if child is None else self.node(child)
         for name in _PROPERTIES.get(cls, ()):
             value = getattr(result, name)
+            if cls in (AxisAlignedSurface, Coverage, Extremum, ScalarResult, ExtremaResult, HistogramResult,
+                       FieldDefinition) and isinstance(value, np.generic):
+                value = value.item()
             if name == "local_radius" and isinstance(value, (np.integer, np.floating)):
                 value = float(value)
             if name == "length_units":
@@ -369,7 +501,7 @@ class _Decoder:
             data[name].flags.writeable = False
         for name, child_type in _CHILDREN.get(cls, {}).items():
             if node[name] is None:
-                _require(cls is PointSet and name == "plane", f"{name} cannot be null")
+                _require(name in _OPTIONAL_CHILDREN.get(cls, ()), f"{name} cannot be null")
                 data[name] = None
             else:
                 data[name] = self.node(node[name], child_type)
@@ -380,6 +512,13 @@ class _Decoder:
             _keys(value,("scale","unit"),"length units")
             data["length_units"]=LengthUnits(value["scale"],value["unit"])
         _validate(cls, data)
+        # Slices retain the original topology so block IDs, spacing and cell edges
+        # have the same meaning after loading. No Source or field payload is read.
+        if cls is Mesh:
+            return mesh_from_forest(data["root_shape"], data["leaf_flags"], lower=data["lower"],
+                                    upper=data["upper"], block_shape=data["block_shape"])
+        if cls is AxisSlice:
+            return AxisSlice(**data)
         if cls in _IDENTIFIED:
             data["source_identity"] = None
         if self.validate_only:
@@ -391,6 +530,8 @@ class _Decoder:
             for name, value in data.items():
                 object.__setattr__(result,name,value)
             return result
+        if cls is AMRSliceResult:
+            data.pop("representation")  # Fixed init=False dataclass field, already validated.
         result = cls(**data)
         # Constructors normalize vectors. Preserve the already-validated bits,
         # since renormalization can change ray clipping at grazing surfaces.
@@ -414,7 +555,7 @@ def _manifest_result(manifest, arrays, *, validate_only=False):
              "source verification cannot be asserted by a result file")
     decoder = _Decoder(arrays,validate_only=validate_only)
     result = decoder.node(manifest["result"])
-    _require(type(result) is not Plane, "standalone Plane is not a supported result")
+    _require(type(result) in _RESULT_TYPES, f"standalone {type(result).__name__} is not a supported result")
     _require(decoder.used == set(arrays) - {_MANIFEST}, "unexpected array members")
     return ResultFile(result, metadata, source)
 
@@ -443,8 +584,9 @@ def save_result(path, result, *, metadata=None, source=None, overwrite=False):
     path : str or Path
         Destination NPZ file; its parent must exist.
     result : object
-        Registered geometry/application result; not arbitrary Fields, raw trace/LOS or
-        reduction objects.
+        PointSet, RaySet, SampledPoints, ConnectivityMap, QSLResult, RayResult,
+        LineSet, LineProfiles, UniformResult, AMRSliceResult, ScalarResult,
+        ExtremaResult or HistogramResult. Fields and raw trace/LOS are not supported.
     metadata : dict, optional
         Finite JSON values recording controls, units and model assumptions absent from
         the result; tuples become lists.
@@ -464,6 +606,8 @@ def save_result(path, result, *, metadata=None, source=None, overwrite=False):
     - Keep inputs and geometry write protection unchanged throughout saving.
     - Potentially aliased arrays are snapshotted; owned read-only geometry may be
       borrowed until return. Whole-result saving has no bounded-memory guarantee.
+    - AMR slices include original mesh topology and reconstruct its geometry on load;
+      reductions retain units, coverage, weights, tails and surface/location metadata.
     """
     _require(type(overwrite) is bool, "overwrite must be boolean")
     destination = Path(path)

@@ -126,6 +126,11 @@ class ScalarResult:
         Analyzed component.
     weight_sum, weight_units, weight_field, weight_mode : object
         Weight normalization and interpretation, when applicable.
+    surface : AxisAlignedSurface, optional
+        Oriented rectangle for a surface flux; coordinates retain the original mesh scale.
+    representation : str
+        Piecewise-constant leaf-interior interpretation. save_result preserves this
+        contract together with coverage, field definitions and weight metadata.
     """
     value: float
     units: str
@@ -161,6 +166,10 @@ class ExtremaResult:
         Geometric completion and omission policies.
     field : FieldDefinition
         Analyzed component.
+    units, position_units : str
+        Value units and original coordinate-length units for extrema locations.
+    representation : str
+        Piecewise-constant leaf-interior interpretation; retained by save_result.
     """
     minimum: Extremum
     maximum: Extremum
@@ -187,6 +196,9 @@ class HistogramResult:
         Geometric completion and omission policies.
     field, weight_field, weight_mode : object
         Component and weight interpretation.
+    representation : str
+        Piecewise-constant leaf-interior interpretation; save_result retains the
+        complete histogram, including underflow and overflow contributions.
     """
     edges: np.ndarray
     bin_weights: np.ndarray

@@ -150,7 +150,8 @@ class AMRSliceResult:
     -----
     slice_axis owns output arrays independently of input leases. Direct construction
     marks arrays read-only but does not remove external writable aliases.
-    This raw result is not directly accepted by save_result.
+    save_result retains values, coverage and the original mesh topology; load_result
+    reconstructs the geometry without accessing a Source.
     """
 
     geometry: AxisSlice
