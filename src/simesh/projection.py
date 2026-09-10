@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 import numpy as np
 
-from .fields import require_continuous
+from .fields import require_continuous, _field_index
 from .slices import Plane
 from ._validation import admit, workers_count
 from ._execution import worker_context, run_ranges, native_dispatch
@@ -172,6 +172,10 @@ def _integrate_views(planes,directions,definitions,footprint,runner,*,component=
         raise ValueError("quadrature must be midpoint or gauss2")
     native,dispatch=native_dispatch(backend,schedule)
     workers_count(workers)
+    if isinstance(component, str):
+        component = _field_index(definitions, component)
+    elif isinstance(component, np.integer) and not isinstance(component, np.bool_):
+        component = int(component)
     if (type(component) is not int or not 0<=component<len(definitions) or
             not np.isfinite(step_fraction) or step_fraction<=0 or type(max_samples) is not int or
             not 1<=max_samples<=np.iinfo(np.int64).max):
@@ -243,8 +247,8 @@ def integrate_los_views(fields,planes,directions,**kwargs):
 
     Other Parameters
     ----------------
-    component : int
-        Local scalar column (default 0).
+    component : str or int
+        Scalar field name or local column index (default 0).
     near, far : float or array-like
         Nonnegative plane-shaped clipping distances (defaults 0 and infinity).
     quadrature : str
@@ -273,7 +277,7 @@ def integrate_los_views(fields,planes,directions,**kwargs):
         One raw result per equal-shaped plane, in field units times coordinate length;
         LOSResult defines validity and completion.
     """
-    require_continuous(fields, (kwargs.get("component", 0),), operation="LOS")
+    kwargs["component"], = require_continuous(fields, (kwargs.get("component", 0),), operation="LOS")
     return _integrate_views(planes,directions,fields.fields,fields.nbytes+fields.mesh.nbytes,
                            lambda *args:_tile_ready(fields,*args),**kwargs)
 

@@ -353,10 +353,10 @@ def thermal_fields(density,temperature,*,density_unit_g_cm3,model=AIA171(),densi
         Grams per cubic centimeter per stored mass-density value.
     model : AIA171
         Selected historical response, composition and number-density convention.
-    density_component : int
-        Local mass-density component index.
-    temperature_component : int
-        Local kelvin temperature component index.
+    density_component : str or int
+        Mass-density field name or local component index.
+    temperature_component : str or int
+        Kelvin temperature field name or local component index; unused for a scalar temperature.
     temperature_label : str
         Explicit provenance/interpretation of the kelvin temperature input.
     memory_limit : int, optional
@@ -369,15 +369,15 @@ def thermal_fields(density,temperature,*,density_unit_g_cm3,model=AIA171(),densi
     """
     require_fields(density)
     if (not isinstance(temperature_label,str) or not temperature_label.strip() or
-            not np.isfinite(density_unit_g_cm3) or density_unit_g_cm3<=0 or
-            type(density_component) is not int or not 0<=density_component<len(density.fields)):
+            not np.isfinite(density_unit_g_cm3) or density_unit_g_cm3<=0):
         raise ValueError("positive density units, component and temperature provenance are required")
-    require_continuous(density,(density_component,),halo=0,operation="thermal density")
+    density_component, = require_continuous(density,(density_component,),halo=0,operation="thermal density")
     tproduct=isinstance(temperature,Fields)
     if tproduct:
         require_fields(temperature)
-        if (temperature.mesh is not density.mesh or type(temperature_component) is not int or
-                not 0<=temperature_component<len(temperature.fields) or
+        temperature_component, = require_continuous(temperature,(temperature_component,),halo=0,
+                                                    operation="thermal temperature")
+        if (temperature.mesh is not density.mesh or
                 temperature.fields[temperature_component].units!='K' or
                 np.any(temperature.slot_of_leaf[density.leaf_ids]<0)):
             raise ValueError("temperature must be kelvin on the same mesh and prepared coverage")
@@ -389,8 +389,6 @@ def thermal_fields(density,temperature,*,density_unit_g_cm3,model=AIA171(),densi
         if np.ndim(temperature)!=0 or not np.isfinite(value) or value<=0:
             raise ValueError("temperature must be a positive kelvin scalar or prepared field")
         temperature=value
-    if tproduct:
-        require_continuous(temperature,(temperature_component,),halo=0,operation="thermal temperature")
     h, spatial_shape, boxes = _layout((density,temperature) if tproduct else (density,))
     shape=(len(density.leaf_ids),*spatial_shape,2)
     extra=temperature.nbytes if tproduct and temperature is not density else 0

@@ -12,7 +12,7 @@ import numpy as np
 from .geometry import PointSet, RaySet, LineSet
 from .fields import require_fields, require_continuous, _input_arrays
 from .operators.sampling import sample as sample_values
-from .connectivity import qsl, iter_qsl, line_diagnostics, iter_line_diagnostics, QSLResult
+from .connectivity import line_diagnostics, iter_line_diagnostics, QSLResult
 from .slices import Plane, _uniform_geometry
 from .tracing import _iter_path_segments, Termination, _validate_vector, _validate_inputs
 from ._validation import admit, remaining, workers_count, array_bytes
@@ -233,10 +233,15 @@ def sample(fields, points, *, components=None, output=None, workers=1, memory_li
 
 def _diagnostic_support(fields, quantities, controls):
     from .connectivity import _require_support, _quantities
-    names=None if quantities is None else _quantities(quantities)
-    _require_support(fields,
-        twist=controls.get("twist",True) if names is None else "twist" in names,
-        curl_field=controls.get("curl_field"))
+    if "twist" in controls:
+        if quantities is not None:
+            raise ValueError("use quantities alone to select diagnostics; do not also pass twist")
+        twist = controls.pop("twist")
+        if type(twist) is not bool:
+            raise ValueError("twist must be boolean")
+        quantities = ("q", "twist") if twist else ("q",)
+    names = _quantities(("q", "twist") if quantities is None else quantities)
+    _require_support(fields, twist="twist" in names, curl_field=controls.get("curl_field"))
     return names
 
 
@@ -250,11 +255,12 @@ def connectivity(fields, points, *, quantities=None, memory_limit=None, **contro
     points : PointSet
         Owned finite positions and stable IDs, optionally with a plane/image layout.
     quantities : sequence of str, optional
-        q, twist, or both. None uses qsl defaults, including Q and default twist.
+        q, twist, or both. None selects both unless the compatibility twist control is supplied.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
     **controls : object
-        Forwarded [qsl][simesh.qsl] controls; backend/schedule are not accepted.
+        Forwarded [qsl][simesh.qsl] controls. The boolean twist control is accepted only
+        when quantities is None; prefer quantities. backend/schedule are not accepted.
 
     Returns
     -------
@@ -265,8 +271,7 @@ def connectivity(fields, points, *, quantities=None, memory_limit=None, **contro
     quantities=_diagnostic_support(fields,quantities,controls)
     _points(points)
     limit = remaining(memory_limit,points.nbytes)
-    data = (qsl(fields,points.positions,memory_limit=limit,**controls) if quantities is None else
-            line_diagnostics(fields,points.positions,quantities=quantities,memory_limit=limit,**controls))
+    data = line_diagnostics(fields,points.positions,quantities=quantities,memory_limit=limit,**controls)
     return ConnectivityMap(points,data,fields.value_identity)
 
 
@@ -280,13 +285,14 @@ def iter_connectivity(fields, points, *, quantities=None, seed_batch=256, memory
     points : PointSet
         Owned finite positions and stable IDs, optionally with a plane/image layout.
     quantities : sequence of str, optional
-        q, twist, or both. None uses qsl defaults, including Q and default twist.
+        q, twist, or both. None selects both unless the compatibility twist control is supplied.
     seed_batch : int
         Maximum seeds in a computation/output batch; input fields remain resident.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
     **controls : object
-        Forwarded [qsl][simesh.qsl] controls; backend/schedule are not accepted.
+        Forwarded [qsl][simesh.qsl] controls. The boolean twist control is accepted only
+        when quantities is None; prefer quantities. backend/schedule are not accepted.
 
     Returns
     -------
@@ -298,9 +304,8 @@ def iter_connectivity(fields, points, *, quantities=None, seed_batch=256, memory
     _points(points)
     reserved = points.nbytes+min(seed_batch,len(points))*64 if type(seed_batch) is int and seed_batch>0 else points.nbytes
     limit = remaining(memory_limit,reserved)
-    batches = (iter_qsl(fields,points.positions,seed_batch=seed_batch,memory_limit=limit,**controls)
-               if quantities is None else iter_line_diagnostics(fields,points.positions,quantities=quantities,
-                   seed_batch=seed_batch,memory_limit=limit,**controls))
+    batches = iter_line_diagnostics(fields,points.positions,quantities=quantities,
+                                   seed_batch=seed_batch,memory_limit=limit,**controls)
     start = 0
     try:
         for data in batches:
@@ -351,7 +356,7 @@ def field_map(fields, surface, *, components=None, output=None, workers=1, memor
     return sample(fields,_surface(fields,surface,memory_limit),components=selected,output=output,workers=workers,memory_limit=memory_limit)
 
 
-def surface_diagnostics(fields, surface, *, quantities=("q","twist"), memory_limit=None, **controls):
+def surface_diagnostics(fields, surface, *, quantities=None, memory_limit=None, **controls):
     """Compute selected Q/twist products on an arbitrary sampling surface.
 
     Parameters
@@ -361,11 +366,12 @@ def surface_diagnostics(fields, surface, *, quantities=("q","twist"), memory_lim
     surface : Plane or PointSet
         Surface positions at which to start diagnostics.
     quantities : sequence of str, optional
-        q, twist, or both. None uses qsl defaults, including Q and default twist.
+        q, twist, or both. None selects both unless the compatibility twist control is supplied.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
     **controls : object
-        Forwarded [qsl][simesh.qsl] controls; backend/schedule are not accepted.
+        Forwarded [qsl][simesh.qsl] controls. The boolean twist control is accepted only
+        when quantities is None; prefer quantities. backend/schedule are not accepted.
 
     Returns
     -------
@@ -378,7 +384,7 @@ def surface_diagnostics(fields, surface, *, quantities=("q","twist"), memory_lim
                         memory_limit=memory_limit,**controls)
 
 
-def bottom_diagnostics(fields, shape=(128,128), *, quantities=("q","twist"), ids=None,
+def bottom_diagnostics(fields, shape=(128,128), *, quantities=None, ids=None,
                        memory_limit=None, **controls):
     """Compute diagnostics on the physical z-min face with pixel-center seeds.
 
@@ -389,13 +395,14 @@ def bottom_diagnostics(fields, shape=(128,128), *, quantities=("q","twist"), ids
     shape : tuple of int
         Pixel counts on the physical z-min face.
     quantities : sequence of str, optional
-        q, twist, or both. None uses qsl defaults, including Q and default twist.
+        q, twist, or both. None selects both unless the compatibility twist control is supplied.
     ids : array-like, optional
         Unique IDs for the generated boundary seeds.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
     **controls : object
-        Forwarded [qsl][simesh.qsl] controls; backend/schedule are not accepted.
+        Forwarded [qsl][simesh.qsl] controls. The boolean twist control is accepted only
+        when quantities is None; prefer quantities. backend/schedule are not accepted.
 
     Returns
     -------
@@ -653,8 +660,8 @@ def los(fields, rays, *, component=0, quadrature="gauss2", step_fraction=.5,
         Selected continuous scalar component with at least one valid halo.
     rays : RaySet
         Identified origins, normalized shared/per-ray directions and near/far distances.
-    component : int
-        Local continuous scalar component index.
+    component : str or int
+        Continuous scalar field name or local component index.
     quadrature : str
         gauss2 splits at interpolation knots; midpoint uses step_fraction.
     step_fraction : float
@@ -675,7 +682,7 @@ def los(fields, rays, *, component=0, quadrature="gauss2", step_fraction=.5,
         RayResult.valid interprets COMPLETE/EMPTY statuses.
     """
     from ._kernels.native import integrate_ray_set
-    require_continuous(fields,(component,),operation="LOS")
+    component, = require_continuous(fields,(component,),operation="LOS")
     if not isinstance(rays,RaySet):
         raise TypeError("rays must be a RaySet")
     workers_count(workers)
