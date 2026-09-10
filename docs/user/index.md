@@ -1,27 +1,18 @@
-# User interfaces
+# User guide
+
+Use this guide after the [installation and first run](../../README.md#install-and-run)
+in the README. It explains how to combine interfaces for analysis, regional
+extraction and result delivery. The [API reference](api.md) supplies exact
+signatures, parameter definitions and result contracts from source docstrings.
+
+Choose a runnable example below, or use the
+[application guide (Chinese)](../application-overview.md) to select a workflow by
+scientific question. The recipes use these imports:
 
 ```python
 import simesh as sm
 from simesh import applications as app
 ```
-
-[API reference](api.md): choose a function and read its signature, parameters,
-return type and required support. Native analysis supports balanced nonperiodic
-Cartesian 3D AMRVAC v5 ordinary fields; units and physical models are explicit.
-
-## Install and run
-
-From the repository root, with Python 3.11 or newer:
-
-```bash
-python3.11 -m venv .venv
-.venv/bin/python -m pip install -e .
-.venv/bin/python examples/user_quickstart.py --output example-output/user-quickstart
-```
-
-Use a fresh output directory. The example creates its input and verifies
-`Bz = 0.001 T`, `mass = 1e6 kg`, 64 usable map samples and result save/load.
-The scales are teaching values, not simulation calibration.
 
 ## Examples
 
@@ -31,10 +22,7 @@ The scales are teaching values, not simulation calibration.
 | [Magnetic applications](../../examples/standard_applications.py) | Synthetic AMR arcade, Q/twist, paths and LOS; custom NumPy archive |
 | [Uniform export](../../examples/uniform_export.py) | AMRVAC fields to NumPy memory maps or uniform VTK using explicit reconstruction |
 | [MHD analysis](../../examples/recovered_state_analysis.py) | Analytic recovered state, reductions, profiles and result files |
-| [Root-subtree crop](../../examples/root_crop.py) | Mixed-level AMR snapshot, root-aligned regional export and integral comparison |
-
-Exact API text is generated when
-building the documentation; GitHub Markdown displays the object directives.
+| [Root-subtree crop](../../examples/root_crop.py) | Regional analysis, independent AMR export, reloadable slice and integral |
 
 ## Native AMR sections
 
@@ -47,14 +35,17 @@ section = sm.slice_axis(fields, "z", 0.5)
 geometry = section.geometry
 u_edges, v_edges = geometry.cell_edges(0)
 block_values = section.values[0]
+sm.save_result("section.result.npz", section)
 ```
 
 The [API reference](api.md) describes block layout, interface-side selection,
 coverage and ownership. Geometry and values are independent of plotting tools.
 
-## Root-aligned AMR output
+## Root-block regional analysis and independent output
 
-Keep complete refined subtrees using integer root-block bounds:
+Combine adjacent level-1 root blocks into a rectangular region, retaining each
+root's complete refinement subtree. Root indices are zero-based with exclusive
+upper bounds; this example selects 3 by 2 by 2 roots in a sufficiently large mesh:
 
 ```python
 box = ((1, 1, 0), (4, 3, 2))
@@ -71,10 +62,60 @@ with sm.open_amrvac("snapshot.dat") as source:
 sm.write_amrvac("crop.dat", fields, metadata=metadata, root_bounds=box)
 ```
 
+For interpolated regional maps or derivatives, prepare the selection while the
+original Source is open. Explicit output bounds keep the map inside that region:
+
+```python
+with sm.open_amrvac("snapshot.dat") as source:
+    selection = sm.select_roots(source.mesh, box)
+    ready = sm.prepare(source, ("rho", "b3"), region=selection, scheme="exact-phase")
+grid = app.uniform_grid(ready, (48, 32, 32), bounds=selection.requested_bounds)
+```
+
+Regional preparation reads neighboring support from the original domain. By
+contrast, reopening `crop.dat` makes its edges the new domain boundaries. Include
+enough surrounding roots for derivatives and integration paths; an independently
+cropped field need not reproduce original-domain results near those edges.
+
 The [API reference](api.md) specifies indexing, coverage, bounded payload storage
 and output boundary semantics. A crop retains original refinement and values;
 it does not create a level-1 uniform grid. Field units and crop provenance belong
 in a separate description, as illustrated by the executable example.
+
+## Compose and save analyses
+
+Select continuous quantities by name, so changing the output order does not
+change their meaning. After recovering density and temperature in `state`:
+
+```python
+thermal = sm.thermal_fields(state, state, density_component="density",
+                            temperature_component="temperature", density_unit_g_cm3=1.,
+                            temperature_label="recovered ideal-MHD temperature")
+column = app.los(state, rays, component="density")
+```
+
+The scalar column retains coordinate-length units; physical column density
+requires the corresponding explicit length conversion. Use `quantities="q"`,
+`"twist"` or `("q", "twist")` consistently with all application connectivity
+entry points. A compatibility `twist=False` control selects Q alone only when
+`quantities` is omitted; specifying both is rejected.
+
+The same result protocol supports native AMR sections, integral/mean/flux results,
+extrema and histograms, as well as sampled maps, lines, profiles and projections:
+
+```python
+integral = sm.volume_integral(fields, "rho", units=sm.LengthUnits(1e8, "cm"))
+sm.save_result("integral.result.npz", integral,
+               metadata={"description": "density integral with explicit length scale"})
+restored = sm.load_result("integral.result.npz").result
+print(restored.value, restored.units, restored.coverage.fraction)
+```
+
+Choose the length scale to match the actual simulation; labels on stored fields
+do not convert values. Reductions retain coverage, weights, histogram tails and
+surface/location information. Native sections include the original mesh topology
+so their block IDs and cell edges can be reconstructed. Whole-result saving and
+loading require resident memory; caller-supplied source descriptions remain unverified.
 
 ## Uniform output
 

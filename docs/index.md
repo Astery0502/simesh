@@ -1,13 +1,16 @@
 # simesh documentation
 
-Choose an entry by task. For a first run, use the self-contained
-[quickstart](user/index.md#install-and-run).
+Choose an entry by task. Start with the
+[README](../README.md#install-and-run) for installation and a first run, then
+follow the user guide to carry out an analysis.
 
 ## Application use
 
 | Entry | Purpose |
 | --- | --- |
-| [English quickstart](user/index.md) | Install, run a teaching example and choose runnable examples |
+| [README](../README.md) | Project capabilities, supported scope, installation and first run |
+| [User guide](user/index.md) | Combine interfaces into analysis workflows and save their results |
+| [Application guide (Chinese)](application-overview.md) | Choose a scientific workflow, including root-block regional analysis |
 | [User API](user/api.md) | Exact signatures, parameters, results and constraints generated from source |
 
 ## Development and maintenance

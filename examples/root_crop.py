@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import simesh as sm
+from simesh import applications as app
 
 
 def run(output):
@@ -47,6 +48,7 @@ def run(output):
     with sm.open_amrvac(original) as source:
         selection = sm.select_roots(source.mesh, box)
         fields = sm.read_fields(source, chosen, region=selection)
+        ready = sm.prepare(source, chosen, region=selection, scheme='exact-phase')
         metadata = source.metadata
     # Owned Fields survive Source closure and retain original Mesh geometry.
     detached = output/'fields.dat'
@@ -69,6 +71,17 @@ def run(output):
         'restart_certified': False,
     }
     (output/'crop-info.json').write_text(json.dumps(description, indent=2)+'\n')
+    grid = app.uniform_grid(ready, (12,8,8), components='rho', bounds=selection.requested_bounds)
+    assert grid.usable.all()
+    section = sm.slice_axis(cropped, 'z', float(cropped.mesh.lower[2]), components='rho')
+    for name, result in (('regional-grid',grid), ('crop-section',section), ('density-integral',after)):
+        path = sm.save_result(output/f'{name}.result.npz',result,source=description)
+        restored = sm.load_result(path).result
+        if name == 'density-integral':
+            assert restored == result
+        else:
+            np.testing.assert_array_equal(restored.values,result.values)
+            np.testing.assert_array_equal(restored.valid,result.valid)
     print(f'Density volume integral: {after.value:g}; native values and file paths agree')
 
 

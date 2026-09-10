@@ -51,7 +51,7 @@ def run(output):
                 "temperature_histogram":{"edges":distribution.edges.tolist(),
                     "weights":distribution.bin_weights.tolist(),"weight_units":distribution.weight_units}}
     state = sm.mhd_fields(prepared,model=model,outputs=("density","temperature"))
-    thermal = sm.thermal_fields(state,state,density_component=0,temperature_component=1,
+    thermal = sm.thermal_fields(state,state,density_component="density",temperature_component="temperature",
                                 density_unit_g_cm3=1.,temperature_label="recovered analytic ideal-MHD state")
     rays = sm.RaySet.from_plane(sm.Plane([0,0,-.1],[2,0,0],[0,1,0],(8,6)),[0,0,1])
     image = app.thermal_los(thermal,rays,length_unit_cm=units.length_cm,workers=2)
@@ -82,6 +82,11 @@ def run(output):
     np.testing.assert_allclose(profiles.values[interior,0],.8*(1+.1*lines.positions[interior,2]))
     np.testing.assert_allclose(profiles.values[:,1],1e-15*(1+.2*lines.positions[:,0]))
     np.testing.assert_array_equal(profiles.values[:,2],0.)
+    for name, result in (("mass",mass), ("temperature-mean",mean_t),
+                         ("temperature-histogram",distribution), ("bottom-flux",flux), ("profiles",profiles)):
+        saved = sm.save_result(output/f"{name}.result.npz",result,metadata={"model":asdict(model)},overwrite=True)
+        restored_result = sm.load_result(saved).result
+        assert type(restored_result) is type(result)
     print(f"Mass: {mass.value:g} {mass.units}")
     print(f"Mass-weighted temperature: {mean_t.value:g} K")
     print(f"Outward bottom flux: {flux.value:g} {flux.units}")

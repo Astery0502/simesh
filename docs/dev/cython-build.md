@@ -25,6 +25,8 @@ Register each interface once with `::: simesh.object` in the
 
 `make docs-check` checks API resolution/coverage, structured parameter names,
 selected members and links, including the LOS wrapper's forwarded keyword names.
+User-facing scientific functions must provide a Parameters section; the deferred
+array-tool documentation is excluded from that completeness requirement.
 
 ### Docstring content
 

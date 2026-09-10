@@ -1,13 +1,12 @@
 # simesh
 
 `simesh` is a Python/Cython toolkit for native AMR scientific analysis and
-numerical result delivery. The repository root contains the selected package,
-including its AMRVAC file interfaces and array-based magnetic field tools.
+numerical result delivery, with AMRVAC file interfaces and array-based magnetic
+field tools.
 
-Start with the [user interfaces](docs/user/index.md) and the
-[source-generated API index](docs/user/api.md). The
-[developer interfaces](docs/dev/index.md) cover core objects and advanced execution.
-See the [documentation map](docs/index.md) for the full structure.
+This page introduces the supported capabilities and the shortest path to a first
+run. Continue with the [user guide](docs/user/index.md) for analysis workflows and
+the [API reference](docs/user/api.md) for exact interface contracts.
 
 ## Scientific workflows
 
@@ -17,7 +16,8 @@ See the [documentation map](docs/index.md) for the full structure.
 - CGS ideal-MHD recovery with `MHDUnits.solar()`, AMR integrals/statistics and rectangular surface flux
 - Scalar and historical AIA171 thermal LOS
 - Identified lines/profiles, result save/load and incremental output shards
-- AMRVAC v5 ordinary-field input and complete-mesh or root-aligned `.dat` export
+- Reloadable native AMR sections and quantitative integral/statistical results
+- AMRVAC v5 input, root-block regional analysis retaining AMR refinement, and `.dat` export
 - Uniform-volume VTK export from sampled results or directly from AMRVAC files
 
 Native analysis accepts balanced, nonperiodic Cartesian 3D AMRVAC v5 ordinary
@@ -34,29 +34,24 @@ Python 3.11 or newer is required. From the repository root:
 
 ```bash
 python3.11 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m pip install -e .
 .venv/bin/python examples/user_quickstart.py --output example-output/user-quickstart
 ```
 
-The quickstart creates a teaching snapshot and verifies a magnetic map, mass
-and result save/load. Use a fresh output directory. More executable examples
-are linked from the [user entry](docs/user/index.md).
+Use a fresh output directory. The quickstart creates a teaching snapshot and
+verifies `Bz = 0.001 T`, `mass = 1e6 kg`, 64 usable map samples and result save/load.
+These scales are teaching values, not simulation calibration. Continue with the
+[workflow examples](docs/user/index.md#examples) for your analysis task.
 Optional `.[plot]` enables PNG rendering; `.[fft]` adds FFT convolution.
 
-## Build the interface reference
+## Documentation and development
 
-```bash
-.venv/bin/python -m pip install -e '.[docs]'
-make docs
-make docs-serve
-```
+The [documentation map](docs/index.md) links workflow guides and API references.
+Guides explain how to combine interfaces; API details are generated from source
+signatures and docstrings when the documentation site is built.
 
-The build reads signatures and NumPy-style docstrings directly from `src/`
-without importing compiled modules. `make docs` checks public API coverage,
-parameter descriptions and links, then writes HTML to ignored `site/`.
-GitHub Markdown shows the API directives; the built site renders their content.
-For package development use `make build` and `make test`; see
-[build instructions](docs/dev/cython-build.md).
+For extension builds, tests, development dependencies and local documentation
+preview, follow the [developer build instructions](docs/dev/cython-build.md).
 
 ## Project layout and history
 

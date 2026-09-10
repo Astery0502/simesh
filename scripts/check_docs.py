@@ -60,7 +60,11 @@ def main():
             if obj.is_function or obj.is_class:
                 described = section_names(obj, "parameters")
                 actual = {p.name for p in obj.parameters} - {"self", "cls"}
-                if described:
+                # User-facing scientific functions must not bypass validation by
+                # omitting the entire Parameters section. Array tools are deferred.
+                user_function = (path == DOCS / "user/api.md" and obj.is_function and
+                                 not obj.path.startswith("simesh.tools."))
+                if described or user_function:
                     for unknown in sorted(described - actual):
                         errors.append(f"{name}: documented parameter {unknown!r} is absent from signature")
                     for missing in sorted(actual - described):

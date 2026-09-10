@@ -5,8 +5,6 @@ edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: site
 use_directory_urls: false
-exclude_docs: |
-  application-overview.md
 theme:
   name: readthedocs
   highlightjs: true
@@ -15,7 +13,8 @@ hooks:
 nav:
   - Home: index.md
   - User:
-      - Start: user/index.md
+      - Guide: user/index.md
+      - Applications (Chinese): application-overview.md
       - API: user/api.md
   - Developer:
       - Start: dev/index.md

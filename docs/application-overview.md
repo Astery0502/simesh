@@ -27,8 +27,9 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 | A09 | AIA171 热辐射合成 | 指定热力学状态在历史 AIA171 响应下形成怎样的图像？ | 带模型、单位和有效性的热辐射图 |
 | A10 | 势场外推与解析磁场 | 如何从底面磁场构造参考场，或生成可控的分析样本？ | 均匀磁场数组、矢势或解析构型 |
 | A11 | 数据读写与结果交付 | 如何准备输入、保存结果、交给其他程序继续使用？ | `.dat`、应用结果文件、分片目录等 |
+| A12 | 根块组合区域分析 | 如何提取多个 level 1 根块并独立研究其中的精细结构？ | 保留细化层级的子区域文件、局部分析结果 |
 
-按分析依赖选择流程：A01/A02 提供场分布和局部诊断，A03/A04 提供曲线和连接性；A05 的恢复量可用于 A06、A07、A09，A03 的曲线是 A07 的输入。A10 提供参考磁场，A11 负责各条流程的数据读写。
+按分析依赖选择流程：A01/A02 提供场分布和局部诊断，A03/A04 提供曲线和连接性；A05 的恢复量可用于 A06、A07、A09，A03 的曲线是 A07 的输入。A10 提供参考磁场，A11 负责各条流程的数据读写；A12 将根块组合成子区域，可接入前述分析流程。
 
 ### 共同输入约定
 
@@ -54,6 +55,7 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 
 | 入口 | 功能与输出 |
 | --- | --- |
+| `sm.slice_axis(fields, axis, coordinate, components=...)` | 从内部单元直接提取原生 AMR 截面，返回可保存的 `AMRSliceResult`，无需插值 halo |
 | `app.sample(fields, points, components=...)` | 对 `PointSet` 采样，返回 `SampledPoints`，保留点编号、值和覆盖 |
 | `app.field_map(fields, surface, components=...)` | 接受 `Plane` 或 `PointSet`，返回相同类型；有图像布局时可访问 `image` |
 | `app.uniform_grid(fields, resolution, components=..., bounds=...)` | 返回 `UniformResult`，数值布局为 `(nx, ny, nz, component)` |
@@ -104,7 +106,7 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 
 **简介。** Q 描述磁力线脚点映射的拉伸程度，可用于寻找准分离层候选结构；Q⊥提供垂直于场方向的映射诊断；twist 提供沿磁力线的扭转诊断。将诊断图与有效性结合，可挑选种子后继续追踪和做沿线分析。高 Q 或高 twist 的阈值应由具体科学问题确定，不能直接当作重联发生或结构不稳定的结论。
 
-**输入与接口。** 输入是三分量磁场，准备范围需覆盖积分路径及所选方法需要的邻域。接口通过 `quantities=("q",)`、`("twist",)` 或两者选择计算内容。
+**输入与接口。** 输入是三分量磁场，准备范围需覆盖积分路径及所选方法需要的邻域。各应用入口统一通过 `quantities="q"`、`"twist"` 或 `("q", "twist")` 选择计算内容。默认计算两者；兼容的 `twist=False` 仅在未指定 `quantities` 时可用，不能同时传入两个选择参数。
 
 | 入口 | 功能与输出 |
 | --- | --- |
@@ -168,7 +170,7 @@ state = sm.mhd_fields(conserved, model=model)
 
 区域裁剪使用单元交叠体积或面积，场采用给定内部值的分片常数表示。面通量需由调用者选对法向分量；它是单元中心场的单侧估计，不提供 CT 面通量或粗细网格通量连续性保证。
 
-默认拒绝缺覆盖及非有限值；使用 `missing="omit"` 或 `nonfinite="omit"` 后，数值仅描述有效覆盖，需一起保存 `coverage`。归约结果目前不能直接用 `save_result` 保存，应将值、单位、覆盖和直方图尾部写入 JSON/NumPy 等格式。
+默认拒绝缺覆盖及非有限值；使用 `missing="omit"` 或 `nonfinite="omit"` 后，数值仅描述有效覆盖，需一起保存 `coverage`。归约结果可直接用 `save_result` 保存，再用 `load_result(...).result` 恢复；值、单位、覆盖、权重、极值位置、面方向和直方图尾部均随对应结果保留。
 
 参考：[应用接口](user/api.md)。
 
@@ -188,7 +190,7 @@ state = sm.mhd_fields(conserved, model=model)
 
 **输入与接口。** `sm.RaySet.from_plane(plane, direction, near=..., far=...)` 建立射线，`app.los(fields, rays, component=0, quadrature=..., ...)` 返回 `RayResult`。`sm.orthographic_plane(lower, upper, direction, shape)` 可自动构造覆盖盒投影的相机平面。原始图像接口为 `sm.integrate_los` 和 `sm.integrate_los_views`。
 
-`component` 当前用整数列号。标量结果单位是字段单位乘原坐标长度，实际柱密度还需显式乘相应长度换算系数。`near/far` 控制沿射线的深度截断。输出包含积分值、入域/出域深度、状态和采样次数，`image` 提供图像布局。
+`component` 支持字段名或局部分量索引，建议用名称避免字段重排造成误选。标量结果单位是字段单位乘原坐标长度，实际柱密度还需显式乘相应长度换算系数。`near/far` 控制沿射线的深度截断。输出包含积分值、入域/出域深度、状态和采样次数，`image` 提供图像布局。
 
 默认 `quadrature="gauss2"`，也支持 `"midpoint"`。空射线可以是合法零贡献；应通过 `status` 区分空射线、正常积分、缺覆盖和采样上限。`complete` 表示全部射线具有有效状态。
 
@@ -198,7 +200,7 @@ state = sm.mhd_fields(conserved, model=model)
 
 **简介。** 将密度和温度转换为热力学场，再用保留的历史 AIA171 响应计算光学薄视线积分。适合展示密度和温度结构对合成亮度的共同影响；当前内置响应的范围是 AIA171，不能把接口当成任意波段的通用合成观测模型。
 
-**输入与接口。** 密度必须明确数值到 g/cm³ 的系数；温度以 K 提供，可以是显式等温常量，也可以来自 A05 的恢复场。
+**输入与接口。** 密度必须明确数值到 g/cm³ 的系数；温度以 K 提供，可以是显式等温常量，也可以来自 A05 的恢复场。`density_component` 与 `temperature_component` 均支持字段名或局部分量索引。
 
 | 入口 | 功能与输出 |
 | --- | --- |
@@ -242,19 +244,50 @@ state = sm.mhd_fields(conserved, model=model)
 | `sm.export_uniform(...)` | 将普通场导出为均匀体数据，支持按批读取 |
 | `sm.write_uniform_vtk(path, grid)` | 将已有均匀体结果保存为二进制 VTK，保留网格边界、标量分量与覆盖标记 |
 | `sm.export_uniform_vtk(source, path, resolution, ...)` | 直接从原始文件或 Source 重采样并生成均匀网格 VTK，复用均匀场接口的采样控制 |
-| `sm.save_result(path, result, metadata=...)`、`sm.load_result(path)` | 保存和恢复支持的几何、采样、连接性、射线、曲线、剖面及均匀结果对象 |
+| `sm.save_result(path, result, metadata=...)`、`sm.load_result(path)` | 保存和恢复支持的几何、原生截面、积分统计、采样、连接性、射线、曲线、剖面及均匀结果对象 |
 | `sm.save_result_shards(...)`、`sm.open_result_shards(...)` | 逐批保存并按分片加载曲线/剖面等支持的批次结果 |
-| `sm.write_amrvac(path, fields, metadata=...)` | 将完整原网格覆盖的字段导出为普通 `.dat` |
+| `sm.write_amrvac(path, fields, metadata=..., root_bounds=...)` | 将完整原网格或根块对齐区域的字段导出为普通 `.dat` |
+| `sm.select_roots(...)`、`sm.crop_amrvac(...)` | 选择完整根块子树，或直接从文件裁剪为独立快照，见 A12 |
 
 当前包仅提供 Source/Fields 数据流程。VTK 导出仅支持均匀体，不保存 AMR 层级或曲线；每个分量保存为单元标量，`simesh_valid` 单独记录覆盖有效性，单位和来源信息需另行保存。历史 Dataset 和二维数据流程不在当前发布范围内；旧代码见 `legacy/previous/`。
 
-`load_result(...).result` 恢复保存的应用对象；自定义 `numpy.savez_compressed` 文件需用 `numpy.load`。原始 `Fields`、`TraceResult` 和归约类等不能直接传给 `save_result`。额外数值控制、模型和来源应放入 `metadata` 等记录中；加载器不会核验结果与原始快照的物理对应关系。
+`load_result(...).result` 恢复保存的应用对象；自定义 `numpy.savez_compressed` 文件需用 `numpy.load`。原始 `Fields`、`TraceResult` 和原始 LOS 结果不能直接传给 `save_result`；曲线和投影应使用应用入口返回的结果。原生截面保存原始网格拓扑以重建块编号和单元边界，整体保存和加载不保证有限内存。额外数值控制、模型和来源应放入 `metadata` 等记录中；加载器不会核验结果与原始快照的物理对应关系。
 
 大曲线使用 `app.iter_lines`，大均匀体使用 `sm.iter_uniform`。分批输出不意味着所有算法都支持有限容量输入，尤其 QSL 与热 LOS 仍要求输入字段驻留。分片清单完成也不代表所有积分成功，分片不是积分状态断点。
 
 参考：[数据产品与保存协议](user/api.md#outputs)、[高级执行](dev/api.md#preparation-and-bounded-execution)。
 
-## 13. 可直接运行的示例
+## 13. A12：根块组合区域分析
+
+**简介。** 以 level 1 根块为单位，将相邻根块组成矩形区域，提取完整细化子树。区域内部的细化层级、单元间距和字段数值保留，可独立分析局部结构，也可由脚本组织多个区域进行对比。
+
+**输入与接口。** `root_bounds` 是零基整数上下界，上界不包含。下面选取 `3 × 2 × 2` 个根块；输入网格必须包含这一范围。
+
+```python
+box = ((1, 1, 0), (4, 3, 2))
+sm.crop_amrvac("snapshot.dat", "crop.dat", root_bounds=box, fields=("rho", "b3"))
+with sm.open_amrvac("crop.dat") as source:
+    local = sm.read_fields(source)
+section = sm.slice_axis(local, "z", float(local.mesh.lower[2]))
+sm.save_result("crop-section.result.npz", section)
+```
+
+若需要保留原域的邻域支撑，先用 `select_roots` 建立选区，再显式准备：
+
+```python
+with sm.open_amrvac("snapshot.dat") as source:
+    selection = sm.select_roots(source.mesh, box)
+    ready = sm.prepare(source, ("rho", "b3"), region=selection, scheme="exact-phase")
+local_grid = app.uniform_grid(ready, (48, 32, 32), bounds=selection.requested_bounds)
+```
+
+这两条路径的边界含义不同：内存选区仍属于原始网格，准备时可读取原域邻块；独立裁剪文件的边缘则成为新计算域边界，不保留原域外侧 halo。求导或追踪时应选足邻域与路径范围，不能将裁剪边缘解释为原模拟的物理边界。区域积分默认使用选区；均匀输出需显式指定区域范围，原生切片则保留所属网格的完整截面几何和覆盖标记。
+
+`write_amrvac(..., root_bounds=box)` 还可导出已读取或派生的字段。裁剪不会重采样成 level 1 均匀网格；文件直接裁剪按批处理选中字段，输入网格和索引仍驻留内存。
+
+参考：[根块区域分析](user/index.md#root-block-regional-analysis-and-independent-output)、[可执行裁剪示例](../examples/root_crop.py)。
+
+## 14. 可直接运行的示例
 
 这些示例自行生成输入，可先用来熟悉输出格式，再替换成自己的快照和单位配置。
 
@@ -262,7 +295,8 @@ state = sm.mhd_fields(conserved, model=model)
 | --- | --- | --- |
 | [快速开始](../examples/user_quickstart.py) | 教学快照、磁场图、质量积分及保存恢复 | 应用结果用 `sm.load_result` |
 | [标准应用示例](../examples/standard_applications.py) | 合成磁场、电流图、Q/twist、筛选曲线、标量/热 LOS；可选绘图 | `products.npz` 用 `numpy.load`，另有 `summary.json` |
-| [恢复状态分析示例](../examples/recovered_state_analysis.py) | MHD 恢复、质量/温度/磁通、热图、速度流线和沿线量检查 | 两个 `.result.npz` 用 `sm.load_result`；剖面在运行中检查，不自动保存 |
+| [根块裁剪示例](../examples/root_crop.py) | 根块选区准备、独立文件裁剪及截面和积分保存 | `.result.npz` 用 `sm.load_result`；裁剪文件用 `sm.open_amrvac` |
+| [恢复状态分析示例](../examples/recovered_state_analysis.py) | MHD 恢复、质量/温度/磁通、热图、速度流线和沿线量检查 | 状态统计、热图、流线和剖面均用 `sm.load_result` 恢复 |
 
 在仓库根目录运行，输出目录使用本次新目录：
 
@@ -270,6 +304,7 @@ state = sm.mhd_fields(conserved, model=model)
 .venv/bin/python examples/user_quickstart.py --output /tmp/simesh-overview-quickstart
 .venv/bin/python examples/standard_applications.py --output /tmp/simesh-overview-standard
 .venv/bin/python examples/recovered_state_analysis.py --output /tmp/simesh-overview-recovered
+.venv/bin/python examples/root_crop.py --output /tmp/simesh-overview-crop
 ```
 
-恢复状态示例提供的已知量为质量 `2.4e-12 kg`、质量加权温度 `840000 K`、底面向外磁通 `-2e-4 T*m²`。这些值来自该示例的解析输入，不能作为其他数据的通用验收标准。
+恢复状态示例提供的已知量为质量 `2.4e12 g`、质量加权温度 `840000 K`、底面向外磁通 `-2e18 G*cm²`。这些值来自该示例的解析输入，不能作为其他数据的通用验收标准。
