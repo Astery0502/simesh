@@ -20,7 +20,7 @@ def bipolar_Avec(coordinates:np.ndarray, q_para:float, L_para:float, d_para:floa
 def bipolar_Bvec(coordinates:np.ndarray, q_para:float, L_para:float, d_para:float):
 
     """
-    Calculate the bipolar magnetic field Bvec
+    Calculate the bipolar magnetic field, scaled by signed strength q_para.
     """
     x, y, z = coordinates[0], coordinates[1], coordinates[2]
     Bvec = np.zeros((3, *x.shape))
@@ -33,7 +33,7 @@ def bipolar_Bvec(coordinates:np.ndarray, q_para:float, L_para:float, d_para:floa
     Bvec[1] = Bvec[1] - y/tmp
     Bvec[2] = Bvec[2] - (z+d_para)/tmp
 
-    return Bvec
+    return q_para * Bvec
 
 
 def rbsl_Avec(coordinates:np.ndarray, x_axis:np.ndarray, a:float, F_flx:float, positive_helicity:bool):
@@ -51,17 +51,20 @@ def rbsl_Avec(coordinates:np.ndarray, x_axis:np.ndarray, a:float, F_flx:float, p
     F_flx : float
         Net magnetic flux along the flux rope axis.
     positive_helicity : bool
-        Indicates if the helicity is positive.
+        True gives current and axial flux the same sign; False gives opposite
+        signs. The signed axial flux F_flx is retained in either case.
 
     Returns:
     Atotal : np.ndarray
         Vector potential.
     """
 
+    if not isinstance(positive_helicity, (bool, np.bool_)):
+        raise ValueError("positive_helicity must be boolean")
     naxis = x_axis.shape[1]
 
     # Calculate I_cur
-    I_cur = 1.0 * F_flx * 5.0 * np.sqrt(2.0) / 3.0 / a
+    I_cur = (1.0 if positive_helicity else -1.0) * F_flx * 5.0 * np.sqrt(2.0) / 3.0 / a
     re_pi = 1.0 / np.pi
 
     r_vec = (coordinates[:, :, None] - x_axis[:, None, :]) / a # r_vec.shape = (3, N, M)

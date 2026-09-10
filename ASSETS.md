@@ -52,6 +52,12 @@ revision. Those interfaces and their mutable mesh are now excluded from the
 active package; `legacy/previous/` retains the preceding implementation. The
 independent array tools remain under `tools/`.
 
+The retained RBSL configuration uses the current/flux relation in Equation (12)
+of [Titov et al. (2018)](https://arxiv.org/abs/1712.06708). Its helicity selector
+sets the relative sign of current and signed axial flux, retaining the existing
+normalization and kernel arithmetic. The bipolar field's signed source strength
+is applied consistently with its retained vector potential.
+
 `io/_v5/writer.py` adapts the ordinary-field SFC serializer from
 `amrvac/datio.py`, retaining the binary header, tree and block layout. It accepts
 only the current nonperiodic Cartesian 3D v5 profile, calculates offsets from
