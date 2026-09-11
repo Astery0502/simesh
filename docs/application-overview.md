@@ -24,7 +24,7 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 | A06 | 原生 AMR 积分、统计与面通量 | 区域总量、平均量、分布和穿面通量是多少？ | 带单位和覆盖信息的定量结果 |
 | A07 | 沿线物理量剖面 | 密度、温度、电流沿已选曲线如何变化？ | 弧长—物理量剖面 |
 | A08 | 标量视线积分 | 给定方向上的柱密度或其他标量积分是什么？ | 带射线状态的投影图 |
-| A09 | AIA171 热辐射合成 | 指定热力学状态在历史 AIA171 响应下形成怎样的图像？ | 带模型、单位和有效性的热辐射图 |
+| A09 | EUV 与射电辐射合成 | 指定热力学状态和吸收模型会形成怎样的多波段图像？ | 带模型、单位、光深和有效性的辐射图 |
 | A10 | 势场外推与解析磁场 | 如何从底面磁场构造参考场，或生成可控的分析样本？ | 均匀磁场数组、矢势或解析构型 |
 | A11 | 数据读写与结果交付 | 如何准备输入、保存结果、交给其他程序继续使用？ | `.dat`、应用结果文件、分片目录等 |
 | A12 | 根块组合区域分析 | 如何提取多个 level 1 根块并独立研究其中的精细结构？ | 保留细化层级的子区域文件、局部分析结果 |
@@ -196,22 +196,26 @@ state = sm.mhd_fields(conserved, model=model)
 
 参考：[应用接口](user/api.md)。
 
-## 10. A09：AIA171 热辐射合成
+## 10. A09：EUV 与射电辐射合成
 
-**简介。** 将密度和温度转换为热力学场，再用保留的历史 AIA171 响应计算光学薄视线积分。适合展示密度和温度结构对合成亮度的共同影响；当前内置响应的范围是 AIA171，不能把接口当成任意波段的通用合成观测模型。
+**简介。** 将密度和温度转换为热力学场，可合成 AIA、IRIS、EIS 的 12 个 EUV 通道，以及射电自由–自由辐射。光学厚路径显式加入吸收，返回亮度、光深和无吸收亮度。
 
 **输入与接口。** 密度必须明确数值到 g/cm³ 的系数；温度以 K 提供，可以是显式等温常量，也可以来自 A05 的恢复场。`density_component` 与 `temperature_component` 均支持字段名或局部分量索引。
 
 | 入口 | 功能与输出 |
 | --- | --- |
-| `sm.AIA171(...)`、`sm.CoronalComposition(...)` | 明确电子/氢数密度约定和完全电离 H/He 组成 |
+| `sm.EUV(wavelength=...)`、`sm.RadioFreeFree(...)` | 选择波段及完全电离发射模型；`sm.AIA171(...)` 保留历史约定 |
 | `sm.thermal_fields(density, temperature, density_unit_g_cm3=..., temperature_label=..., ...)` | 生成数密度和温度字段，记录温度解释 |
 | `sm.emissivity_fields(thermodynamics, model=...)` | 生成节点发射率，供局部分布检查等用途 |
-| `app.thermal_los(thermodynamics, rays, length_unit_cm=..., order=..., subdivisions=...)` | 返回 `RayResult`，亮度单位为 DN s^-1 pixel^-1 |
+| `app.thermal_los(thermodynamics, rays, length_unit_cm=..., order=..., subdivisions=...)` | 返回 EUV 光学薄 `RayResult`，亮度单位为 DN s^-1 pixel^-1 |
+| `sm.radiation_fields(thermodynamics, model=..., absorption=...)` | 生成发射率和吸收系数；EUV 可选 `sm.HHeAbsorption()`，射电使用自身吸收 |
+| `sm.radiative_los(coefficients, rays, length_unit_cm=...)` | 沿观察者到远端的方向求解传输；射电亮温单位为 K |
 
 默认 `order="thermodynamics-first"` 先插值密度和温度，再计算非线性响应；`"emissivity-first"` 先计算节点发射率再插值，是不同重构。`subdivisions` 控制非线性求积细分，不改变所选重构。输入能量列不会被此接口自动解释为温度。
 
-参考：[热力学与视线接口](user/api.md)、[标准应用示例](../examples/standard_applications.py)。
+新 EUV 默认发射量为 `nₑ nH R(T)`；原 `AIA171` 默认保持 `nₑ² R(T)`。吸收模型只用于辐射后处理，不改变输入热力学状态。厚辐射先在节点计算系数再插值，应增加细分检查收敛。1 MK 等温图中的 EUV 吸收很弱，不能替代冷吸收层验证。
+
+参考：[热力学与视线接口](user/api.md)、[多波段示例](../examples/radiation_bands.py)。
 
 ## 11. A10：势场外推与解析磁场
 

@@ -22,7 +22,39 @@ from simesh import applications as app
 | [Magnetic applications](../../examples/standard_applications.py) | Synthetic AMR arcade, Q/twist, paths and LOS; custom NumPy archive |
 | [Uniform export](../../examples/uniform_export.py) | AMRVAC fields to NumPy memory maps or uniform VTK using explicit reconstruction |
 | [MHD analysis](../../examples/recovered_state_analysis.py) | Analytic recovered state, reductions, profiles and result files |
+| [Radiation bands](../../examples/radiation_bands.py) | Isothermal snapshot, EUV/radio images, optical depth and convergence checks |
 | [Root-subtree crop](../../examples/root_crop.py) | Regional analysis, independent AMR export, reloadable slice and integral |
+
+## EUV and radio synthesis
+
+Prepare density explicitly, select a response, then integrate identified rays:
+
+```python
+units = sm.MHDUnits.solar()  # Select scales appropriate to the simulation.
+model = sm.EUV(wavelength=193)
+with sm.open_amrvac("snapshot.dat", fields=["rho"]) as source:
+    density = sm.prepare(source, scheme="exact-phase")
+thermal = sm.thermal_fields(density, 1e6, model=model,
+    density_unit_g_cm3=units.density_g_cm3, temperature_label="prescribed 1 MK")
+plane = sm.orthographic_plane(density.mesh.lower, density.mesh.upper, [0, 0, 1], (64, 64))
+rays = sm.RaySet.from_plane(plane, [0, 0, 1])
+thin = app.thermal_los(thermal, rays, model=model, length_unit_cm=units.length_cm)
+coefficients = sm.radiation_fields(thermal, model=model, absorption=sm.HHeAbsorption())
+thick = sm.radiative_los(coefficients, rays, length_unit_cm=units.length_cm)
+if not thick.complete:
+    raise RuntimeError("Incomplete radiation coverage or integration")
+sm.save_result("euv193.result.npz", thick.intensity)
+sm.save_result("euv193-tau.result.npz", thick.optical_depth)
+```
+
+For radio, select `sm.RadioFreeFree(frequency_hz=17e9)` when creating thermal
+fields and call `radiation_fields(thermal, model=model)` without a separate
+absorber. `radiative_los` returns brightness temperature and its unabsorbed
+counterpart. Model choices, table domains, reconstruction differences, observer
+direction and physical limits are defined in the [API reference](api.md).
+`AIA171` retains its historical default; `EUV` defaults to the current upstream
+emission-measure convention. Use the supplied example to synthesize every channel
+and compare native and reference integration.
 
 ## Native AMR sections
 

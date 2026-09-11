@@ -28,7 +28,8 @@ from .diagnostics import (magnitude, dot, gradient, divergence, MagneticUnits,
 from .slices import Plane, SliceResult, sample_plane, iter_uniform, AxisSlice, AMRSliceResult, slice_axis
 from .tracing import Termination, TraceResult, trace, iter_traces, retrace
 from .projection import LOSResult, LOSStatus, integrate_los, integrate_los_views, orthographic_plane
-from .physics.thermal import AIA171, CoronalComposition, ThermalLOSResult, thermal_fields, emissivity_fields, integrate_thermal_los
+from .physics.thermal import AIA171, EUV, CoronalComposition, ThermalLOSResult, thermal_fields, emissivity_fields, integrate_thermal_los
+from .physics.radiation import HHeAbsorption, RadioFreeFree, radiation_fields
 from .geometry import PointSet, RaySet, LineSet
 from .line_profiles import LineProfile, LineProfiles, sample_line_profiles, iter_line_profiles
 from .reductions import (LengthUnits, AxisAlignedSurface, volume_integral,
@@ -60,3 +61,5 @@ __version__ = "0.2.0rc1"
 from .result_shards import ResultShards, save_result_shards, open_result_shards
 __all__ += ["iter_line_profiles", "ResultShards", "save_result_shards", "open_result_shards"]
 __all__ += ["select_roots", "crop_amrvac"]
+from .applications import RadiationResult, radiative_los
+__all__ += ["EUV", "HHeAbsorption", "RadioFreeFree", "radiation_fields", "RadiationResult", "radiative_los"]

@@ -189,9 +189,23 @@ Core object contracts are in the [developer API](../dev/api.md).
     options:
       members: [identity, response, emissivity, from_number_density]
 
+::: simesh.EUV
+    options:
+      members: [identity]
+
+::: simesh.HHeAbsorption
+    options:
+      members: [identity, opacity]
+
+::: simesh.RadioFreeFree
+    options:
+      members: [identity, response, emissivity, from_number_density]
+
 ::: simesh.thermal_fields
 
 ::: simesh.emissivity_fields
+
+::: simesh.radiation_fields
 
 ## Integration and statistics
 
@@ -237,6 +251,13 @@ Core object contracts are in the [developer API](../dev/api.md).
 ::: simesh.applications.los
 
 ::: simesh.applications.thermal_los
+
+::: simesh.radiative_los
+
+::: simesh.RadiationResult
+    options:
+      members: [complete, absorption_fraction]
+      merge_init_into_class: false
 
 ::: simesh.applications.RayResult
     options:

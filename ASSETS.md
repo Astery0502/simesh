@@ -166,3 +166,35 @@ at four compute workers.
 | `src/simesh/utils/lib/analysis/native.pxd` | `_kernels/native.pxd` | Selected N1 kernels; derivative binding may be adapted |
 | `src/simesh/utils/lib/analysis/preparation.pyx` | `_kernels/preparation.pyx` | Selected N1 kernels; derivative binding may be adapted |
 | `src/simesh/amrvac/analysis_read.py` | `io/_bulk.py` | Reader namespace adaptation |
+
+
+## EUV and radio radiation synthesis
+
+The 2026-09-11 extension uses MPI-AMRVAC branch `amrvac3.3`, pinned to
+[`423ad207a7fedcf5436a4d1d229199e29e166e81`](https://github.com/amrvac/amrvac/commit/423ad207a7fedcf5436a4d1d229199e29e166e81).
+The source is `src/physics/mod_thermal_emission.t` (SHA-256
+`a865d67beade83c07a67befed282a30123548d8e169fb20ccdfee6e13fc1e920`),
+under the upstream GNU GPL version 3 license, compatible with this repository's
+GPL-3.0-only distribution. The repository LICENSE remains applicable.
+
+- `physics/_euv_tables.py` copies the 12 AIA/IRIS/EIS response tables. Their
+  calibration-generation settings remain unspecified. Log/log AIA/IRIS and
+  linear/linear EIS interpolation follow `interpolate_response_value`.
+- `physics/thermal.py::EUV` follows the new `get_EUV` emission-measure factor
+  `n_e n_H`. The emitting composition is explicitly fully ionized; the existing
+  `AIA171` model and its historical identity/default remain available.
+- `physics/radiation.py` adapts `get_EUV_HHe_opacity`, the fully ionized EOS
+  branch's radiation-only Saha charge-neutrality closure, and
+  `get_radio_ff_source_opacity`. It does not import the simulation's PI/LTE EOS.
+  The absorber's helium abundance is independent of the emitting composition.
+  Neutral fractions are retained directly in log space to avoid hot-plasma
+  subtraction cancellation, and nonconvergence is reported explicitly.
+- Ordered transfer reuses the native tree locator, interpolation stencil and
+  thermal interval traversal. It follows upstream near-to-far ordering while
+  replacing the upstream first-order `exp(-tau) j ds` layer contribution by
+  `exp(-tau) j ds [-expm1(-d_tau)/d_tau]`, with its continuous zero-opacity
+  limit. This is exact within each constant-coefficient midpoint slab; varying
+  coefficients still require subdivision convergence checks.
+
+No upstream Dataset, MPI communication, spherical ray machinery or instrument
+post-processing is imported into the active package.

@@ -32,4 +32,8 @@ bounded payload batches. Global input Mesh/index storage remains resident.
 `io/_v5/writer.py` shares batch serialization between file and Fields exports,
 without a mutable mesh dependency. Historical Dataset implementations are excluded from the package.
 `_kernels/primitives` retains its original compiler semantics.
+`physics/thermal.py` owns tabulated EUV responses and explicit thermal nodes;
+`physics/radiation.py` constructs EUV absorption and radio coefficients without
+modifying the simulation EOS. Both thermal and ordered transfer consumers reuse
+`_kernels/thermal_rays.pyx` for leaf ownership and interpolation-knot traversal.
 See [core contracts](api.md) and [build groups](cython-build.md).

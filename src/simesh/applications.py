@@ -21,7 +21,8 @@ from .projection import LOSStatus
 
 __all__ = ["PointSet","RaySet","LineSet","SampledPoints","ConnectivityMap","RayResult",
            "UniformResult","sample","field_map","uniform_grid","surface_diagnostics","bottom_diagnostics",
-           "connectivity","iter_connectivity","trace","los","thermal_los"]
+           "connectivity","iter_connectivity","trace","los","thermal_los",
+           "RadiationResult", "radiative_los"]
 
 
 def _points(points):
@@ -717,7 +718,7 @@ def los(fields, rays, *, component=0, quadrature="gauss2", step_fraction=.5,
 def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
                 order="thermodynamics-first", subdivisions=4, max_samples=1000000,
                 workers=1, ray_batch=4096, memory_limit=None):
-    """Apply the existing native AIA171 reconstruction to identified rays.
+    """Apply a native tabulated EUV reconstruction to identified rays.
 
     Parameters
     ----------
@@ -728,7 +729,7 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
         Identified rays and coordinate-distance clipping.
     length_unit_cm : float
         Centimeters per coordinate-length unit.
-    model : AIA171, optional
+    model : AIA171 or EUV, optional
         Model matching the thermal fields; None selects the default AIA171 model.
     order : str
         thermodynamics-first interpolates n,T before n²R(T); emissivity-first applies
@@ -747,7 +748,7 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
     Returns
     -------
     RayResult
-        Historical AIA171 brightness in DN s^-1 pixel^-1, with identified rays and status.
+        Tabulated EUV brightness in DN s^-1 pixel^-1, with identified rays and status.
 
     Notes
     -----
@@ -755,20 +756,21 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
     """
     from dataclasses import replace
     from .physics.thermal import (AIA171, _check_thermal, emissivity_fields,
-                                  _RESPONSE_GRID, _LOG_RESPONSE, _RESPONSE_SLOPES, _scale_thermal_values)
+                                  _native_response, _scale_thermal_values)
     from ._kernels.native import initialize_ray_set
     from ._kernels.thermal_rays import integrate_ray_set_ready
     model = AIA171() if model is None else model
     _check_thermal(thermodynamics,model)
+    grid, ordinates, slopes, mode = _native_response(model)
     if not isinstance(rays,RaySet):
         raise TypeError("rays must be a RaySet")
     workers_count(workers)
-    if (type(model) is not AIA171 or order not in ("thermodynamics-first","emissivity-first") or
+    if (order not in ("thermodynamics-first","emissivity-first") or
             not np.isfinite(length_unit_cm) or length_unit_cm <= 0 or
             type(subdivisions) is not int or not 1 <= subdivisions <= np.iinfo(np.int64).max//2 or
             type(max_samples) is not int or not 1 <= max_samples <= np.iinfo(np.int64).max or
             type(ray_batch) is not int or ray_batch < 1):
-        raise ValueError("native AIA171, positive units and valid quadrature/batch controls are required")
+        raise ValueError("positive units and valid quadrature/batch controls are required")
     if order == "emissivity-first":
         emissivity = emissivity_fields(thermodynamics,model=model,
                                       memory_limit=remaining(memory_limit,rays.nbytes+len(rays.origins)*32))
@@ -799,7 +801,7 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
                     integrate_ray_set_ready(mesh.roots,mesh.children,mesh.node_leaves,mesh.node_lower,mesh.node_upper,
                         mesh.bounds,mesh.spacing,thermodynamics.slot_of_leaf,thermodynamics.values,
                         thermodynamics.storage_halo,origins,direction,entry[s],exit[s],subdivisions,max_samples,
-                        _RESPONSE_GRID,_LOG_RESPONSE,_RESPONSE_SLOPES,values[s],status[s],samples[s])
+                        grid,ordinates,slopes,values[s],status[s],samples[s],mode)
                 run_ranges(stop-start,workers,run,executor)
         result = RayResult(rays,values,entry,exit,status,samples,misses,"DN s^-1 pixel^-1",
                            f"thermodynamics-first/composite-gauss2/{subdivisions}",thermodynamics.value_identity)
@@ -808,6 +810,202 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
                    metadata={"model":model.identity,"temperature_label":thermodynamics.source[2],
                              "density_unit_g_cm3":thermodynamics.preparation_stats["density_unit_g_cm3"],
                              "length_unit_cm":float(length_unit_cm)})
+
+
+@dataclass(frozen=True)
+class RadiationResult:
+    """Ordered radiation and diagnostic products sharing identified rays.
+
+    Attributes
+    ----------
+    intensity : RayResult
+        Emergent brightness including the attenuated far-side background.
+    optical_depth : RayResult
+        Dimensionless integrated opacity.
+    thin_intensity : RayResult
+        Emission without absorption or background, in the same brightness units.
+    absorption_fraction : ndarray
+        Fraction of emitted brightness absorbed, excluding background; zero for
+        dark valid rays and NaN for invalid rays.
+
+    Notes
+    -----
+    Save each RayResult with save_result. All products mark incomplete rays
+    invalid; none infer missing coverage from an opaque foreground.
+    """
+    intensity: RayResult
+    optical_depth: RayResult
+    thin_intensity: RayResult
+    absorption_fraction: np.ndarray
+
+    @property
+    def complete(self):
+        """Whether all three products contain only COMPLETE or EMPTY rays."""
+        return all(item.complete for item in (self.intensity, self.optical_depth, self.thin_intensity))
+
+def radiative_los(coefficients, rays, *, length_unit_cm, background=0., subdivisions=4,
+                  max_samples=1000000, workers=1, ray_batch=4096, memory_limit=None,
+                  implementation="native"):
+    """Integrate emission and absorption from the observer towards the far side.
+
+    Parameters
+    ----------
+    coefficients : Fields
+        Two continuous prepared components from radiation_fields: emissivity and
+        opacity, with at least one valid halo. No Source reads occur here.
+    rays : RaySet
+        Identified observer-side origins, directions pointing into the scene,
+        and coordinate-distance clipping. The background enters at each far end.
+    length_unit_cm : float
+        Positive centimeters per coordinate-length unit, applied to j and kappa.
+    background : float
+        Uniform nonnegative far-side brightness, in the model's output units.
+    subdivisions : int
+        Positive number of midpoint slabs per interpolation-knot interval.
+    max_samples : int
+        Positive per-ray sample limit. Truncated rays are invalid, even if opaque.
+    workers : int
+        Workers over disjoint ray ranges; reference requires one.
+    ray_batch : int
+        Positive maximum native rays per batch; coefficients remain resident.
+    memory_limit : int, optional
+        Accounted-array budget in bytes for this call, not a process RSS limit.
+    implementation : str
+        native for compiled traversal or reference for independent leaf intersections.
+
+    Returns
+    -------
+    RadiationResult
+        Emergent intensity, optical depth and unabsorbed emission. EUV brightness
+        is DN s^-1 pixel^-1; radio brightness temperature is K. Empty rays transmit
+        background unchanged. Numerical failures and missing coverage yield NaN.
+
+    Notes
+    -----
+    Interpolates prepared j,kappa, then composes exact constant-coefficient slab
+    solutions in physical order. This approximates spatially varying transfer;
+    increase subdivisions to check convergence. Region edges are not physical boundaries.
+    """
+    from dataclasses import replace
+    from ._kernels.native import initialize_ray_set
+    from ._kernels.thermal_rays import integrate_transfer_ray_set_ready
+
+    require_continuous(coefficients, operation="radiative LOS")
+    if not isinstance(rays, RaySet):
+        raise TypeError("rays must be a RaySet")
+    units = coefficients.preparation_stats.get("radiation_units")
+    if (units not in ("K", "DN s^-1 pixel^-1") or
+            tuple(f.units for f in coefficients.fields) != (units+" cm^-1", "cm^-1")):
+        raise ValueError("radiative LOS requires emissivity/opacity from radiation_fields")
+    workers_count(workers)
+    if (not np.isfinite(length_unit_cm) or length_unit_cm <= 0 or
+            np.ndim(background) != 0 or not np.isfinite(background) or background < 0 or
+            type(subdivisions) is not int or not 1 <= subdivisions <= np.iinfo(np.int64).max//2 or
+            type(max_samples) is not int or not 1 <= max_samples <= np.iinfo(np.int64).max or
+            type(ray_batch) is not int or ray_batch < 1 or
+            implementation not in ("native", "reference")):
+        raise ValueError("positive units, nonnegative background and valid integration controls are required")
+    if implementation == "reference" and workers != 1:
+        raise ValueError("reference implementation requires one worker")
+    n = len(rays.origins)
+    mesh = coefficients.mesh
+    scratch = (mesh.leaf_count*128+2*subdivisions*(sum(mesh.block_shape)+1)*384
+               if implementation == "reference" else min(n,ray_batch)*128)
+    admit(mesh.nbytes+coefficients.nbytes+rays.nbytes+n*160+scratch+workers*65536,
+          memory_limit, "radiative LOS")
+    values, entry, exit, tau, thin = (np.zeros(n) for _ in range(5))
+    status, samples, misses = (np.zeros(n, dtype=np.int64) for _ in range(3))
+    directions = np.broadcast_to(rays.directions, (n, 3))
+    if implementation == "reference":
+        _reference_transfer(coefficients, rays, directions, length_unit_cm, subdivisions,
+                            max_samples, values, entry, exit, tau, thin, status, samples)
+    else:
+        backing = coefficients.values
+        with worker_context(workers) as executor:
+            for start in range(0, n, ray_batch):
+                stop = min(start+ray_batch, n)
+                direction_batch = np.ascontiguousarray(directions[start:stop])
+                def run(first, last):
+                    s = slice(start+first, start+last)
+                    origins = rays.origins.positions[s]
+                    direction = direction_batch[first:last]
+                    initialize_ray_set(mesh.lower, mesh.upper, origins, direction, rays.near[s], rays.far[s],
+                                       entry[s], exit[s], status[s])
+                    integrate_transfer_ray_set_ready(mesh.roots, mesh.children, mesh.node_leaves,
+                        mesh.node_lower, mesh.node_upper, mesh.bounds, mesh.spacing,
+                        coefficients.slot_of_leaf, backing, coefficients.storage_halo,
+                        origins, direction, entry[s], exit[s], subdivisions, max_samples, length_unit_cm,
+                        values[s], status[s], samples[s], tau[s], thin[s])
+                run_ranges(stop-start, workers, run, executor)
+    valid = np.isin(status, (LOSStatus.COMPLETE, LOSStatus.EMPTY))
+    # Compute before adding background: subtracting a bright background later
+    # can erase the emitted signal and corrupt the absorption diagnostic.
+    fraction = np.ones_like(thin)
+    np.divide(values, thin, out=fraction, where=thin > 0)
+    fraction = np.clip(1-fraction, 0., 1.)
+    with np.errstate(over="ignore", invalid="ignore"):
+        values += float(background)*np.exp(-tau)
+    bad = valid & ~(np.isfinite(values) & np.isfinite(tau) & np.isfinite(thin))
+    status[bad] = LOSStatus.UNREPRESENTABLE_INTEGRAL
+    for data in (values, tau, thin, fraction):
+        data[~valid | bad] = np.nan
+    metadata = {key: coefficients.preparation_stats[key] for key in
+                ("model", "temperature", "density_unit_g_cm3", "absorption")}
+    metadata.update(length_unit_cm=float(length_unit_cm), background=float(background),
+                    observer="ray-origin", reconstruction="coefficients-first")
+    intensity = RayResult(rays, values, entry, exit, status, samples, misses, units,
+        f"ordered-midpoint-slabs/{subdivisions}", coefficients.value_identity, metadata)
+    return RadiationResult(intensity, replace(intensity, values=tau, units="1"),
+                           replace(intensity, values=thin), fraction)
+
+
+def _reference_transfer(fields, rays, directions, length, subdivisions, limit,
+                        values, entry, exit, tau, thin, status, samples):
+    from .physics.thermal import ray_segments, ray_nodes
+
+    mesh = fields.mesh
+    for row, (origin, direction) in enumerate(zip(rays.origins.positions, directions)):
+        leaves, first, last = ray_segments(mesh, origin, direction, rays.near[row], rays.far[row])
+        status[row] = LOSStatus.EMPTY
+        if not len(leaves):
+            continue
+        entry[row], exit[row] = first[0], last[-1]
+        status[row] = LOSStatus.COMPLETE
+        if not np.allclose(first[1:], last[:-1], rtol=2e-13, atol=2e-13):
+            status[row] = LOSStatus.GEOMETRY_FAILURE
+        for leaf, lo, hi in zip(leaves, first, last):
+            if status[row] != LOSStatus.COMPLETE:
+                break
+            if fields.slot_of_leaf[leaf] < 0:
+                status[row] = LOSStatus.MISSING_COVERAGE
+                break
+            nodes, weights = ray_nodes(mesh, leaf, origin, direction, lo, hi, subdivisions)
+            nodes = nodes.reshape(-1, 2).mean(axis=1)
+            widths = weights.reshape(-1, 2).sum(axis=1)*length
+            if samples[row]+len(nodes) > limit:
+                status[row] = LOSStatus.SAMPLE_LIMIT
+                break
+            points = origin+nodes[:, None]*direction
+            points = np.maximum(mesh.bounds[leaf, 0], np.minimum(points,
+                                np.nextafter(mesh.bounds[leaf, 1], mesh.bounds[leaf, 0])))
+            data, owners, valid = sample_values(fields, points)
+            if not np.all(valid) or not np.all(owners == leaf):
+                status[row] = LOSStatus.UNREPRESENTABLE_SAMPLE
+                break
+            if not np.isfinite(data).all() or np.any(data < 0):
+                status[row] = LOSStatus.NONFINITE_SCALAR
+                break
+            with np.errstate(over="ignore", invalid="ignore"):
+                for (j, kappa), ds in zip(data, widths):
+                    dtau = kappa*ds
+                    emission = j*ds
+                    thin[row] += emission
+                    slab = -np.expm1(-dtau)/dtau if dtau > 0 else 1.
+                    values[row] += np.exp(-tau[row])*emission*slab
+                    tau[row] += dtau
+                if not np.isfinite([values[row], tau[row], thin[row]]).all():
+                    status[row] = LOSStatus.UNREPRESENTABLE_INTEGRAL
+            samples[row] += len(nodes)
 
 
 def iter_lines(fields, points, *, seed_batch=128, memory_limit=None, **controls):

@@ -1,8 +1,9 @@
-"""Explicit historical AIA171 response and H/He thermodynamics on ready fields."""
+"""Explicit EUV responses and H/He thermodynamics on ready fields."""
 from dataclasses import dataclass, replace
 from contextlib import nullcontext
 import numpy as np
 from ._aia171_table import LOG_T, RESPONSE, UPSTREAM_COMMIT
+from . import _euv_tables
 from ..fields import FieldDefinition, Fields, require_fields, publish, require_continuous
 from .._validation import frozen_array, admit, remaining, workers_count
 from .._execution import native_dispatch, worker_context, run_ranges
@@ -16,6 +17,12 @@ BOLTZMANN_ERG_K = 1.380649e-16
 _RESPONSE_GRID = frozen_array(LOG_T, float)
 _LOG_RESPONSE = frozen_array(np.log10(RESPONSE), float)
 _RESPONSE_SLOPES = frozen_array(np.diff(_LOG_RESPONSE)/np.diff(_RESPONSE_GRID), float)
+_EUV_TABLES = {}
+for _wave, (_grid, _values, _logarithmic) in _euv_tables.RESPONSES.items():
+    _ordinates = np.log10(np.maximum(_values, 1e-99)) if _logarithmic else np.asarray(_values)
+    _EUV_TABLES[_wave] = (frozen_array(_grid, float), frozen_array(_ordinates, float),
+                        frozen_array(np.diff(_ordinates)/np.diff(_grid), float),
+                        0 if _logarithmic else 1)
 
 @dataclass(frozen=True)
 class ThermalLOSResult(LOSResult):
@@ -24,7 +31,7 @@ class ThermalLOSResult(LOSResult):
     Attributes
     ----------
     model : object
-        Historical response identity.
+        Pinned response identity.
     temperature_label : str
         Temperature provenance.
     density_unit_g_cm3, length_unit_cm : float
@@ -51,15 +58,25 @@ class CoronalComposition:
             raise ValueError("helium abundance must be finite and nonnegative")
 
     def number_density(self, mass_density_cgs, *, convention="electron"):
-        """Convert mass density in g/cm³ to electron or amrvac-hydrogen number density in cm^-3."""
+        """Convert g/cm³ to n_e, n_H, or sqrt(n_e n_H) in cm^-3.
+
+        Conventions are electron, amrvac-hydrogen and electron-hydrogen,
+        respectively, for the explicitly fully ionized composition.
+        """
         rho = np.asarray(mass_density_cgs, dtype=float)
         if not np.isfinite(rho).all() or np.any(rho < 0):
             raise ValueError("mass density must be finite and nonnegative")
-        if convention not in ("electron", "amrvac-hydrogen"):
-            raise ValueError("density convention must be electron or amrvac-hydrogen")
         h = self.helium_abundance
         nh = rho / ((1 + 4*h)*PROTON_MASS_G)
-        return nh*(1 + 2*h) if convention == "electron" else nh
+        return nh*self._number_density_factor(convention)
+
+    def _number_density_factor(self, convention):
+        factors = {"electron": 1+2*self.helium_abundance, "amrvac-hydrogen": 1.,
+                   "electron-hydrogen": np.sqrt(1+2*self.helium_abundance)}
+        try:
+            return factors[convention]
+        except KeyError:
+            raise ValueError("unknown number-density convention") from None
 
     def temperature(self, mass_density_cgs, thermal_pressure_cgs):
         """p = (2+3a) n_H k_B T. Pressure is thermal, not total energy."""
@@ -83,8 +100,19 @@ class AIA171:
     composition: CoronalComposition = CoronalComposition()
 
     def __post_init__(self):
-        if self.density_convention not in ("electron", "amrvac-hydrogen"):
+        if self.density_convention not in ("electron", "amrvac-hydrogen", "electron-hydrogen"):
             raise ValueError("unknown emission-measure density convention")
+        if not isinstance(self.composition, CoronalComposition):
+            raise TypeError("composition must be a CoronalComposition")
+
+    @property
+    def _table(self):
+        return _RESPONSE_GRID, _LOG_RESPONSE, _RESPONSE_SLOPES, 0
+
+    @property
+    def emissivity_name(self):
+        """Prepared emissivity field name."""
+        return "aia171_emissivity"
 
     @property
     def identity(self):
@@ -92,13 +120,15 @@ class AIA171:
         return f"amrvac-{UPSTREAM_COMMIT}-171-{self.density_convention}-He{self.composition.helium_abundance:g}"
 
     def response(self, temperature_k):
-        """Interpolate the historical response in log temperature/response; zero outside the table."""
+        """Interpolate the selected response table; EUV defines each instrument's interpolation axes."""
         t = np.asarray(temperature_k, dtype=float)
         if not np.isfinite(t).all() or np.any(t <= 0):
             raise ValueError("temperature must be finite and positive in kelvin")
-        logt = np.log10(t)
-        log_response = np.interp(logt, _RESPONSE_GRID, _LOG_RESPONSE)
-        return np.where((logt >= _RESPONSE_GRID[0]) & (logt <= _RESPONSE_GRID[-1]), 10.**log_response, 0.)
+        grid, ordinates, _, mode = self._table
+        lookup = np.log10(t) if mode == 0 else t
+        value = np.interp(lookup, grid, ordinates)
+        value = np.where(value > -99., 10.**value, 0.) if mode == 0 else value
+        return np.where((lookup >= grid[0]) & (lookup <= grid[-1]), value, 0.)
 
     def emissivity(self, mass_density_cgs, temperature_k):
         """Evaluate emission from mass density in g/cm³ and positive kelvin temperature."""
@@ -115,6 +145,58 @@ class AIA171:
         if not np.isfinite(value).all():
             raise ValueError("unrepresentable thermal emissivity")
         return value
+
+
+@dataclass(frozen=True)
+class EUV(AIA171):
+    """Upstream EUV response with explicit fully ionized emission measure.
+
+    Parameters
+    ----------
+    density_convention : str
+        electron-hydrogen uses n_e n_H R(T), as in AMRVAC 3.3. electron and
+        amrvac-hydrogen select n_e² and n_H² explicitly.
+    composition : CoronalComposition
+        Fully ionized H/He composition for emission-measure conversion.
+    wavelength : int
+        AIA 94, 131, 171, 193, 211, 304, 335; IRIS 1354; or EIS 192, 255,
+        263, 264, in Angstrom. Supply by keyword.
+
+    Notes
+    -----
+    AIA/IRIS interpolate log10(T)-log10(R); EIS interpolates T-R linearly.
+    Responses vanish outside their tables; original calibration settings are
+    unspecified. This model does not recover a partially ionized simulation EOS.
+    Response and emissivity methods are inherited from [AIA171][simesh.AIA171].
+    """
+    density_convention: str = "electron-hydrogen"
+    wavelength: int = 171
+
+    def __post_init__(self):
+        super().__post_init__()
+        if type(self.wavelength) is not int or self.wavelength not in _EUV_TABLES:
+            raise ValueError("unsupported EUV wavelength")
+
+    @property
+    def _table(self):
+        return _EUV_TABLES[self.wavelength]
+
+    @property
+    def identity(self):
+        """Pinned response, wavelength, composition and emission-measure identity."""
+        return (f"amrvac-{_euv_tables.UPSTREAM_COMMIT}-{self.wavelength}-"
+                f"{self.density_convention}-He{self.composition.helium_abundance:g}")
+
+    @property
+    def emissivity_name(self):
+        """Prepared emissivity field name."""
+        return f"euv{self.wavelength}_emissivity"
+
+
+def _native_response(model):
+    if type(model) not in (AIA171, EUV):
+        raise ValueError("native response requires AIA171 or EUV; use reference for customized models")
+    return model._table
 
 
 def ray_segments(mesh, origin, direction, near, far):
@@ -168,7 +250,7 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
         Finite nonzero viewing direction (3,).
     length_unit_cm : float
         Centimeters per coordinate-length unit.
-    model : AIA171
+    model : AIA171 or EUV
         Response matching the thermal fields.
     order : str
         thermodynamics-first interpolates n,T before n²R(T); emissivity-first applies
@@ -208,8 +290,8 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
         raise ValueError("implementation must be native or reference")
     if implementation == "reference" and workers != 1:
         raise ValueError("reference implementation requires one worker")
-    if implementation == "native" and type(model) is not AIA171:
-        raise ValueError("native response requires AIA171; use reference for customized models")
+    if implementation == "native":
+        _native_response(model)
     if not np.isfinite(length_unit_cm) or length_unit_cm <= 0:
         raise ValueError("length unit must be a positive finite cm multiplier")
     if order not in ("thermodynamics-first", "emissivity-first"):
@@ -245,7 +327,7 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
     samples, misses = (np.zeros(plane.shape, dtype=np.int64) for _ in range(2))
     if implementation == "native":
         _native_los(thermodynamics,plane,direction,near,far,subdivisions,max_samples,
-                    workers,values,entry,exit,status,samples,backend,schedule)
+                    workers,values,entry,exit,status,samples,backend,schedule,model)
     for pixel in (np.ndindex(plane.shape) if implementation == "reference" else ()):
         origin = plane.origin+(pixel[0]+.5)/plane.shape[0]*plane.u+(pixel[1]+.5)/plane.shape[1]*plane.v
         leaves, first, last = ray_segments(mesh, origin, direction, near[pixel], far[pixel])
@@ -291,11 +373,12 @@ def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
 
 
 def _native_los(fields,plane,direction,near,far,subdivisions,max_samples,
-                workers,values,entry,exit,status,samples,backend,schedule):
+                workers,values,entry,exit,status,samples,backend,schedule,model):
     from .._kernels.native import initialize_rays
     from .._kernels.thermal_rays import integrate_ready, openmp_build_info
     native, dispatch = native_dispatch(backend,schedule,build_info=openmp_build_info)
     mesh = fields.mesh
+    grid, ordinates, slopes, mode = _native_response(model)
     nx,ny = plane.shape
     origins = (plane.origin+((np.arange(nx)+.5)/nx)[:,None,None]*plane.u+
                ((np.arange(ny)+.5)/ny)[None,:,None]*plane.v).reshape(-1,3)
@@ -310,8 +393,8 @@ def _native_los(fields,plane,direction,near,far,subdivisions,max_samples,
         integrate_ready(mesh.roots,mesh.children,mesh.node_leaves,mesh.node_lower,mesh.node_upper,
             mesh.bounds,mesh.spacing,fields.slot_of_leaf,fields.values,fields.storage_halo,
             origins[span],direction,starts[span],ends[span],subdivisions,max_samples,
-            _RESPONSE_GRID,_LOG_RESPONSE,_RESPONSE_SLOPES,output[span],flags[span],counts[span],
-            workers if native else 1,dispatch)
+            grid,ordinates,slopes,output[span],flags[span],counts[span],
+            workers if native else 1,dispatch,mode)
     tasks = workers*4 if dispatch else workers
     context = nullcontext(None) if native else worker_context(workers)
     with context as executor:
@@ -351,8 +434,9 @@ def thermal_fields(density,temperature,*,density_unit_g_cm3,model=AIA171(),densi
         Positive kelvin scalar or kelvin field covering density on the same Mesh.
     density_unit_g_cm3 : float
         Grams per cubic centimeter per stored mass-density value.
-    model : AIA171
-        Selected historical response, composition and number-density convention.
+    model : AIA171, EUV or RadioFreeFree
+        Selected emitting model, composition and number-density convention. Radio
+        thermal nodes are consumed by radiation_fields and radiative_los.
     density_component : str or int
         Mass-density field name or local component index.
     temperature_component : str or int
@@ -434,7 +518,7 @@ def emissivity_fields(thermodynamics,*,model=AIA171(),memory_limit=None):
     ----------
     thermodynamics : Fields
         Number-density and kelvin fields produced by thermal_fields with the same model.
-    model : AIA171
+    model : AIA171 or EUV
         Response matching the supplied thermal fields.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
@@ -449,12 +533,20 @@ def emissivity_fields(thermodynamics,*,model=AIA171(),memory_limit=None):
     Response-before-interpolation defines emissivity-first reconstruction; it is not interchangeable with thermodynamics-first.
     """
     _check_thermal(thermodynamics,model,halo=0)
+    definitions = (FieldDefinition(model.emissivity_name,'DN s^-1 pixel^-1 cm^-1','prepared-node'),)
+    return _map_thermal(thermodynamics, definitions,
+        lambda data: model.from_number_density(data[...,0], data[...,1])[...,None],
+        'response-before-interpolation', memory_limit)
+
+
+def _map_thermal(thermodynamics, definitions, transform, operation, memory_limit, *,
+                 stats=None, scratch_per_node=128):
     h=thermodynamics.valid_halo
     block=thermodynamics.mesh.block_shape
-    shape=(len(thermodynamics.leaf_ids),*(n+2*h for n in block),1)
+    shape=(len(thermodynamics.leaf_ids),*(n+2*h for n in block),len(definitions))
     required=(thermodynamics.nbytes+thermodynamics.mesh.nbytes+8*int(np.prod(shape))+
-              128*int(np.prod(shape[1:4])))
-    admit(required,memory_limit,"emissivity")
+              scratch_per_node*int(np.prod(shape[1:4])))
+    admit(required,memory_limit,operation)
     values=np.empty(shape)
     backing=thermodynamics.values
     slots=thermodynamics.slot_of_leaf[thermodynamics.leaf_ids]
@@ -462,8 +554,10 @@ def emissivity_fields(thermodynamics,*,model=AIA171(),memory_limit=None):
     box=tuple(slice(offset-h,offset+n+h) for n in block)
     for row,slot in enumerate(slots):
         data=backing[(slot,*box,slice(None))]
-        values[row,...,0]=model.from_number_density(data[...,0],data[...,1])
+        transformed = transform(data)
+        if not np.isfinite(transformed).all() or np.any(transformed < 0):
+            raise ValueError("radiation coefficients must be finite and nonnegative")
+        values[row]=transformed
     return publish(thermodynamics.mesh,values,thermodynamics.selection,
-        (FieldDefinition('aia171_emissivity','DN s^-1 pixel^-1 cm^-1','prepared-node'),),h,h,
-        thermodynamics.scheme+'/response-before-interpolation',thermodynamics.source,
-        thermodynamics.preparation_stats)
+        definitions,h,h,thermodynamics.scheme+'/'+operation,thermodynamics.source,
+        {**thermodynamics.preparation_stats, **(stats or {}), "controlled_upper_bytes": required})

@@ -14,7 +14,7 @@ the [API reference](docs/user/api.md) for exact interface contracts.
 - Gradients, divergence, curl and explicitly normalized magnetic diagnostics
 - Magnetic tracing, Q/Q-perpendicular, localized footpoints and twist
 - CGS ideal-MHD recovery with `MHDUnits.solar()`, AMR integrals/statistics and rectangular surface flux
-- Scalar and historical AIA171 thermal LOS
+- Scalar LOS, 12 EUV response channels, H/He absorption and radio free-free transfer
 - Identified lines/profiles, result save/load and incremental output shards
 - Reloadable native AMR sections and quantitative integral/statistical results
 - AMRVAC v5 input, root-block regional analysis retaining AMR refinement, and `.dat` export
