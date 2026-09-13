@@ -44,6 +44,14 @@ These scales are teaching values, not simulation calibration. Continue with the
 [workflow examples](docs/user/index.md#examples) for your analysis task.
 Optional `.[plot]` enables PNG rendering; `.[fft]` adds FFT convolution.
 
+## Choosing a workflow with AI
+
+Ask your assistant to run `python -m simesh.guide` in the environment where
+simesh is installed before organizing an analysis. The short, offline guide
+provides calculation decision points and interface starting points for that
+version. It is also readable directly by users; installing the package does
+not automatically load it into an assistant.
+
 ## Documentation and development
 
 The [documentation map](docs/index.md) links workflow guides and API references.

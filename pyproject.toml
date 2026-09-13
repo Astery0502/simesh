@@ -25,6 +25,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["*.pyx", "*.pxd"]
+"simesh" = ["_guide.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
