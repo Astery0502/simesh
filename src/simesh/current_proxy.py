@@ -13,6 +13,7 @@ from .tracing import Termination, _validate_vector, _resolve_curl
 from .line_profiles import sample_line_profiles
 from .connectivity import Boundary
 from .fields import require_fields
+from .operators.line import _trapezoid
 
 
 @dataclass(frozen=True)
@@ -207,7 +208,7 @@ def _deposit_lines(fields,companion,lines,areas,shape,lower,upper,step,workers):
             current = profiles.values[indices]
             with np.errstate(over='ignore',invalid='ignore'):
                 j2 = np.einsum('ij,ij->i',current,current)
-                mean = np.sum(.5*(j2[:-1]+j2[1:])*ds)/lengths[row]
+                mean = _trapezoid(j2,ds)/lengths[row]
                 weighted = mean*areas[row]
             if not np.isfinite(mean) or not np.isfinite(weighted):
                 continue

@@ -357,3 +357,9 @@ Core object contracts are in the [developer API](../dev/api.md).
 ::: simesh.colormaps.iris_colormap
 
 ::: simesh.colormaps.eis_intensity_colormap
+
+## Sampled-curve calculus
+
+::: simesh.line_integral
+
+::: simesh.line_derivative

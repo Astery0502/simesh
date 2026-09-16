@@ -24,6 +24,7 @@ from simesh import applications as app
 | [MHD analysis](../../examples/recovered_state_analysis.py) | Analytic recovered state, reductions, profiles and result files |
 | [Radiation bands](../../examples/radiation_bands.py) | Isothermal snapshot, EUV/radio images, optical depth and convergence checks |
 | [Root-subtree crop](../../examples/root_crop.py) | Regional analysis, independent AMR export, reloadable slice and integral |
+| [Along-line calculus](../../examples/line_calculus.py) | RK scalar integrals, weighted means, bounded continuation and sampled-curve derivatives |
 | [Current-based proxy](../../examples/current_proxy.py) | Native or supplied seed quadrature, traced-line contributions and checkpointed display volumes |
 
 ## Current-based morphology proxy
@@ -177,6 +178,43 @@ than a display cell. Raw traces retain accepted prefixes; QSL diagnostics retain
 their separate boundary-localization behavior. Smaller local steps may require
 larger `max_steps` to reach the boundary. Previously saved figures and results
 retain their original step controls and are not recomputed automatically.
+
+## Compose along-line calculations
+
+Pass prepared scalar `Fields` as `integrands` to `sm.trace` or `sm.iter_traces`
+to integrate all components alongside the trajectory without retaining a path:
+
+```python
+traced = sm.trace(vector, seeds, integrands=rates, max_length=0.2, workers=4)
+values = traced.integrals
+```
+
+The rates must share the vector's Mesh and have one valid halo. Their components
+are interpolated at the same RK stage positions; a nonlinear transform prepared
+on grid nodes therefore means "transform, then interpolate". Each integral uses
+positive branch arc length and retains only accepted steps. Inspect termination
+before treating a result as a complete physical line. Weighted averages use two
+rates, weight times quantity and weight; divide their integrals only when the
+weight integral is nonzero. No automatic unit conversion is performed.
+
+`trace_bounded` accepts the same optional rates as resident Fields covering the
+entire Mesh. Its primary/curl pool still manages vector coverage; the rates are
+accounted in the memory budget and are never silently loaded by that pool.
+
+For an existing `LineProfile`, apply NumPy transformations and use the independent
+sampled-curve operations:
+
+```python
+integral = sm.line_integral(profile.values, profile.arclength)
+derivative = sm.line_derivative(profile.values, profile.arclength, edge_order=2)
+```
+
+These use the supplied sample sequence and distances, not the original RK
+stages. Check `profile.usable` first. Joined profiles retain both seed samples;
+remove repeated distances before differentiation. Summation and extrema can use
+NumPy directly, with a deliberately chosen sampling grid and validity mask.
+The [runnable example](../../examples/line_calculus.py) verifies RK integrals,
+weighted averages, bounded continuation and sampled derivatives on an AMR field.
 
 ## Magnetic connectivity methods
 

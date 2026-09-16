@@ -7,8 +7,10 @@ ownership and trilinear interpolation are shared with the native N4 consumers.
 
 from libc.math cimport fabs, fmin, fmax, hypot, isfinite, log, nextafter, INFINITY
 from libc.stdint cimport int64_t
-from .native cimport owner, interpolate
+from .native cimport owner_node, contains_point, interpolate
 from .tracing_step cimport cell_width, trace_step, finer_step
+from .rk4 cimport rk4_trial
+from .line_quantities cimport twist_density
 
 
 cdef class _Sampler:
@@ -25,6 +27,10 @@ cdef class _Sampler:
     cdef double center[3]
     cdef double radius
     cdef bint twist, variational
+    cdef bint outside_stage
+    cdef double min_width, norm
+    cdef int64_t node_hint
+    cdef int direction
 
     def __init__(self, fields, gradient, companion, null_threshold, lower, upper):
         mesh = fields.mesh
@@ -63,10 +69,12 @@ cdef class _Sampler:
                 # beyond the sphere must not read unrelated missing coverage.
                 for a in range(3):
                     q[a] = nextafter(self.center[a]+(self.radius/distance)*(q[a]-self.center[a]), self.center[a])
-        leaf = owner(q, self.lo, self.hi, self.roots, self.children,
-                     self.leaves, self.nlo, self.nhi)
-        if leaf < 0:
+        if self.node_hint < 0 or not contains_point(q, &self.nlo[self.node_hint,0], &self.nhi[self.node_hint,0]):
+            self.node_hint = owner_node(q, self.lo, self.hi, self.roots, self.children,
+                                        self.leaves, self.nlo, self.nhi)
+        if self.node_hint < 0:
             return 10
+        leaf = self.leaves[self.node_hint]
         slot = self.slots[leaf]
         if slot < 0:
             return 7
@@ -81,6 +89,7 @@ cdef class _Sampler:
             return 8
         if norm <= self.null_threshold:
             return 4
+        self.norm = norm
         if self.variational:
             if self.gslots[leaf] < 0:
                 return 7
@@ -97,9 +106,7 @@ cdef class _Sampler:
             if not interpolate(q, leaf, self.cslots[leaf], self.bounds, self.spacing,
                                self.curl, self.chalo, cb):
                 return 10
-            for a in range(3):
-                alpha[0] += (cb[a]/norm)*(b[a]/norm)
-            alpha[0] /= 12.566370614359172
+            alpha[0] = twist_density(b, cb, norm)
             if not isfinite(alpha[0]):
                 return 9
         return 0
@@ -114,7 +121,7 @@ cdef int _rhs(_Sampler sampler, const double* y, int direction,
     code = sampler.evaluate(y, b, g, &alpha, width)
     if code:
         return code
-    norm = hypot(hypot(b[0], b[1]), b[2])
+    norm = sampler.norm
     for a in range(3):
         out[a] = direction*b[a]/norm
         if sampler.variational:
@@ -126,35 +133,39 @@ cdef int _rhs(_Sampler sampler, const double* y, int direction,
     return 0
 
 
+cdef int _stage(void* context, const double* state, double* out,
+                double* h, int stage) noexcept nogil:
+    cdef double width
+    cdef int a, code
+    for a in range(3):
+        if state[a] < (<_Sampler>context).sample_lo[a] or state[a] > (<_Sampler>context).sample_hi[a]:
+            (<_Sampler>context).outside_stage = True
+    if (<_Sampler>context).radius > 0. and hypot(hypot(
+            state[0]-(<_Sampler>context).center[0],
+            state[1]-(<_Sampler>context).center[1]),
+            state[2]-(<_Sampler>context).center[2]) > (<_Sampler>context).radius:
+        (<_Sampler>context).outside_stage = True
+    code = _rhs(<_Sampler>context, state, (<_Sampler>context).direction, out, &width)
+    if not code:
+        (<_Sampler>context).min_width = fmin((<_Sampler>context).min_width, width)
+    return code
+
+
 cdef int _rk4(_Sampler sampler, const double* y, double h, int direction,
               double* out, double* min_width,
-              const double* lo, const double* hi, bint* outside_stage) noexcept nogil:
-    cdef double k[4][10]
-    cdef double stage[10]
-    cdef double width, factor, total
-    cdef int i, j, code
-    cdef int state_size = 10 if sampler.variational else 4
-    min_width[0] = INFINITY
-    outside_stage[0] = False
-    for i in range(4):
-        factor = .5 if i < 3 else 1.
-        for j in range(state_size):
-            stage[j] = y[j] if i == 0 else y[j] + factor*h*k[i-1][j]
-        for j in range(3):
-            if stage[j] < lo[j] or stage[j] > hi[j]:
-                outside_stage[0] = True
-        if sampler.radius > 0. and hypot(hypot(stage[0]-sampler.center[0], stage[1]-sampler.center[1]), stage[2]-sampler.center[2]) > sampler.radius:
-            outside_stage[0] = True
-        code = _rhs(sampler, stage, direction, k[i], &width)
-        if code:
-            return code
-        min_width[0] = fmin(min_width[0], width)
-    for j in range(state_size):
-        total = k[0][j] + 2.*k[1][j] + 2.*k[2][j] + k[3][j]
-        out[j] = y[j] + (h/6.)*total
-        if not isfinite(out[j]):
-            return 9
-    return 0
+              bint* outside_stage) noexcept nogil:
+    cdef double slopes[40]
+    cdef double scratch[10]
+    cdef int64_t stage = 0
+    cdef int code
+    sampler.min_width = INFINITY
+    sampler.outside_stage = False
+    sampler.direction = direction
+    code = rk4_trial(<void*>sampler, _stage, y, 10 if sampler.variational else 4,
+                     &h, &stage, slopes, scratch, out)
+    min_width[0] = sampler.min_width
+    outside_stage[0] = sampler.outside_stage
+    return code
 
 
 cdef double _margin(const double* p, const double* lo, const double* hi,
@@ -226,11 +237,12 @@ cdef void _half(_Sampler sampler, const double* seed, const double* center, int 
             status[0] = 6
             return
     sampler.radius = radius
+    sampler.node_hint = -1
     code = sampler.evaluate(y, b, g, &alpha, &width)
     if code:
         status[0] = code
         return
-    norm = hypot(hypot(b[0], b[1]), b[2])
+    norm = sampler.norm
     axis = 0
     for a in range(3):
         tangent[a] = direction*b[a]/norm
@@ -265,7 +277,7 @@ cdef void _half(_Sampler sampler, const double* seed, const double* center, int 
             if h <= 0. or length[0]+h == length[0]:
                 status[0] = 11
                 break
-            code = _rk4(sampler, y, h, direction, trial, &min_width, lo, hi, &outside)
+            code = _rk4(sampler, y, h, direction, trial, &min_width, &outside)
             if code:
                 status[0] = code
                 break
@@ -285,7 +297,7 @@ cdef void _half(_Sampler sampler, const double* seed, const double* center, int 
             low, high = 0., h
             for iteration in range(80):
                 mid = .5*(low+high)
-                code = _rk4(sampler, y, mid, direction, middle, &min_width, lo, hi, &outside)
+                code = _rk4(sampler, y, mid, direction, middle, &min_width, &outside)
                 if code:
                     status[0] = code
                     break
@@ -298,7 +310,7 @@ cdef void _half(_Sampler sampler, const double* seed, const double* center, int 
             if status[0]:
                 break
             h = .5*(low+high)
-            code = _rk4(sampler, y, h, direction, trial, &min_width, lo, hi, &outside)
+            code = _rk4(sampler, y, h, direction, trial, &min_width, &outside)
             if code:
                 status[0] = code
                 break
@@ -313,7 +325,7 @@ cdef void _half(_Sampler sampler, const double* seed, const double* center, int 
         if code:
             status[0] = code
             break
-        norm = hypot(hypot(b[0], b[1]), b[2])
+        norm = sampler.norm
         for a in range(3):
             tangent[a] = direction*b[a]/norm
         face[0] = _boundary(y, lo, hi, center, radius, tolerance, tangent, True, normal)

@@ -67,3 +67,6 @@ from .current_proxy import (current_proxy, iter_current_proxy, current_proxy_fro
                             CurrentProxyDiagnostics, CurrentProxyBatch, CurrentProxyResult)
 __all__ += ["native_bottom_seeds", "current_proxy", "iter_current_proxy", "current_proxy_from_lines",
             "CurrentProxyDiagnostics", "CurrentProxyBatch", "CurrentProxyResult"]
+
+from .operators.line import line_integral, line_derivative
+__all__ += ["line_integral", "line_derivative"]
