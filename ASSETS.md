@@ -12,12 +12,24 @@ independent implementation of published magnetic-connectivity mathematics using
 this package's existing AMR primitives. No FastQSL2 code is bundled or translated.
 Definitions follow [Chen et al. (2026), FastQSL 2](https://arxiv.org/abs/2604.16195),
 including Scott et al. (2017), Pariat and Démoulin (2012), Titov (2007), and Berger
-and Prior (2006). See also [Zhang et al. (2022), FastQSL](https://arxiv.org/abs/2208.12569).
+and Prior (2006).
+Single-line variational transport is the default QSL method; neighboring-seed
+endpoint differences remain available as `method="finite-difference"`.
+Variational transport uses centered gradients of unit-vector nodes on the native
+mesh; it does not import the archived implementation at runtime. See also [Zhang et al. (2022), FastQSL](https://arxiv.org/abs/2208.12569).
 The [FastQSL2 repository](https://github.com/el2718/FastQSL2) declares CC BY-NC-SA 4.0;
 it remains an external comparison reference, not a runtime dependency. Comparison
 used revision `314bbf01ab72e43f82cb6b2e1c2a4d22d93aacdd`.
 
 Source revision: `b91bbc015d882ffd7dfcd7e10590cdce559f8532`.
+
+`current_proxy.py` independently implements the field-line mean-squared-current
+prescription of [Cheung & DeRosa (2012), ApJ 757, 147, Section 2.4](https://doi.org/10.1088/0004-637X/757/2/147).
+No external implementation code is copied. Native AMR bottom-face cell areas
+weight the default seeds. The existing accepted-prefix tracer supplies paths;
+ambiguous face classifications and incomplete paths are excluded. Raw curl,
+explicit display voxels and caller seed weights define this uncalibrated
+morphology proxy, independently of thermodynamic or instrument response models.
 
 The native interior-only uniform exporter follows the block placement and
 containing-cell sampling algorithms from the former `amrvac/_mesh/mesh.pyx`
@@ -198,3 +210,43 @@ GPL-3.0-only distribution. The repository LICENSE remains applicable.
 
 No upstream Dataset, MPI communication, spherical ray machinery or instrument
 post-processing is imported into the active package.
+
+## Classic AIA display colormaps
+
+`src/simesh/_data/aia_colormaps.npz` contains the ten classic SDO/AIA RGB
+control tables derived from SunPy 7.0.0, pinned to
+[`5915092bf6b790bf792b50dd6814f320b809cc61`](https://github.com/sunpy/sunpy/commit/5915092bf6b790bf792b50dd6814f320b809cc61).
+The upstream sources are `sunpy/visualization/colormaps/color_tables.py`
+and `sunpy/visualization/colormaps/data/idl_3.csv`. SunPy attributes these
+AIA tables to SSWIDL `aia_lct.pro`, Karel Schrijver (2010-04-12).
+
+SunPy copyright and BSD-2-Clause terms are retained in
+`LICENSES/SunPy-BSD-2-Clause.txt`, including in built distributions.
+The adjacent `aia_colormaps.json` records source URLs and SHA-256 hashes.
+`scripts/vendor_aia_colormaps.py` downloads the pinned sources, rebuilds the
+normalized RGB controls without quantizing their floating-point values, and
+checks 4,097 scalar samples per channel against the upstream constructors.
+
+`simesh.colormaps.aia_colormap` creates an independent Matplotlib palette
+without requiring SunPy or Astropy at runtime. These display palettes do not
+change the separately retained EUV response functions, physical units or
+intensity normalization. No AIA palette is assigned to IRIS or EIS channels.
+
+## IRIS spectral and EIS intensity display conventions
+
+`src/simesh/_data/iris_colormaps.npz` retains the IRIS FUV and NUV spectral
+palettes from the same pinned SunPy 7.0.0 source and BSD-2-Clause license above.
+`iris_colormaps.json` records provenance; `scripts/vendor_iris_colormaps.py`
+reproduces and verifies all 4,097 sampled colors per palette.
+The [IRISpy color-table guide](https://irispy.readthedocs.io/en/stable/tutorial/data_idiosyncrasies.html)
+describes the reddish FUV and yellowish NUV convention for images and spectra.
+The 1354 Angstrom spectral line uses the FUV-family palette, not the 1330 SJI
+palette and not a line-specific invented color table.
+
+`eis_intensity_colormap()` selects the built-in Matplotlib `Blues_r` palette
+used by [EISPAC EISMap intensity maps](https://eispac.readthedocs.io/en/latest/_modules/eispac/core/eismap.html).
+This is an intensity-map convention, not a universal per-line palette;
+EISPAC also demonstrates grayscale plots. No EISPAC code or RGB data is copied.
+A pinned source reference is retained in `_data/instrument_display_conventions.json`.
+The integration plots retain their explicit logarithmic normalization, rather
+than adopting EISPAC's separate default asinh stretch.

@@ -42,7 +42,7 @@ def iter_prepared(source, fields=None, *, region=None, leaf_ids=None, scheme,
 from ._pool import PreparedPool, CurlPool
 
 
-def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
+def iter_traces_bounded(pool, seeds, *, seed_ids=None, step=None, step_fraction=.25, max_steps=1000,
                         max_length=np.inf, null_threshold=0., direction=1, workers=1,
                         seed_batch=256, trajectories=False, twist=False,
                         memory_limit=None, backend="threadpool", schedule="static"):
@@ -58,7 +58,7 @@ def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
     if len(primary.fields)!=3 or len({f.units for f in primary.fields})!=1:
         raise ValueError("tracing requires three ordered vector components with common units")
     seeds,seed_ids = _validate_inputs(seeds,seed_ids,step,max_steps,max_length,null_threshold,
-                                    direction,workers,seed_batch,trajectories,twist)
+                                    direction,workers,seed_batch,trajectories,twist,step_fraction)
     native,dispatch = native_dispatch(backend,schedule)
     seed_batch = min(seed_batch,primary.capacity)
     reserve = _trace_batch_bytes(seeds,seed_ids,min(seed_batch,len(seeds)),max_steps,trajectories)
@@ -78,7 +78,7 @@ def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
                 while np.any(state.status==Termination.RUNNING):
                     with pool.borrow(primary.resident_leaf_ids) as product:
                         field,companion = product if twist else (product,None)
-                        _advance_state(field,companion,state,step=step,max_steps=max_steps,max_length=max_length,
+                        _advance_state(field,companion,state,step=step,step_fraction=step_fraction,max_steps=max_steps,max_length=max_length,
                             null_threshold=null_threshold,direction=direction,workers=workers,executor=executor,
                             native=native,dispatch=dispatch)
                     missing = np.unique(state.requested[(state.status==Termination.RUNNING)&(state.requested>=0)])

@@ -10,7 +10,7 @@ authors = [{name = "Astery", email = "aster0502@outlook.com"}]
 readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-only"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "LICENSES/SunPy-BSD-2-Clause.txt"]
 dependencies = ["numpy>=1.23.5,<3"]
 
 [project.optional-dependencies]
@@ -25,7 +25,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["*.pyx", "*.pxd"]
-"simesh" = ["_guide.md"]
+"simesh" = ["_guide.md", "_data/*.npz", "_data/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

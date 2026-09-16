@@ -24,6 +24,54 @@ from simesh import applications as app
 | [MHD analysis](../../examples/recovered_state_analysis.py) | Analytic recovered state, reductions, profiles and result files |
 | [Radiation bands](../../examples/radiation_bands.py) | Isothermal snapshot, EUV/radio images, optical depth and convergence checks |
 | [Root-subtree crop](../../examples/root_crop.py) | Regional analysis, independent AMR export, reloadable slice and integral |
+| [Current-based proxy](../../examples/current_proxy.py) | Native or supplied seed quadrature, traced-line contributions and checkpointed display volumes |
+
+## Current-based morphology proxy
+
+This composed magnetic application connects native seed geometry, existing
+field-line tracing and `sample_line_profiles` to an area-weighted display
+product. Its specialized steps are closed-line selection, the arc-length mean
+of squared interpolated curl, and one contribution per visited display cell. Default
+seeds are the original AMR bottom-face cell centers, weighted by their cell-face
+areas. Pass a `PointSet` and explicit `seed_areas` to override the seed geometry.
+
+```python
+with sm.open_amrvac("snapshot.dat") as source:
+    magnetic = sm.prepare(source, ("b1", "b2", "b3"), scheme="exact-phase")
+proxy = sm.current_proxy(magnetic, (128, 128, 128),
+                         step=float(magnetic.mesh.spacing.min()) / 4,
+                         max_steps=20000, workers=4)
+dz = (proxy.upper[2] - proxy.lower[2]) / proxy.emissivity.shape[2]
+image = proxy.emissivity.sum(axis=2) * dz
+```
+
+This is an uncalibrated magnetic morphology proxy following
+[Cheung & DeRosa (2012)](https://doi.org/10.1088/0004-637X/757/2/147), not an EUV
+response model. Inspect `closed`, `accepted` and original termination diagnostics separately; vary seed
+quadrature, integration step and display resolution before quantitative use.
+`iter_current_proxy` yields sparse batch increments for checkpointed applications.
+The resident result keeps per-seed diagnostics without retaining those consumed
+increments.
+
+To reuse an existing `LineSet` named `lines`, supply its original tracing step
+and area weights in `lines.seeds` order:
+
+```python
+contribution = sm.current_proxy_from_lines(
+    magnetic, lines, (128, 128, 128),
+    seed_areas=seed_areas, step=trace_step,
+)
+```
+
+This route does not retrace the field. The same paths can also feed ordinary
+line profiles, or a new proxy grid and new weights. Use `lines.select(mask)`
+with the same selection on area weights to reuse a subset. Reusing loaded paths
+requires matching snapshot and coordinate conventions. Squaring curl before
+interpolation would define a different proxy; native-volume reductions and
+thermal radiation are separate consumers with different measures and models.
+
+The [command-line example](../../examples/current_proxy.py) supports native seeds
+or an NPZ containing `positions`, `areas` and optional `ids`.
 
 ## EUV and radio synthesis
 
@@ -114,6 +162,36 @@ and output boundary semantics. A crop retains original refinement and values;
 it does not create a level-1 uniform grid. Field units and crop provenance belong
 in a separate description, as illustrated by the executable example.
 
+## Field-line integration steps
+
+Magnetic tracing and QSL/Twist diagnostics default to `step_fraction=0.25`:
+steps are capped by one quarter of the smallest local cell edge. RK stages
+entering finer cells cause the step to shrink and restart. An optional `step`
+adds an absolute coordinate-length cap. Use `step_fraction=None, step=...`
+to reproduce fixed-step tracing. This controls spatial sampling, not an
+estimate of local integration error.
+
+The same policy applies to raw and application tracing, bounded pools, batched
+paths and current-proxy tracing. The proxy still requires a `step` cap no larger
+than a display cell. Raw traces retain accepted prefixes; QSL diagnostics retain
+their separate boundary-localization behavior. Smaller local steps may require
+larger `max_steps` to reach the boundary. Previously saved figures and results
+retain their original step controls and are not recomputed automatically.
+
+## Magnetic connectivity methods
+
+QSL calculations default to single-line variational transport. Prepare two valid
+halo layers, then use `sm.qsl(ready, seeds)` or
+`app.connectivity(ready, points, quantities="q")`. Select
+`method="finite-difference"` to use neighboring-seed endpoint differences;
+`delta` applies only to that method. Both methods are available through batched
+and application interfaces, and saved results retain the selected method.
+
+Variational transport avoids four additional neighboring trajectories per seed,
+but retains a nine-component unit-vector gradient field. Its total memory and
+runtime depend on field coverage and seed count. Changing the default does not
+change previously saved maps; reproduce those with their recorded method.
+
 ## Compose and save analyses
 
 Select continuous quantities by name, so changing the output order does not
@@ -201,3 +279,24 @@ Direct export retains a complete volume and accepts the same sampling controls a
 .venv/bin/python examples/uniform_export.py snapshot.dat --format vtk \
   --resolution 256 256 256 --fields rho --output rho.vtk
 ```
+
+## Classic AIA colors
+
+Install `.[plot]` to use the bundled SunPy-derived AIA palettes offline:
+
+```python
+from simesh.colormaps import aia_colormap
+
+image = ax.imshow(intensity, origin="lower", cmap=aia_colormap(171), norm=norm)
+fig.colorbar(image, ax=ax)
+```
+
+Use the full wavelength in Angstroms, such as 94, 131, 171 or 193. Choose
+intensity normalization separately; a display palette does not change a
+band's temperature response. Source and license information is in
+the repository’s `ASSETS.md`.
+
+For IRIS 1354 Angstrom intensity maps, use `iris_colormap("FUV")` from the
+same module. `eis_intensity_colormap()` follows EISPAC's `Blues_r` intensity
+convention for all EIS lines; it is not a separate color assignment per wavelength.
+Both functions return independent palettes and leave normalization to the caller.

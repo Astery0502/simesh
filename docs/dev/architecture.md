@@ -37,3 +37,12 @@ without a mutable mesh dependency. Historical Dataset implementations are exclud
 modifying the simulation EOS. Both thermal and ordered transfer consumers reuse
 `_kernels/thermal_rays.pyx` for leaf ownership and interpolation-knot traversal.
 See [core contracts](api.md) and [build groups](cython-build.md).
+
+`geometry.py` owns native bottom-face seed positions and area weights, reusable
+by magnetic diagnostics and tracing. `current_proxy.py` is a composed magnetic
+application: its convenience iterator uses existing tracing, while
+`current_proxy_from_lines` reuses stored `LineSet` geometry and samples curl with
+`sample_line_profiles`. The proxy module owns only its closed-line policy,
+arc-length average and display-cell deposition. It keeps geometric closure,
+contribution acceptance and original trace termination distinct. Source reads,
+checkpoint files and view selection remain in the calling example.

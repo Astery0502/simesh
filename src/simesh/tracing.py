@@ -24,6 +24,7 @@ class Termination(IntEnum):
     UNREPRESENTABLE_NORM = 8
     NONFINITE_DIAGNOSTIC = 9
     UNREPRESENTABLE_SAMPLE = 10
+    UNREPRESENTABLE_STEP = 11
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,7 @@ class _LineState:
     alpha: np.ndarray
     twist: np.ndarray
     paths: np.ndarray
+    step_size: np.ndarray
 
 
 def _new_state(mesh, seeds, ids, max_steps, max_length, trajectories, twist, *, path_capacity=None):
@@ -90,7 +92,7 @@ def _new_state(mesh, seeds, ids, max_steps, max_length, trajectories, twist, *, 
         np.zeros(n, np.int64), np.zeros(n, np.int64), np.zeros(n, np.int64),
         np.empty((n,4,3)), np.full(n,-1,np.int64), np.zeros(n,np.int64), np.zeros(n,np.int64),
         np.empty((n if twist else 0,4)), np.zeros(n if twist else 0),
-        np.full((n,capacity,3),np.nan) if trajectories else np.empty((0,0,3)))
+        np.full((n,capacity,3),np.nan) if trajectories else np.empty((0,0,3)), np.zeros(n))
     owners = mesh.locate(seeds)
     state.status[owners < 0] = Termination.OUTSIDE_SEED
     if max_steps == 0:
@@ -102,7 +104,7 @@ def _new_state(mesh, seeds, ids, max_steps, max_length, trajectories, twist, *, 
     return state
 
 
-def _advance_state(fields, companion, state, *, step, max_steps, max_length,
+def _advance_state(fields, companion, state, *, step, step_fraction, max_steps, max_length,
                    null_threshold, direction, workers, executor, native=False, dispatch=0, path_start=0):
     """Advance private RK state; missing data is returned to the coordinator."""
     from ._kernels.native import advance_lines
@@ -117,8 +119,9 @@ def _advance_state(fields, companion, state, *, step, max_steps, max_length,
         advance_lines(mesh.lower,mesh.upper,mesh.roots,mesh.children,mesh.node_leaves,
             mesh.node_lower,mesh.node_upper,mesh.bounds,mesh.spacing,
             fields.slot_of_leaf,values,fields.storage_halo,
-            step,max_steps,max_length,null_threshold,direction,
-            state.positions[s],state.length[s],state.steps[s],state.status[s],state.stages[s],
+            np.inf if step is None else step, 0. if step_fraction is None else step_fraction,
+            max_steps,max_length,null_threshold,direction,
+            state.positions[s],state.length[s],state.steps[s],state.status[s],state.stages[s],state.step_size[s],
             state.tangents[s],state.requested[s],state.samples[s],state.misses[s],
             companion.slot_of_leaf if companion is not None else fields.slot_of_leaf,
             curl_values,companion.storage_halo if companion is not None else 1,
@@ -142,7 +145,7 @@ def _trace_output_bytes(count, max_steps, trajectories, twist):
     return count*(96+(8 if twist else 0)+(24*(max_steps+1) if trajectories else 0))
 
 
-def _iter_path_segments(fields, seeds, seed_ids, *, step, max_steps, max_length,
+def _iter_path_segments(fields, seeds, seed_ids, *, step, step_fraction, max_steps, max_length,
                         null_threshold, direction, workers, backend, schedule,
                         memory_limit=None):
     """Yield borrowed path views and persistent state for one admitted seed batch.
@@ -161,7 +164,7 @@ def _iter_path_segments(fields, seeds, seed_ids, *, step, max_steps, max_length,
     with context as executor:
         while True:
             fields._check()
-            _advance_state(fields,None,state,step=step,max_steps=max_steps,max_length=max_length,
+            _advance_state(fields,None,state,step=step,step_fraction=step_fraction,max_steps=max_steps,max_length=max_length,
                 null_threshold=null_threshold,direction=direction,workers=workers,executor=executor,
                 native=native,dispatch=dispatch,path_start=path_start)
             pending = state.status == Termination.RUNNING
@@ -189,8 +192,19 @@ def _result(state, trajectories, twist):
                        twist=state.twist if twist else None)
 
 
+def _step_controls(step, step_fraction):
+    """Validate common fixed or local-cell tracing controls without allocating."""
+    if step is not None and (not np.isfinite(step) or step <= 0):
+        raise ValueError("step must be a positive finite coordinate-length cap")
+    if step_fraction is not None and (not np.isfinite(step_fraction) or not 0 < step_fraction <= 1):
+        raise ValueError("step_fraction must be in (0, 1] or None for fixed steps")
+    if step is None and step_fraction is None:
+        raise ValueError("fixed-step tracing requires step when step_fraction is None")
+
+
 def _validate_inputs(seeds, seed_ids, step, max_steps, max_length, null_threshold,
-                     direction, workers, seed_batch, trajectories, twist):
+                     direction, workers, seed_batch, trajectories, twist, step_fraction=.25):
+    _step_controls(step, step_fraction)
     workers_count(workers)
     seeds = np.asarray(seeds)
     if (seeds.ndim != 2 or seeds.shape[1] != 3 or seeds.dtype != np.float64 or
@@ -203,7 +217,7 @@ def _validate_inputs(seeds, seed_ids, step, max_steps, max_length, null_threshol
         if (seed_ids.shape != (len(seeds),) or seed_ids.dtype != np.int64 or
                 len(np.unique(seed_ids)) != len(seeds)):
             raise ValueError("seed_ids must be unique int64 IDs matching seeds")
-    if (not np.isfinite(step) or step <= 0 or type(max_steps) is not int or
+    if (type(max_steps) is not int or
             not 0 <= max_steps <= np.iinfo(np.int64).max or np.isnan(max_length) or
             max_length < 0 or not np.isfinite(null_threshold) or null_threshold < 0 or
             direction not in (-1,1) or type(seed_batch) is not int or seed_batch < 1 or
@@ -236,7 +250,7 @@ def _resolve_curl(fields, companion, want_twist, memory_limit):
     return companion
 
 
-def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_length=np.inf,
+def iter_traces(fields, seeds, *, seed_ids=None, step=None, step_fraction=.25, max_steps=1000, max_length=np.inf,
                 null_threshold=0., direction=1, workers=1, seed_batch=256,
                 trajectories=False, twist=False, curl_field=None, memory_limit=None,
                 backend="threadpool", schedule="static"):
@@ -250,8 +264,11 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_lengt
         Seed positions with shape (n, 3).
     seed_ids : array-like, optional
         Unique seed IDs in input order.
-    step : float
-        Positive integration step in coordinate-length units.
+    step : float, optional
+        Positive coordinate-length cap; required only for fixed-step tracing.
+    step_fraction : float, optional
+        Local cell-size fraction in (0, 1], default 0.25. RK stages entering finer
+        cells reduce the step and restart it. None selects fixed steps using step.
     max_steps : int
         Maximum accepted integration steps per branch.
     max_length : float
@@ -285,7 +302,7 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_lengt
     """
     _validate_vector(fields)
     seeds, seed_ids = _validate_inputs(seeds,seed_ids,step,max_steps,max_length,
-        null_threshold,direction,workers,seed_batch,trajectories,twist)
+        null_threshold,direction,workers,seed_batch,trajectories,twist,step_fraction)
     native,dispatch = native_dispatch(backend,schedule)
     count = min(seed_batch,len(seeds))
     reserve = _trace_batch_bytes(seeds,seed_ids,count,max_steps,trajectories)
@@ -303,7 +320,7 @@ def iter_traces(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_lengt
             last = min(first+seed_batch,len(seeds))
             state = _new_state(fields.mesh,seeds[first:last],seed_ids[first:last],
                                max_steps,max_length,trajectories,twist)
-            _advance_state(fields,companion,state,step=step,max_steps=max_steps,max_length=max_length,
+            _advance_state(fields,companion,state,step=step,step_fraction=step_fraction,max_steps=max_steps,max_length=max_length,
                 null_threshold=null_threshold,direction=direction,workers=workers,executor=executor,
                 native=native,dispatch=dispatch)
             pending = state.status == Termination.RUNNING
@@ -340,7 +357,7 @@ def _collect(batches, n, max_steps, trajectories, twist):
         batches.close()
 
 
-def trace(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_length=np.inf,
+def trace(fields, seeds, *, seed_ids=None, step=None, step_fraction=.25, max_steps=1000, max_length=np.inf,
           null_threshold=0., direction=1, workers=1, seed_batch=256,
           trajectories=False, twist=False, curl_field=None, memory_limit=None,
           backend="threadpool", schedule="static"):
@@ -354,8 +371,11 @@ def trace(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_length=np.i
         Seed positions with shape (n, 3).
     seed_ids : array-like, optional
         Unique seed IDs in input order.
-    step : float
-        Positive integration step in coordinate-length units.
+    step : float, optional
+        Positive coordinate-length cap; required only for fixed-step tracing.
+    step_fraction : float, optional
+        Local cell-size fraction in (0, 1], default 0.25. RK stages entering finer
+        cells reduce the step and restart it. None selects fixed steps using step.
     max_steps : int
         Maximum accepted integration steps per branch.
     max_length : float
@@ -391,9 +411,9 @@ def trace(fields, seeds, *, seed_ids=None, step, max_steps=1000, max_length=np.i
     if twist and curl_field is None and max_steps>0 and max_length>0:
         require_fields(fields,halo=2,operation="twist with automatic curl")
     seeds,seed_ids = _validate_inputs(seeds,seed_ids,step,max_steps,max_length,null_threshold,
-                                    direction,workers,seed_batch,trajectories,twist)
+                                    direction,workers,seed_batch,trajectories,twist,step_fraction)
     output = _trace_output_bytes(len(seeds),max_steps,trajectories,twist)
-    batches = iter_traces(fields,seeds,seed_ids=seed_ids,step=step,max_steps=max_steps,max_length=max_length,
+    batches = iter_traces(fields,seeds,seed_ids=seed_ids,step=step,step_fraction=step_fraction,max_steps=max_steps,max_length=max_length,
         null_threshold=null_threshold,direction=direction,workers=workers,seed_batch=seed_batch,
         trajectories=trajectories,twist=twist,curl_field=curl_field,
         memory_limit=remaining(memory_limit,output),backend=backend,schedule=schedule)
@@ -430,7 +450,7 @@ def retrace(fields, result, selected_seed_ids, **kwargs):
     selected_seed_ids : sequence of int
         Existing seed IDs to integrate again.
     **kwargs : object
-        Controls forwarded to simesh.trace, including required step.
+        Controls forwarded to simesh.trace, including step and step_fraction.
 
     Returns
     -------

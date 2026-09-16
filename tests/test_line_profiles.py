@@ -106,7 +106,7 @@ def test_diagnose_select_trace_then_sample_other_physics():
     diagnostics = app.connectivity(magnetic, points, quantities=("q", "twist"), step=.04, max_steps=100)
     selected = diagnostics.threshold(q_min=1.9, abs_twist_min=0., mode="all")
     assert selected.ids.tolist() == [19, 402]
-    lines = app.trace(magnetic, selected, step=.04, max_steps=4)
+    lines = app.trace(magnetic, selected, step=.04, step_fraction=None, max_steps=4)
     assert np.all(lines.termination == sm.Termination.MAX_STEPS)
     assert np.all(np.diff(lines.offsets) == 5)
     result = sample_line_profiles(thermal, lines, ("temperature", "density"), point_batch=3, workers=2)

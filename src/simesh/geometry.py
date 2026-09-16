@@ -6,7 +6,7 @@ from typing import ClassVar
 import numpy as np
 
 from ._validation import frozen_array, identifiers, array_bytes, admit
-from .slices import Plane
+from .slices import Plane, AxisSlice
 
 
 def _unit_vectors(value, count, label):
@@ -139,6 +139,31 @@ class PointSet:
         return values.reshape(*self.shape,*values.shape[1:])
 
 
+def native_bottom_seeds(mesh):
+    """Return native bottom-face cell centers and their quadrature areas.
+
+    Parameters
+    ----------
+    mesh : Mesh
+        Original Cartesian AMR geometry, including the full physical bottom.
+
+    Returns
+    -------
+    points : PointSet
+        One point on zmin per intersecting leaf cell, ordered by leaf, x, y.
+    areas : ndarray
+        Owned positive cell-face areas (n,) in squared coordinate-length units.
+        Refinement changes both seed density and weights, with no halo seeds.
+    """
+    section = AxisSlice(mesh,'z',float(mesh.lower[2]))
+    positions, areas = [], []
+    for row in range(len(section.leaf_ids)):
+        x,y = section.cell_edges(row)
+        xx,yy = np.meshgrid(.5*(x[:-1]+x[1:]),.5*(y[:-1]+y[1:]),indexing='ij')
+        positions.append(np.column_stack((xx.ravel(),yy.ravel(),np.full(xx.size,mesh.lower[2]))))
+        areas.append((np.diff(x)[:,None]*np.diff(y)[None,:]).ravel())
+    return PointSet(np.concatenate(positions)), np.concatenate(areas)
+
 @dataclass(frozen=True, eq=False)
 class RaySet:
     """Associate identified origins with normalized rays and depth clipping.
@@ -260,3 +285,27 @@ class LineSet:
         """
         negative,positive = self.branch(seed_id,-1),self.branch(seed_id,1)
         return np.concatenate((negative[::-1],positive[1:] if len(negative) else positive))
+
+    def select(self, mask):
+        """Copy selected seeds and both branches, retaining IDs and termination.
+
+        Parameters
+        ----------
+        mask : array-like
+            Boolean selection matching the seed layout.
+
+        Returns
+        -------
+        LineSet
+            Owned compact geometry in original seed order; source identity is
+            retained without verifying the snapshot represented by loaded paths.
+        """
+        rows = self.seeds.rows(mask)
+        seeds = self.seeds.select(mask)
+        counts = np.diff(self.offsets).reshape(-1,2)[rows].ravel()
+        positions = np.empty((int(counts.sum()),3),dtype=float)
+        offsets = np.r_[np.int64(0),np.cumsum(counts,dtype=np.int64)]
+        for selected,row in enumerate(rows):
+            start,stop = self.offsets[2*row],self.offsets[2*row+2]
+            positions[offsets[2*selected]:offsets[2*selected+2]] = self.positions[start:stop]
+        return LineSet(seeds,positions,offsets,self.termination[rows].copy(),self.source_identity)

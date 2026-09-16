@@ -242,7 +242,8 @@ def _diagnostic_support(fields, quantities, controls):
             raise ValueError("twist must be boolean")
         quantities = ("q", "twist") if twist else ("q",)
     names = _quantities(("q", "twist") if quantities is None else quantities)
-    _require_support(fields, twist="twist" in names, curl_field=controls.get("curl_field"))
+    _require_support(fields, compute_q="q" in names, method=controls.get("method","variational"),
+        twist="twist" in names, curl_field=controls.get("curl_field"))
     return names
 
 
@@ -526,7 +527,7 @@ def uniform_grid(fields, resolution, *, components=None, output=None, bounds=Non
                          tuple(fields.fields[i] for i in selected),fields.value_identity)
 
 
-def trace(fields, points, *, direction="both", step, max_steps=1000, max_length=np.inf,
+def trace(fields, points, *, direction="both", step=None, step_fraction=.25, max_steps=1000, max_length=np.inf,
           null_threshold=0., workers=1, backend="threadpool", schedule="static",
           seed_batch=128, memory_limit=None):
     """Trace selected points into compact branches, preserving IDs.
@@ -540,8 +541,11 @@ def trace(fields, points, *, direction="both", step, max_steps=1000, max_length=
     direction : str
         both, along, against or inward; inward needs seeds on exactly one physical domain
         face.
-    step : float
-        Positive integration step in coordinate-length units.
+    step : float, optional
+        Positive coordinate-length cap; required only for fixed-step tracing.
+    step_fraction : float, optional
+        Local cell-size fraction in (0, 1], default 0.25; None selects fixed
+        steps. The shared tracer restarts RK steps that encounter finer cells.
     max_steps : int
         Maximum accepted integration steps per branch.
     max_length : float
@@ -576,7 +580,7 @@ def trace(fields, points, *, direction="both", step, max_steps=1000, max_length=
     if type(seed_batch) is not int or seed_batch < 1:
         raise ValueError("seed_batch must be positive")
     _validate_inputs(points.positions,points.ids,step,max_steps,max_length,null_threshold,
-                     1,workers,seed_batch,True,False)
+                     1,workers,seed_batch,True,False,step_fraction)
     native_dispatch(backend,schedule)
     base = fields.mesh.nbytes+fields.nbytes+points.nbytes+len(points)*256
     admit(base,memory_limit,"trace geometry")
@@ -614,7 +618,7 @@ def trace(fields, points, *, direction="both", step, max_steps=1000, max_length=
         for start in range(0,len(rows),seed_batch):
             selected = rows[start:start+seed_batch]
             segments = _iter_path_segments(fields,np.ascontiguousarray(positions[selected]),points.ids[selected],
-                step=step,max_steps=max_steps,direction=2*side-1,
+                step=step,step_fraction=step_fraction,max_steps=max_steps,direction=2*side-1,
                 max_length=max_length,null_threshold=null_threshold,workers=workers,backend=backend,schedule=schedule,
                 memory_limit=remaining(memory_limit,base-fields.nbytes-fields.mesh.nbytes+retained))
             try:
@@ -1022,7 +1026,7 @@ def iter_lines(fields, points, *, seed_batch=128, memory_limit=None, **controls)
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
     **controls : object
-        Forwarded controls from simesh.applications.trace, including required step.
+        Forwarded controls from simesh.applications.trace, including step and step_fraction.
 
     Returns
     -------

@@ -1,0 +1,35 @@
+{
+  "project": "SunPy",
+  "version": "7.0.0",
+  "commit": "5915092bf6b790bf792b50dd6814f320b809cc61",
+  "license": "BSD-2-Clause",
+  "ancestry": "SSWIDL SDO/AIA aia_lct.pro, Karel Schrijver, 2010-04-12",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/sunpy/sunpy/5915092bf6b790bf792b50dd6814f320b809cc61/sunpy/visualization/colormaps/color_tables.py",
+      "sha256": "2bec55dc33d2d91331fa1e0a9c3440033bfb0e4ec05c63f819d1355609570693"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sunpy/sunpy/5915092bf6b790bf792b50dd6814f320b809cc61/sunpy/visualization/colormaps/data/idl_3.csv",
+      "sha256": "3d6fa48ae13311894ea880aaf953f14e34ade01a31cfa539c32aa84f445fbd32"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sunpy/sunpy/5915092bf6b790bf792b50dd6814f320b809cc61/LICENSE.rst",
+      "sha256": "c4b0d9db611751579f4b9985c8e6958673ceadbf01b7945a987388aa78fee699"
+    }
+  ],
+  "representation": "256 normalized RGB control points per channel, preserving upstream floating-point values",
+  "wavelengths_angstrom": [
+    94,
+    131,
+    171,
+    193,
+    211,
+    304,
+    335,
+    1600,
+    1700,
+    4500
+  ],
+  "verification": "4097 scalar samples per channel match the pinned upstream LinearSegmentedColormap exactly"
+}

@@ -7,6 +7,7 @@ No file, cache, Dataset or Python callback participates in a value query.
 
 from libc.math cimport floor, isfinite, NAN, sqrt, hypot, ceil, nextafter, INFINITY
 from libc.stdint cimport int64_t
+from .tracing_step cimport cell_width, trace_step, finer_step
 from cython.parallel cimport prange
 
 cdef extern from *:
@@ -158,9 +159,9 @@ cdef void _advance_line_range(int64_t first, int64_t last,
     const double[:, ::1] nhi, const double[:, :, ::1] bounds,
     const double[:, ::1] spacing, const int64_t[::1] slots,
     const double[:, :, :, :, ::1] data, int halo,
-    double step, int64_t max_steps, double max_length, double null_threshold, int direction,
+    double step, double step_fraction, int64_t max_steps, double max_length, double null_threshold, int direction,
     double[:, ::1] positions, double[::1] length, int64_t[::1] steps,
-    int64_t[::1] status, int64_t[::1] stages, double[:, :, ::1] tangents,
+    int64_t[::1] status, int64_t[::1] stages, double[::1] step_size, double[:, :, ::1] tangents,
     int64_t[::1] requested, int64_t[::1] samples, int64_t[::1] misses,
     const int64_t[::1] curl_slots, const double[:, :, :, :, ::1] curl_data,
     int curl_halo, double[:, ::1] alpha, double[::1] twist,
@@ -171,7 +172,7 @@ cdef void _advance_line_range(int64_t first, int64_t last,
     cdef double p[3]
     cdef double b[3]
     cdef double cb[3]
-    cdef double h, norm, factor, total, integrand
+    cdef double h, norm, factor, total, integrand, width
     cdef bint want_twist = twist.shape[0] > 0
     cdef bint save_paths = paths.shape[0] > 0
     for seed in range(first,last):
@@ -187,9 +188,7 @@ cdef void _advance_line_range(int64_t first, int64_t last,
             # A full path segment pauses delivery without terminating RK state.
             if save_paths and steps[seed]-path_start >= paths.shape[1]-1:
                 break
-            h = step
-            if max_length-length[seed] < h:
-                h = max_length-length[seed]
+            h = step_size[seed]
             stage = stages[seed]
             for a in range(3):
                 p[a] = positions[seed,a]
@@ -204,6 +203,19 @@ cdef void _advance_line_range(int64_t first, int64_t last,
                 status[seed] = 3
                 break
             leaf = leaves[node_hint]
+            width = cell_width(spacing, leaf)
+            if stage == 0:
+                # A reduced proposal survives both retries and pool misses.
+                h = trace_step(width, step_fraction, step if h == 0. else h,
+                               max_length-length[seed])
+                step_size[seed] = h
+                if h <= 0. or not isfinite(h) or length[seed]+h == length[seed]:
+                    status[seed] = 11
+                    break
+            elif finer_step(h, width, step_fraction):
+                step_size[seed] = trace_step(width, step_fraction, h, max_length-length[seed])
+                stages[seed] = 0
+                continue
             slot = slots[leaf]
             if slot < 0:
                 requested[seed] = leaf
@@ -257,6 +269,9 @@ cdef void _advance_line_range(int64_t first, int64_t last,
             if not contains_point(p,&lo[0],&hi[0]):
                 status[seed] = 3
                 break
+            if p[0] == positions[seed,0] and p[1] == positions[seed,1] and p[2] == positions[seed,2]:
+                status[seed] = 11
+                break
             for a in range(3):
                 positions[seed,a] = p[a]
             length[seed] = length[seed]+h
@@ -270,6 +285,7 @@ cdef void _advance_line_range(int64_t first, int64_t last,
                 for a in range(3):
                     paths[seed,steps[seed]-path_start,a] = p[a]
             stages[seed] = 0
+            step_size[seed] = 0.
 
 
 
@@ -281,9 +297,9 @@ cpdef void advance_lines(
     const double[:, ::1] nhi, const double[:, :, ::1] bounds,
     const double[:, ::1] spacing, const int64_t[::1] slots,
     const double[:, :, :, :, ::1] data, int halo,
-    double step, int64_t max_steps, double max_length, double null_threshold, int direction,
+    double step, double step_fraction, int64_t max_steps, double max_length, double null_threshold, int direction,
     double[:, ::1] positions, double[::1] length, int64_t[::1] steps,
-    int64_t[::1] status, int64_t[::1] stages, double[:, :, ::1] tangents,
+    int64_t[::1] status, int64_t[::1] stages, double[::1] step_size, double[:, :, ::1] tangents,
     int64_t[::1] requested, int64_t[::1] samples, int64_t[::1] misses,
     const int64_t[::1] curl_slots, const double[:, :, :, :, ::1] curl_data,
     int curl_halo, double[:, ::1] alpha, double[::1] twist,
@@ -297,19 +313,19 @@ cpdef void advance_lines(
         raise RuntimeError("native analysis was built without OpenMP")
     with nogil:
         if workers == 1:
-            _advance_line_range(0, count, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths, path_start)
+            _advance_line_range(0, count, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, step_fraction, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, step_size, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths, path_start)
         elif dispatch == 0:
             for task in prange(workers, schedule='static', num_threads=workers):
                 first = count*task//workers
                 last = count*(task+1)//workers
-                _advance_line_range(first, last, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths, path_start)
+                _advance_line_range(first, last, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, step_fraction, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, step_size, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths, path_start)
         else:
             for task in prange((count+7)//8, schedule='dynamic', chunksize=1, num_threads=workers):
                 first = task*8
                 last = first+8
                 if last > count:
                     last = count
-                _advance_line_range(first, last, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths, path_start)
+                _advance_line_range(first, last, lo, hi, roots, children, leaves, nlo, nhi, bounds, spacing, slots, data, halo, step, step_fraction, max_steps, max_length, null_threshold, direction, positions, length, steps, status, stages, step_size, tangents, requested, samples, misses, curl_slots, curl_data, curl_halo, alpha, twist, paths, path_start)
 
 
 

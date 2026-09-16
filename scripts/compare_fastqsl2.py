@@ -68,7 +68,7 @@ def compare(args):
             with sm.source_from_arrays(mesh, values[None], ("b1","b2","b3")) as source:
                 fields = sm.prepare(source, scheme="exact-phase")
             ours = sm.qsl(fields, seeds, bounds=([a[0] for a in axes],[a[-1] for a in axes]),
-                          normalization="flux", step_fraction=.125, max_steps=20000)
+                          normalization="flux", method=args.method, step_fraction=.125, max_steps=20000)
             with np.load(output_path) as upstream:
                 metrics = {"valid_native":int(ours.valid.sum()), "seeds":len(seeds)}
                 for quantity in ("q","q_perp","twist","length"):
@@ -83,7 +83,7 @@ def compare(args):
                 summaries[name] = metrics
     revision = subprocess.check_output(["git","-C",str(args.reference),"rev-parse","HEAD"], text=True).strip()
     report = {"reference":"https://github.com/el2718/FastQSL2", "revision":revision,
-              "cells":cells, "native_scheme":"exact-phase", "native_method":"finite-difference",
+              "cells":cells, "native_scheme":"exact-phase", "native_method":args.method,
               "reference_method":"variational", "normalization":"flux", "cases":summaries}
     text = json.dumps(report, indent=2)
     if args.output is not None:
@@ -96,6 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--reference-python", default="python3")
     parser.add_argument("--cells", type=int, default=32)
+    parser.add_argument("--method", choices=("finite-difference","variational"), default="variational")
     parser.add_argument("--input", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--run-reference", action="store_true")
