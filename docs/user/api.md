@@ -358,6 +358,26 @@ Core object contracts are in the [developer API](../dev/api.md).
 
 ::: simesh.colormaps.eis_intensity_colormap
 
+## Trajectory and integral results
+
+For choosing between reusable paths, diagnostic values, and along-line
+integrals, see [along-line workflows](index.md#compose-along-line-calculations).
+
+::: simesh.trace
+
+::: simesh.iter_traces
+
+::: simesh.TraceResult
+    options:
+      members: [point_counts]
+      merge_init_into_class: false
+
+::: simesh.Termination
+    options:
+      members: true
+      show_if_no_docstring: true
+      merge_init_into_class: false
+
 ## Sampled-curve calculus
 
 ::: simesh.line_integral

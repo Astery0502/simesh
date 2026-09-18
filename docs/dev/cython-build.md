@@ -27,6 +27,11 @@ Register each interface once with `::: simesh.object` in the
 selected members and links, including the LOS wrapper's forwarded keyword names.
 User-facing scientific functions must provide a Parameters section; the deferred
 array-tool documentation is excluded from that completeness requirement.
+The packaged workflow guide stays lightweight: write interface references as
+fully qualified inline names, such as `simesh.applications.trace`. The checker
+resolves those names without requiring a catalog of applications, copied
+signatures, or fixed analysis choices. Update its decision points only when a
+common user-facing choice changes.
 
 ### Docstring content
 

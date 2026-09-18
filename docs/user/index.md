@@ -181,6 +181,19 @@ retain their original step controls and are not recomputed automatically.
 
 ## Compose along-line calculations
 
+Choose the entry point according to the requested result:
+
+| Requested result | Interface to inspect |
+| --- | --- |
+| Reusable field-line geometry | [`applications.trace`](api.md#simesh.applications.trace), returning `LineSet` |
+| QSL or twist values without stored paths | [`applications.connectivity`](api.md#simesh.applications.connectivity) |
+| Scalar integrals calculated during tracing | [`trace`](api.md#simesh.trace), returning `TraceResult` with optional trajectory storage |
+| Quantities calculated from an existing path | [`sample_line_profiles`](api.md#simesh.sample_line_profiles), followed by sampled-curve operations |
+
+Path storage and scientific diagnostics are separate choices. Request the paths
+when they are part of the deliverable; a scalar diagnostic alone need not retain
+them. The result types and exact controls are documented at the linked interfaces.
+
 Pass prepared scalar `Fields` as `integrands` to `sm.trace` or `sm.iter_traces`
 to integrate all components alongside the trajectory without retaining a path:
 
