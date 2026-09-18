@@ -1,0 +1,21 @@
+{
+  "inputs": {
+    "adaptive/amr-slice.npz": "f5ce4776c26831124c79965039e7a8c0b8f7d9e0287c893c5c7938ef929483ba",
+    "isosurface-j.npz": "fbc47d54a0dac92d1296527d840c72571ae4386cd0d715316ee2383d8d90000f",
+    "los-oblique.npz": "bbe2d76fea9412f8906964b8c81ac0e02322dcde898a9b8d8fb46531e0df9884",
+    "summary.json": "c750a4dfc48e7d8899a9e38d84a1c36d336354cad75dcdcd558b281b086bd94a"
+  },
+  "source_figures": [
+    "weno509-slices-amr.png: AMR leaf-block structure",
+    "weno509-emission-isosurfaces-lines.png: current isosurface and oblique emission"
+  ],
+  "length_unit_Mm": 10,
+  "current_isosurface_A_m2": 0.0004270412027835846,
+  "isosurface_method": "Native curl resampled to a uniform volume, then marching cubes",
+  "emission_model": "Isothermal 1 MK, optically thin AIA 171; illustrative solar normalization",
+  "camera": {
+    "azimuth_deg": 45,
+    "elevation_deg": 30
+  },
+  "description": "Existing non-manuscript exploratory panels replotted as a README composition"
+}
