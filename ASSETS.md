@@ -24,7 +24,8 @@ used revision `314bbf01ab72e43f82cb6b2e1c2a4d22d93aacdd`.
 Source revision: `b91bbc015d882ffd7dfcd7e10590cdce559f8532`.
 
 `current_proxy.py` independently implements the field-line mean-squared-current
-prescription of [Cheung & DeRosa (2012), ApJ 757, 147, Section 2.4](https://doi.org/10.1088/0004-637X/757/2/147).
+prescription of [Cheung & DeRosa (2012), ApJ 757, 147, Section 2.4, Equations (17)-(18)](https://doi.org/10.1088/0004-637X/757/2/147),
+with the spatially constant coefficient `G=1`.
 No external implementation code is copied. Native AMR bottom-face cell areas
 weight the default seeds. The existing accepted-prefix tracer supplies paths;
 ambiguous face classifications and incomplete paths are excluded. Raw curl,

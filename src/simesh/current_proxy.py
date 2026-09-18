@@ -1,7 +1,12 @@
 """Area-weighted, field-line-averaged current proxies on a uniform display grid.
 
-The prescription follows Cheung & DeRosa (2012), ApJ 757, 147, Section 2.4.
-It is a morphology proxy, not calibrated radiation or a thermodynamic model.
+The prescription follows Cheung & DeRosa (2012), ApJ 757, 147, Section 2.4,
+Equations (17)-(18), https://doi.org/10.1088/0004-637X/757/2/147. It uses the
+spatially constant coefficient G=1: each accepted bottom-to-bottom line adds
+its seed area times the full-path mean of |curl B|^2 to each visited cell.
+The curl vector is interpolated before squaring. Open or incomplete paths and
+unusable samples contribute nothing. The result is a morphology proxy in input
+units, without conversion to physical current or a thermodynamic emission model.
 """
 
 from dataclasses import dataclass
@@ -205,6 +210,8 @@ def _deposit_lines(fields,companion,lines,areas,shape,lower,upper,step,workers):
             lengths[row] = ds.sum()
             if lengths[row]<=0 or not profiles.valid[indices].all() or not profiles.finite[indices].all():
                 continue
+            # Equation (17) averages the squared full curl magnitude along the
+            # path; Equation (18) deposits that mean with G=1 and seed area.
             current = profiles.values[indices]
             with np.errstate(over='ignore',invalid='ignore'):
                 j2 = np.einsum('ij,ij->i',current,current)
@@ -320,8 +327,8 @@ def iter_current_proxy(fields, resolution, *, points=None, seed_areas=None,
 
     Notes
     -----
-    Following Cheung & DeRosa (2012), each closed line contributes its area times
-    the arc-length mean of squared interpolated curl once per visited cell.
+    The module-level Cheung & DeRosa prescription uses G=1 and the full-path
+    arc-length mean of squared interpolated curl, with no voxel-volume division.
     Accepted-prefix trajectories are not localized endpoints: closure requires
     DOMAIN_EXIT and exactly one face within one step of each final point. Corner
     ambiguities and incomplete lines are excluded; check step convergence.
