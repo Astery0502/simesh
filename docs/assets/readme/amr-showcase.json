@@ -9,6 +9,12 @@
     "weno509-slices-amr.png: AMR leaf-block structure",
     "weno509-emission-isosurfaces-lines.png: current isosurface and oblique emission"
   ],
+  "panels": [
+    "adaptive-mesh.png",
+    "current-structure.png",
+    "synthetic-emission.png"
+  ],
+  "presentation": "Transparent panels without text or decorative backgrounds; Markdown provides labels",
   "length_unit_Mm": 10,
   "current_isosurface_A_m2": 0.0004270412027835846,
   "isosurface_method": "Native curl resampled to a uniform volume, then marching cubes",
@@ -17,5 +23,5 @@
     "azimuth_deg": 45,
     "elevation_deg": 30
   },
-  "description": "Existing non-manuscript exploratory panels replotted as a README composition"
+  "description": "Existing non-manuscript exploratory panels replotted for the README"
 }

@@ -254,13 +254,16 @@ than adopting EISPAC's separate default asinh stretch.
 
 ## README showcase
 
-`docs/assets/readme/amr-showcase.png` is a new composition of three exploratory
+The three transparent panels in `docs/assets/readme/` form a composition of exploratory
 WENO509 subplots that were not included in the manuscript: the native leaf-block
 view from `weno509-slices-amr.png`, and the current isosurface and oblique emission
 views from `weno509-emission-isosurfaces-lines.png`. The original figures and
 numerical products are retained locally under
 `report/weno509-applications-20260909/`. The showcase is replotted from those
 products, preserving geometry and values while changing layout and styling.
+The images contain no titles or decorative backgrounds; README Markdown supplies
+headings and captions so that text follows the reader's theme. Only invalid
+emission pixels are transparent; valid low intensities retain their colormap values.
 
 - Native mesh: 1,799 leaf blocks on x = 0, colored by refinement level.
 - Current structure: the 99th-percentile current-density isosurface. Native curl
@@ -278,5 +281,5 @@ The showcase is separate from the quickstart teaching dataset.
 product directory. Run `python scripts/render_readme_showcase.py SOURCE_DIRECTORY`
 with the plot extra installed. `docs/assets/readme/amr-showcase.json` records the
 input hashes, source subplot names, physical scaling, and display assumptions.
-The PNG is included in the repository and can be displayed without the local
-research inputs.
+The PNG panels are included in the repository and can be displayed without the
+local research inputs.

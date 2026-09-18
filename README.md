@@ -2,49 +2,55 @@
 
 **Scientific analysis directly on native AMR simulation data.**
 
-`simesh` is a Python framework for exploring physical fields, tracing magnetic
-structures, and producing synthetic observations from three-dimensional
-block-structured adaptive mesh refinement (AMR) simulations. It preserves the
-original mesh hierarchy and cell scales, so analysis can use the resolved data
-without first resampling the entire simulation onto a uniform grid.
+Explore physical fields, trace magnetic structures, and produce synthetic
+observations while preserving the simulation's original AMR hierarchy and cell
+scales. Reusable Python interfaces connect the workflow; compiled Cython kernels
+perform the numerical calculations.
 
-Combine reusable Python analysis steps with compiled Cython numerical kernels.
+[Get started](#install-and-run) · [User guide](docs/user/index.md) ·
+[Examples](docs/user/index.md#examples) · [API reference](docs/user/api.md)
 
-[User guide](docs/user/index.md) · [Runnable examples](docs/user/index.md#examples) ·
-[API reference](docs/user/api.md) · [Developer guide](docs/dev/index.md)
+## Explore the mesh, structures, and observables
 
-![Three complementary views of a simulated current sheet: native AMR leaf blocks, a three-dimensional current isosurface, and oblique synthetic AIA 171 emission.](docs/assets/readme/amr-showcase.png)
+Three complementary views of the same simulated current sheet.
 
-*Explore one simulation through its mesh, three-dimensional structures, and
-synthetic views. This showcase recombines earlier exploratory results for the
-README; it does not reproduce the manuscript figures.*
+| Adaptive mesh | Current structure | Synthetic emission |
+| :---: | :---: | :---: |
+| ![Native AMR leaf blocks colored by refinement level.](docs/assets/readme/adaptive-mesh.png) | ![Three-dimensional current-density isosurface.](docs/assets/readme/current-structure.png) | ![Oblique synthetic AIA 171 angstrom emission.](docs/assets/readme/synthetic-emission.png) |
+| 1,799 leaf blocks on the x = 0 plane | Current-density surface at the 99th percentile | AIA 171 Å · Oblique view · 1 MK |
 
 <details>
-<summary>About the showcase</summary>
+<summary>Scientific context and figure provenance</summary>
 
-The left panel shows 1,799 native AMR leaf blocks on the x = 0 plane, colored by
-refinement level. The center shows a current-density isosurface extracted from a
-uniformly sampled volume. The right panel shows an oblique, optically thin AIA
-171 Å synthesis with a prescribed temperature of 1 MK. The physical scaling is
-illustrative, and the images are distinct from the quickstart teaching dataset.
-[Figure provenance and rendering details](ASSETS.md#readme-showcase) are recorded
-alongside the project assets.
+These panels recombine earlier WENO509 exploratory results. The mesh colors
+indicate refinement level. The current isosurface is extracted from a uniformly
+sampled volume; the synthetic image assumes optically thin emission and a
+prescribed temperature of 1 MK. Physical scaling is illustrative. These results
+are separate from the quickstart teaching dataset.
+
+[Figure provenance and rendering details](ASSETS.md#readme-showcase) record the
+source products and display assumptions.
 
 </details>
 
 ## What can you do with simesh?
 
-| Scientific task | Capabilities | Start here |
-| --- | --- | --- |
-| Explore physical fields | Sample points and slices, construct derived fields, compute gradients and curl, and measure regional integrals and statistics | [MHD analysis](examples/recovered_state_analysis.py) |
-| Examine magnetic structures | Trace field lines, calculate squashing factors and twist, extract along-line profiles, and construct a current-based emission proxy | [Magnetic analysis](examples/standard_applications.py) |
-| Produce synthetic observations | Integrate along lines of sight, synthesize EUV emission with optional H/He absorption, and model radio free-free transfer | [Radiation synthesis](examples/radiation_bands.py) |
-| Extract and share results | Save reloadable analysis results, export regional AMR snapshots, and generate uniform volumes for VTK visualization | [Regional extraction](examples/root_crop.py) · [VTK export](examples/uniform_export.py) |
+- **Explore physical fields.** Sample points and slices, compute derivatives,
+  and measure regional integrals and statistics.
+  [MHD example →](examples/recovered_state_analysis.py)
+- **Examine magnetic structures.** Trace field lines, calculate squashing factors
+  and twist, and extract along-line profiles and current-based emission proxies.
+  [Magnetic analysis →](examples/standard_applications.py)
+- **Produce synthetic observations.** Integrate along lines of sight, synthesize
+  EUV emission with optional absorption, and model radio free-free transfer.
+  [Radiation example →](examples/radiation_bands.py)
+- **Save and share results.** Retain reloadable analysis products, extract regional
+  AMR snapshots, and export uniform volumes for VTK visualization.
+  [Regional extraction →](examples/root_crop.py) · [VTK export →](examples/uniform_export.py)
 
-These operations share the same fields and analysis geometries. A diagnostic
-map can guide seed selection; traced field lines can then be reused to sample
-other quantities. Numerical schemes, physical units, and emission models remain
-explicit throughout the workflow.
+A diagnostic map can guide seed selection; the resulting field lines can be
+reused to sample other quantities. Fields and geometries carry across analysis
+steps, with explicit numerical schemes, units, and physical models.
 
 ## Install and run
 
@@ -61,7 +67,10 @@ python3.11 -m venv .venv
 
 The quickstart generates a small teaching snapshot, samples its magnetic field,
 computes its mass, and saves and reloads a result. No simulation download is
-needed. Expected checks include:
+needed.
+
+<details>
+<summary>Expected output</summary>
 
 ```text
 Usable map samples: 64/64
@@ -69,6 +78,8 @@ Magnetic Bz: 0.001 T
 Mass: 1e+06 kg; complete coverage: True
 Result round trip: values and point IDs match
 ```
+
+</details>
 
 Choose a new output directory each time you run the example. Its physical scales
 are synthetic teaching values. Optional `.[plot]` adds PNG rendering dependencies;
