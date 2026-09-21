@@ -1,5 +1,12 @@
 # Retained implementation assets
 
+The local manuscript under `paper/` uses unmodified AAS AASTeX 7.0.1
+publication macros; the fixed A&A baseline retains EDP Sciences A&A v9.4.
+These publication assets are separate from the package implementation and its
+GPL-3.0 license. Sources and copyright/license notices are recorded in
+`paper/vendor/aastex/UPSTREAM.md`, `paper/vendor/aa/UPSTREAM.md`, and their
+bundled files. These assets are not included in the Python distribution.
+
 The selected implementation now lives at the repository root. Historical
 source paths in the provenance tables below identify the pinned revision, not
 runtime imports. Array configurations moved to `tools/configurations.py` during

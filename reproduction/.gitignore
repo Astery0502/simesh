@@ -1,0 +1,10 @@
+/output
+# Downloaded figure inputs and data archives are never tracked in Git.
+/data
+*.npz
+*.npy
+*.zip
+*.tar
+*.tgz
+/manifest.json
+__pycache__/

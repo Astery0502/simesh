@@ -143,6 +143,19 @@ readable directly by users; package installation does not automatically load it
 into an assistant. Review the selected units, numerical controls, and result
 validity as you would for any analysis script.
 
+## Manuscript figures
+
+The [figure reproduction instructions](reproduction/README.md) cover Figures 1–7,
+including dependency installation, input verification, and rendering. Download the
+[plotting data ZIP from Google Drive](https://drive.google.com/file/d/1XglvwIhu7mi8HKRKTBa28WoX4GM6d75G/view?usp=sharing)
+and extract its top-level `data/` directory into `reproduction/`, or use `--data`
+to select another location. The ZIP checksum is recorded in the instructions.
+Original simulation snapshots are not required for rendering. Rendering does not require a
+compiled simesh installation. The scripts' scope and scientific provenance
+limitations are documented separately from the general-purpose package examples.
+These materials reproduce the figures from retained products; they do not rerun
+the original simulations or the full scientific analysis pipeline.
+
 ## Development and license
 
 See the [developer guide](docs/dev/index.md) for architecture and the
