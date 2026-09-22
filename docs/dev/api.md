@@ -22,7 +22,7 @@ Scientific and application functions are in the [user API](../user/api.md).
 
 ::: simesh.Source
     options:
-      members: [metadata, nbytes, field_ids, read_into, read_native_into, read_footprint, validate, close]
+      members: [metadata, boundary, nbytes, field_ids, read_into, read_native_into, read_footprint, validate, close]
       merge_init_into_class: false
 
 ::: simesh.SnapshotMetadata

@@ -6,6 +6,8 @@ from itertools import combinations
 
 import numpy as np
 
+from simesh._validation import periodic_mask
+
 from simesh._kernels.primitives._contacts import invalid_contact_direction_unchecked
 from simesh._kernels.primitives._relations import fill_balanced_refined_relations_unchecked
 from simesh._kernels.primitives._storage import validate_indices_unchecked
@@ -64,6 +66,7 @@ def fill_balanced_refined_relations(
     physical_masks: np.ndarray,
     source_counts: np.ndarray,
     source_leaf_ids: np.ndarray,
+    *, periodic=(False, False, False),
 ) -> None:
     """Fill balanced relation facts for selected leaf-by-direction pairs."""
     (
@@ -159,6 +162,7 @@ def fill_balanced_refined_relations(
         physical_masks,
         source_counts,
         source_leaf_ids,
+        periodic_mask(periodic),
     )
 
 
@@ -173,6 +177,7 @@ def balanced_refined_relations(
     leaf_node_ids: np.ndarray,
     leaf_ids: np.ndarray,
     directions: np.ndarray,
+    *, periodic=(False, False, False),
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Allocate and return selected balanced refined relation records."""
     leaf_ids = _require_index_vector("leaf_ids", leaf_ids)
@@ -197,5 +202,6 @@ def balanced_refined_relations(
         physical_masks,
         source_counts,
         source_leaf_ids,
+        periodic=periodic,
     )
     return relation_kinds, physical_masks, source_counts, source_leaf_ids

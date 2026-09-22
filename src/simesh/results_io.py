@@ -431,6 +431,8 @@ class _Encoder:
     def node(self, result):
         cls = type(result)
         _require(cls in _ARRAYS, "unsupported result type")
+        if cls is Mesh:
+            _require(not any(result.periodic), "result serialization does not support periodic meshes")
         node = {"type": cls.__name__}
         for name, dtype in _ARRAYS[cls].items():
             array = result.node_leaves >= 0 if cls is Mesh and name == "leaf_flags" else getattr(result, name)
@@ -607,7 +609,8 @@ def save_result(path, result, *, metadata=None, source=None, overwrite=False):
     - Potentially aliased arrays are snapshotted; owned read-only geometry may be
       borrowed until return. Whole-result saving has no bounded-memory guarantee.
     - AMR slices include original mesh topology and reconstruct its geometry on load;
-      reductions retain units, coverage, weights, tails and surface/location metadata.
+      periodic meshes are rejected because this schema cannot retain their halo
+      topology. Reductions retain units, coverage, weights, tails and surface/location metadata.
     """
     _require(type(overwrite) is bool, "overwrite must be boolean")
     destination = Path(path)

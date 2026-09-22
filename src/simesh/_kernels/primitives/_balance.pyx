@@ -16,6 +16,7 @@ cpdef tuple first_refined_balance_violation_unchecked(
     const int64_t[:, ::1] child_node_ids,
     const int64_t[::1] node_leaf_ids,
     const int64_t[::1] leaf_node_ids,
+    unsigned char periodic_mask=0,
 ):
     cdef int64_t source_leaf, source_node, source_level
     cdef int64_t column, target_node, target_leaf, child_node
@@ -42,6 +43,7 @@ cpdef tuple first_refined_balance_violation_unchecked(
                 dx,
                 dy,
                 dz,
+                periodic_mask,
             )
             if target_node < 0:
                 continue

@@ -33,7 +33,7 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 
 ### 共同输入约定
 
-原生科学分析支持满足平衡条件的非周期 Cartesian 三维 AMR 网格，以及 AMRVAC v5 普通单元中心字段；等价数组也可建立输入。当前原生准备使用连续物理边界。周期、球坐标、CT 面变量和 GPU 分析不在这一支持范围内。
+原生科学分析支持满足平衡条件的 Cartesian 三维 AMR 网格，以及 AMRVAC v5 普通单元中心字段；等价数组也可建立输入。逐轴周期配置仅用于 `exact-phase` 的 halo 准备，由对侧真实叶块提供鬼点；非周期侧默认连续外推，也可通过 Source 的 `boundary` 按字段和面显式设置对称或反对称镜像。坐标、采样、区域与积分保持原有有限域语义，不支持周期轨迹和磁连通性分析。`coordinate-phase`、AMRVAC 与均匀网格导出、AMR 切片结果保存均拒绝周期网格。球坐标、CT 面变量和 GPU 分析仍不在支持范围内。
 
 | 对象或入口 | 应用中的作用 |
 | --- | --- |
@@ -243,7 +243,7 @@ state = sm.mhd_fields(conserved, model=model)
 
 | 任务与入口 | 功能和范围 |
 | --- | --- |
-| `sm.open_amrvac(...)`、`sm.read_fields(...)` | 读取非周期笛卡尔三维 AMRVAC v5 普通场，数值采用分量在后布局 |
+| `sm.open_amrvac(...)`、`sm.read_fields(...)` | 读取笛卡尔三维 AMRVAC v5 普通场，保留仅用于 halo 准备的逐轴周期标记，数值采用分量在后布局 |
 | `sm.source_from_arrays(...)` | 从明确的网格与块数组建立 Source |
 | `sm.export_uniform(...)` | 将普通场导出为均匀体数据，支持按批读取 |
 | `sm.write_uniform_vtk(path, grid)` | 将已有均匀体结果保存为二进制 VTK，保留网格边界、标量分量与覆盖标记 |

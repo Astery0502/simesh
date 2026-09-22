@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from simesh._validation import periodic_mask
+
 from simesh._kernels.primitives._contacts import (
     fill_refined_contact_targets_unchecked,
     invalid_contact_direction_unchecked,
@@ -82,6 +84,7 @@ def fill_refined_contact_targets(
     source_leaf_ids: np.ndarray,
     directions: np.ndarray,
     target_node_ids: np.ndarray,
+    *, periodic=(False, False, False),
 ) -> None:
     """Fill raw target nodes for explicit refined leaf/direction queries."""
     (
@@ -154,6 +157,7 @@ def fill_refined_contact_targets(
         source_leaf_ids,
         directions,
         target_node_ids,
+        periodic_mask(periodic),
     )
 
 
@@ -168,6 +172,7 @@ def refined_contact_targets(
     leaf_node_ids: np.ndarray,
     source_leaf_ids: np.ndarray,
     directions: np.ndarray,
+    *, periodic=(False, False, False),
 ) -> np.ndarray:
     """Allocate and return raw TOP-002 target node IDs."""
     source_leaf_ids = _require_index_vector(
@@ -186,5 +191,6 @@ def refined_contact_targets(
         source_leaf_ids,
         directions,
         output,
+        periodic=periodic,
     )
     return output

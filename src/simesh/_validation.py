@@ -9,6 +9,18 @@ def frozen_array(value, dtype):
     return result
 
 
+def periodic_flags(value):
+    """Return a detached immutable three-axis ordinary-periodicity configuration."""
+    flags = np.asarray(value)
+    if flags.shape != (3,) or flags.dtype != np.dtype(bool):
+        raise ValueError("periodic must contain three boolean axis flags")
+    return tuple(bool(flag) for flag in flags)
+
+
+def periodic_mask(value):
+    return sum(1 << axis for axis, flag in enumerate(periodic_flags(value)) if flag)
+
+
 def indices(value, size, name="leaf_ids"):
     array = np.asarray(value)
     if array.ndim != 1 or (array.size and array.dtype.kind not in "iu"):

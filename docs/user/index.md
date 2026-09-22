@@ -14,6 +14,30 @@ import simesh as sm
 from simesh import applications as app
 ```
 
+Physical boundary parity can be specified when opening a Source. For example,
+for an x-normal reflecting wall on both x faces:
+
+```python
+boundary = {
+    "rho": ("symmetric", "symmetric", "continuous", "continuous", "continuous", "continuous"),
+    "m1": ("asymmetric", "asymmetric", "continuous", "continuous", "continuous", "continuous"),
+    "m2": ("symmetric", "symmetric", "continuous", "continuous", "continuous", "continuous"),
+    "m3": ("symmetric", "symmetric", "continuous", "continuous", "continuous", "continuous"),
+}
+with sm.open_amrvac("snapshot.dat", boundary=boundary) as source:
+    fields = sm.prepare(source, scheme="exact-phase")
+```
+
+Use the actual stored field names and specify any other components according to
+that simulation's model. See `Source` in the [developer API](../dev/api.md) for
+face order, defaults, periodic compatibility and accepted configuration forms.
+
+For axis-periodic input, use `prepare(..., scheme="exact-phase")` to obtain
+halos from opposite real leaves. Mesh periodicity affects halo support only;
+sampling and regions remain in the original finite coordinate domain. Periodic
+trajectories/connectivity are outside the supported profile. Coordinate-phase,
+AMRVAC/uniform exports and saving AMR slices reject periodic meshes.
+
 ## Examples
 
 | Example | Input and output |

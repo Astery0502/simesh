@@ -130,13 +130,14 @@ def cache_source(source, *, capacity, fields=None, memory_limit=None):
         raise ValueError("cache capacity must be a positive integer")
     count=min(capacity,source.mesh.leaf_count)
     block_bytes=8*int(np.prod(source.mesh.block_shape))
-    cache_bytes=count*len(source.fields)*block_bytes+source.mesh.leaf_count*8+count*16
+    cache_bytes=(count*len(source.fields)*block_bytes+source.mesh.leaf_count*8+count*16
+                 + source._boundary_modes.nbytes)
     admit(source.mesh.nbytes+source.nbytes+cache_bytes,memory_limit,"raw cache")
     cache=InteriorValueCache(source._reader,count,source.validate)
     cached=Source(source.mesh,source.fields,cache.reader,validate=source.validate,close=cache.close,
         read_native=cache.read_native, metadata_arrays=source._memory_arrays,
         read_scratch=lambda n,k:source.read_footprint(n,k)+n*k*block_bytes+64*(n+count),
-        io_stats=cache.stats, metadata=source.metadata)
+        io_stats=cache.stats, metadata=source.metadata, boundary=source.boundary)
     cached.identity=source.identity
     cached.field_origins=source.field_origins
     return cached

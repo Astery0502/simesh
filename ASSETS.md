@@ -31,6 +31,15 @@ source, field, preparation and consumer orchestration is implemented here.
 No runtime import resolves to the donor checkout. Retained code remains under
 the repository GPL-3.0 license. Primitive compiler semantics stay separate.
 
+Periodic halo adjacency was informed by AMRVAC revision
+`ff3cd44d07b7e6c25ec173848228d4125be87d48`, particularly
+`src/amr/mod_amr_neighbors.t`, `src/amr/mod_amr_solution_node.t`,
+`src/amr/mod_coarsen_refine.t` and `src/mod_ghostcells_update.t`.
+The implementation adds periodic integer contact lookup to the existing flat
+forest and retains simesh's exact-phase transfer/limiter arithmetic. It does
+not import the simulation, replicate field payload for periodic images, or
+extend coordinate and trajectory semantics.
+
 N2 adds `preparation/coordinate.py` and `_kernels/coordinate.pyx`. The latter
 retains the grid-index, boundary, coarsening, copy and coordinate-prolongation
 arithmetic from `src/simesh/utils/lib/amr/mesh.pyx`, while replacing tree-pointer
@@ -198,3 +207,8 @@ GPL-3.0-only distribution. The repository LICENSE remains applicable.
 
 No upstream Dataset, MPI communication, spherical ray machinery or instrument
 post-processing is imported into the active package.
+
+Physical `continuous`, `symmetric`, and `asymmetric` source configuration reuses
+the retained PBC-001 rules. Cell-centered reflection and odd-parity signs were
+checked against AMRVAC `src/mod_boundary_conditions.t` (`bc_cont`, `bc_symm`,
+`bc_asymm`) at commit `ff3cd44d07b7e6c25ec173848228d4125be87d48`.

@@ -8,6 +8,7 @@ from ..fields import FieldDefinition, publish, source_value_identity, _field_ind
 from ..mesh import resolve_selection
 from .._amr.blockio import array_block_reader, read_blocks_into, make_block_reader
 from .metadata import SnapshotMetadata
+from ._boundary import boundary_configuration
 
 
 class Source:
@@ -23,6 +24,11 @@ class Source:
         Shared original geometry.
     fields : tuple of FieldDefinition
         Available stored components; integer selectors are local to this directory.
+    boundary : tuple of tuple of str
+        Immutable rules in field-directory order, with faces x-, x+, y-, y+, z-, z+.
+        continuous copies the nearest interior cell; symmetric mirrors cell centers;
+        asymmetric mirrors and negates (odd parity). Vector parity is explicit per
+        component, never inferred from names. periodic faces follow Mesh.periodic.
     identity : object
         In-memory source association, not a file hash.
     io_stats : dict
@@ -30,6 +36,10 @@ class Source:
 
     Notes
     -----
+    - Constructor boundary inputs may be a mode string for all nonperiodic faces,
+      a field-name mapping to mode strings or six-face rows, or a (field, 6) table.
+      Omitted fields default to continuous; explicit rows must use periodic exactly
+      on periodic faces. No physical rules are inferred from snapshot headers.
     - Use with/close; detached metadata and owned Fields survive closure.
     - Borrowed adapters must close before their parent. Parent closure or detected
       input changes invalidate reads, including cache hits.
@@ -37,7 +47,7 @@ class Source:
 
     def __init__(self, mesh, definitions, reader, *, validate=None, close=None,
                  read_full=None, read_native=None, read_scratch_bytes=0, metadata_arrays=(), read_scratch=None, io_stats=None,
-                 metadata=None):
+                 metadata=None, boundary=None):
         if metadata is not None and not isinstance(metadata, SnapshotMetadata):
             raise TypeError("metadata must be SnapshotMetadata or None")
         self._metadata = metadata
@@ -47,6 +57,7 @@ class Source:
             raise ValueError("nonempty FieldDefinition sequence required")
         if reader.shape != (mesh.leaf_count, len(self.fields), *mesh.block_shape):
             raise ValueError("reader shape disagrees with source mesh and fields")
+        self._boundary, self._boundary_modes = boundary_configuration(mesh, self.fields, boundary)
         self._reader = reader
         self._validate = validate
         self._close = close
@@ -54,12 +65,17 @@ class Source:
         self._read_native = read_native
         self.field_origins = tuple(range(len(self.fields)))
         self.read_scratch_bytes = int(read_scratch_bytes)
-        self._memory_arrays = tuple(a for a in (*reader.memory_arrays, *metadata_arrays)
+        self._memory_arrays = tuple(a for a in (*reader.memory_arrays, *metadata_arrays, self._boundary_modes)
                                     if isinstance(a, np.ndarray))
         self.identity = object()
         self._closed = False
         self._read_scratch = read_scratch
         self.io_stats = {} if io_stats is None else io_stats
+
+    @property
+    def boundary(self):
+        """Detached immutable physical halo configuration; see Source."""
+        return self._boundary
 
     @property
     def metadata(self):
@@ -69,7 +85,7 @@ class Source:
     @property
     def nbytes(self):
         """Accounted input backing and metadata arrays, excluding the shared Mesh."""
-        return array_bytes(self._memory_arrays)
+        return array_bytes((*self._memory_arrays, self._boundary_modes))
 
     def validate(self):
         """Reject a closed Source or a change detected by its input adapter.
@@ -188,13 +204,13 @@ def definitions_from_names(names, units=None):
                  for name in names)
 
 
-def source_from_arrays(mesh, values, fields, *, units=None, copy=True, memory_limit=None, metadata=None):
+def source_from_arrays(mesh, values, fields, *, units=None, copy=True, memory_limit=None, metadata=None, boundary=None):
     """Create a source from native float64 (leaf, component, x, y, z) data.
 
     Parameters
     ----------
     mesh : Mesh
-        Validated nonperiodic Cartesian 3D mesh.
+        Validated Cartesian 3D mesh; its periodic flags control halo topology only.
     values : ndarray
         C-contiguous float64 array in (leaf, component, x, y, z) order.
     fields : sequence
@@ -207,6 +223,9 @@ def source_from_arrays(mesh, values, fields, *, units=None, copy=True, memory_li
         Accounted-array budget in bytes for this call, not a process RSS limit.
     metadata : SnapshotMetadata, optional
         Detached description; does not verify the supplied array values.
+    boundary : str, mapping or array-like, optional
+        Explicit physical halo rules in this field directory; see Source.boundary
+        and the Source constructor input contract. Defaults to continuous.
 
     Returns
     -------
@@ -222,7 +241,8 @@ def source_from_arrays(mesh, values, fields, *, units=None, copy=True, memory_li
             values.shape != (mesh.leaf_count, len(definitions), *mesh.block_shape) or
             not values.flags.c_contiguous or type(copy) is not bool):
         raise ValueError("array source requires native contiguous field-major float64 values")
-    admit(mesh.nbytes + values.nbytes*(2 if copy else 1), memory_limit, "array source")
+    admit(mesh.nbytes + values.nbytes*(2 if copy else 1) + 6*len(definitions),
+          memory_limit, "array source")
     backing = values.copy() if copy else values
     if copy:
         backing.flags.writeable = False
@@ -231,7 +251,7 @@ def source_from_arrays(mesh, values, fields, *, units=None, copy=True, memory_li
             for column, component in enumerate(selected):
                 target[row, ..., column] = backing[leaf, component]
         return {"selected_load_count": len(ids), "peak_read_buffer_bytes": 0}
-    return Source(mesh, definitions, array_block_reader(backing), read_native=read_native, metadata=metadata)
+    return Source(mesh, definitions, array_block_reader(backing), read_native=read_native, metadata=metadata, boundary=boundary)
 
 
 def read_fields(source, fields=None, *, region=None, leaf_ids=None, memory_limit=None):
@@ -305,7 +325,8 @@ def select_source(source, fields):
         read, memory_arrays=(*source._memory_arrays,chosen))
     result = Source(source.mesh, tuple(source.fields[i] for i in chosen), reader,
         validate=source.validate, read_native=native if source._read_native is not None else None,
-        read_scratch=source.read_footprint, io_stats=source.io_stats, metadata=source.metadata)
+        read_scratch=source.read_footprint, io_stats=source.io_stats, metadata=source.metadata,
+        boundary=tuple(source.boundary[i] for i in chosen))
     result.identity = source.identity
     result.field_origins = tuple(source.field_origins[i] for i in chosen)
     return result

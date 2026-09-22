@@ -20,6 +20,7 @@ cdef inline int64_t refined_contact_target_c(
     int dx,
     int dy,
     int dz,
+    unsigned char periodic_mask=0,
 ) noexcept nogil:
     cdef int64_t source_node = leaf_node_ids[source_leaf_id]
     cdef int64_t level = node_levels[source_node]
@@ -31,6 +32,24 @@ cdef inline int64_t refined_contact_target_c(
     cdef int64_t ty = node_coords[source_node, 1] + dy
     cdef int64_t tz = node_coords[source_node, 2] + dz
     cdef int64_t root_rank, node, depth, shift, child
+    # Only topology queries wrap. Published coordinates stay in the original domain.
+    # The caller supplies adjacent offsets, so one translation suffices (including
+    # a one-block periodic axis). Avoid C remainder semantics for negative indices.
+    if periodic_mask & 1:
+        if tx < 0:
+            tx += extent_x
+        elif tx >= extent_x:
+            tx -= extent_x
+    if periodic_mask & 2:
+        if ty < 0:
+            ty += extent_y
+        elif ty >= extent_y:
+            ty -= extent_y
+    if periodic_mask & 4:
+        if tz < 0:
+            tz += extent_z
+        elif tz >= extent_z:
+            tz -= extent_z
     if (
         tx < 0 or tx >= extent_x
         or ty < 0 or ty >= extent_y

@@ -18,7 +18,8 @@ def mixed_source(function=None):
     return sm.source_from_arrays(mesh, values, ("b1", "b2", "b3"), copy=False), values
 
 
-def write_dat(path, mesh, values, *, byte_order="<", staggered=False, saved_ghosts=False):
+def write_dat(path, mesh, values, *, byte_order="<", staggered=False, saved_ghosts=False,
+              geometry="Cartesian_3D"):
     """Write a minimal v5 fixture directly from the documented binary layout."""
     flags = mesh.node_leaves >= 0
     nleaf, fields = values.shape[:2]
@@ -43,7 +44,7 @@ def write_dat(path, mesh, values, *, byte_order="<", staggered=False, saved_ghos
     header = struct.pack(fixed_format, 5, offset_tree, offset_blocks, fields, 3, 3,
                          mesh.forest.max_level, nleaf, len(flags)-nleaf, 0, 0.,
                          *mesh.lower, *mesh.upper, *(mesh.root_shape*np.array(mesh.block_shape)),
-                         *mesh.block_shape, 0, 0, 0, b"Cartesian_3D".ljust(16, b" "), int(staggered))
+                         *mesh.block_shape, *(int(flag) for flag in mesh.periodic), geometry.encode().ljust(16, b" "), int(staggered))
     header += b"".join(name.encode().ljust(16, b" ") for name in names)
     header += b"mhd".ljust(16, b" ")+struct.pack(byte_order+"4i", 0, 0, 0, 0)
     with path.open("wb") as stream:

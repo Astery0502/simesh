@@ -132,7 +132,8 @@ class FillPlan:
         payload=np.empty((self.capacity,k,*padded))
         coarse=np.empty((1,k,*(block+1)))
         lo,hi=np.full(3,2,dtype=np.int64),block+2
-        modes,normals=np.zeros((k,6),dtype=np.uint8),np.full(3,-1,dtype=np.int64)
+        modes = source._boundary_modes[fields]
+        normals = np.full(3,-1,dtype=np.int64)
         offset=loads=0
         reading=arithmetic=packing=0.
         start=time.perf_counter()

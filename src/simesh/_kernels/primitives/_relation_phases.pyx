@@ -52,14 +52,19 @@ cpdef tuple validate_refined_relation_phases_unchecked(
     const uint8_t[:, ::1] physical_masks,
     const uint8_t[:, ::1] source_counts,
     const int64_t[:, :, ::1] source_slots,
+    const int64_t[::1] root_shape=None,
+    uint8_t periodic_mask=0,
 ):
     cdef int64_t row, direction, source, axis, slot, node
     cdef int64_t primary_leaf, primary_node, primary_level
     cdef int64_t source_leaf, source_node, source_level
-    cdef int64_t shifted, expected_coord, reduced
+    cdef int64_t shifted, expected_coord, reduced, extent
     cdef int64_t neutral_axes, expected_count
     cdef uint8_t kind, mask, count, phase, prior_phase
     cdef bint reduced_noncenter
+
+    if periodic_mask and (root_shape is None or root_shape.shape[0] != 3):
+        raise ValueError("periodic phase validation requires root_shape")
 
     for direction in range(directions.shape[0]):
         reduced_noncenter = False
@@ -79,7 +84,7 @@ cpdef tuple validate_refined_relation_phases_unchecked(
             kind = relation_kinds[row, direction]
             mask = physical_masks[row, direction]
             count = source_counts[row, direction]
-            if mask & <uint8_t>248:
+            if mask & <uint8_t>248 or mask & periodic_mask:
                 return 3, row, direction, -1, -1
             reduced_noncenter = False
             neutral_axes = 0
@@ -134,6 +139,12 @@ cpdef tuple validate_refined_relation_phases_unchecked(
                         return 11, row, direction, 0, axis
                     shifted = node_coords[primary_node, axis] + reduced
                     expected_coord = _floor_divide_two(shifted)
+                    if periodic_mask & (<uint8_t>1 << axis):
+                        extent = root_shape[axis] * ((<int64_t>1) << (source_level - 1))
+                        if expected_coord < 0:
+                            expected_coord += extent
+                        elif expected_coord >= extent:
+                            expected_coord -= extent
                     if node_coords[source_node, axis] != expected_coord:
                         return 11, row, direction, 0, axis
                 continue
@@ -169,6 +180,9 @@ cpdef void fill_refined_relation_phase_codes_unchecked(
     const int64_t[:, :, ::1] source_slots,
     uint8_t[:, :, ::1] fine_phase_codes,
 ):
+    # Fine levels are >= 2 at coarse/fine interfaces. A whole-domain shift
+    # therefore contains an even number of fine blocks and preserves child phase.
+    # Local transfer boxes need no absolute coordinates or periodic field copies.
     cdef int64_t row, direction, source, slot, leaf_id, node
     cdef uint8_t kind, count
     for row in range(relation_kinds.shape[0]):

@@ -21,7 +21,8 @@ def export_uniform(source, resolution, *, fields=None, bounds=None, interpolatio
     ----------
     source : Source or str or Path
         Open immutable source, or a Cartesian 3D ordinary AMRVAC v5 file opened and
-        closed by this call. A supplied Source remains open.
+        closed by this call. A supplied Source remains open. Periodic meshes are
+        not supported by this export interface, in any interpolation mode.
     resolution : sequence of int
         Positive uniform-grid cell counts (nx, ny, nz).
     fields : str or sequence, optional
@@ -86,6 +87,8 @@ def export_uniform(source, resolution, *, fields=None, bounds=None, interpolatio
     with context as current:
         current.validate()
         mesh = current.mesh
+        if any(mesh.periodic):
+            raise ValueError("uniform export does not support periodic meshes")
         selected = current.field_ids(fields)
         shape, lower, upper, step = geometry(mesh, resolution, bounds, interpolation)
         inputs = (*current._memory_arrays,

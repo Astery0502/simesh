@@ -20,12 +20,22 @@ the [API reference](docs/user/api.md) for exact interface contracts.
 - AMRVAC v5 input, root-block regional analysis retaining AMR refinement, and `.dat` export
 - Uniform-volume VTK export from sampled results or directly from AMRVAC files
 
-Native analysis accepts balanced, nonperiodic Cartesian 3D AMRVAC v5 ordinary
+Native analysis accepts balanced Cartesian 3D AMRVAC v5 ordinary
 fields and equivalent array sources. Public workflows use Source and Fields;
 the archived mutable Dataset and 2D workflows are not shipped. VTK output is
 limited to uniform volumes.
+Physical halos support explicit per-field `continuous`, `symmetric`, and
+`asymmetric` (odd reflection) rules through the Source `boundary` configuration.
+See the [input guide](docs/user/index.md) for an example.
+
+Axis-periodic inputs support **exact-phase halo preparation only**: opposite
+real leaves supply ghost values, including balanced AMR seams. Coordinates,
+sampling, region selection and integration keep their finite-domain semantics.
+Coordinate-phase preparation, AMRVAC/uniform exports and saved AMR slices reject
+periodic meshes. Periodic trajectories and magnetic connectivity are outside
+this scope.
 Models, unit scales and numerical schemes are explicit. CT face analysis,
-spherical/periodic native analysis and GPU execution are outside the current profile. Inspect validity and termination
+spherical native analysis and GPU execution are outside the current profile. Inspect validity and termination
 before treating an output as a complete physical result.
 
 ## Install and run

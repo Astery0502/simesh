@@ -19,6 +19,8 @@
 | Mesh / values | Shared immutable geometry has no field storage |
 | Source / Fields | Reads and preparation are explicit; owned published fields survive Source closure |
 | Coverage / region | Selections retain complete original leaves; region edges are not physical boundaries |
+| Physical halo rules | Source owns immutable per-field face parity; adapters preserve it and preparation binds it to selected components |
+| Halo topology / coordinates | Mesh periodic flags connect real leaves for exact-phase preparation only; point and region coordinates never wrap |
 | Storage / validity | Allocated padding is not valid halo; a first derivative consumes one valid layer |
 | Owned / borrowed | Iterator and pool views expire with their lease; caller output retains alias constraints |
 | Science / execution | Numerical schemes, models and units remain explicit; consumers do not fetch missing input |

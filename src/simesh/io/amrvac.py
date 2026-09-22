@@ -11,14 +11,15 @@ from ..mesh import _from_validated
 from .._validation import admit, array_bytes
 
 
-def open_amrvac(path, *, fields=None, units=None, memory_limit=None):
-    """Open immutable nonperiodic Cartesian 3D v5 ordinary fields.
+def open_amrvac(path, *, fields=None, units=None, memory_limit=None, boundary=None):
+    """Open immutable Cartesian 3D v5 ordinary fields with halo periodicity.
 
     Parameters
     ----------
     path : str or Path
-        Ordinary nonperiodic Cartesian 3D AMRVAC v5 snapshot; CT face values are not
-        exposed.
+        Ordinary Cartesian 3D AMRVAC v5 snapshot; CT face values are not exposed.
+        Axis-periodic metadata is retained by Mesh for exact-phase halo preparation
+        only. Periodic coordinate and trajectory semantics are not provided.
     fields : str or sequence, optional
         Names or local Source indices of stored fields; integers must be supplied as a
         sequence.
@@ -26,6 +27,11 @@ def open_amrvac(path, *, fields=None, units=None, memory_limit=None):
         Field unit labels, without numerical scaling.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
+
+    boundary : str, mapping or array-like, optional
+        Explicit physical halo rules for the full file field directory, before
+        selecting fields; see Source. The snapshot stores only periodic flags,
+        so omitted physical rules default to continuous.
 
     Returns
     -------
@@ -36,14 +42,15 @@ def open_amrvac(path, *, fields=None, units=None, memory_limit=None):
     fd = os.open(os.fspath(path), os.O_RDONLY)
     try:
         index = read_amrvac_v5_index(fd)
-        if index.dimension_count != 3 or index.geometry != "Cartesian_3D" or np.any(index.periodic):
-            raise ValueError("source profile requires nonperiodic Cartesian 3D v5 ordinary fields")
+        if index.dimension_count != 3 or index.geometry not in ("Cartesian", "Cartesian_3D"):
+            raise ValueError("source profile requires Cartesian 3D v5 ordinary fields")
         metadata_bytes = array_bytes(index)
         admit(metadata_bytes + index.leaf_count*2048 + len(index.forest_flags)*512,
               memory_limit, "source metadata")
         binding = bind_amrvac_v5_forest(index)
         mesh = _from_validated(binding.root_shape, binding.coord_to_rank, binding.forest,
-                               index.domain_lower, index.domain_upper, index.block_cell_counts)
+                               index.domain_lower, index.domain_upper, index.block_cell_counts,
+                               periodic=index.periodic)
         reader = make_amrvac_v5_ordinary_block_reader(fd, index, binding)
         definitions = definitions_from_names(index.field_names, units)
         offsets = np.r_[index.block_offsets, index.file_identity[2]]
@@ -72,7 +79,7 @@ def open_amrvac(path, *, fields=None, units=None, memory_limit=None):
         source = Source(mesh, definitions, reader, validate=validate, close=lambda: os.close(fd),
                         read_native=read_native, read_scratch_bytes=2*max(maximum_record, 16*1024**2),
                         metadata_arrays=(*index, binding.root_shape, binding.rank_to_coord, binding.coord_to_rank),
-                        metadata=SnapshotMetadata._from_amrvac_index(index, path))
+                        metadata=SnapshotMetadata._from_amrvac_index(index, path), boundary=boundary)
         admit(mesh.nbytes+source.nbytes, memory_limit, "source metadata")
         if fields is not None:
             from .source import select_source

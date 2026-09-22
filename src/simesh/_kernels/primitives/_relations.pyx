@@ -28,6 +28,7 @@ cpdef void fill_balanced_refined_relations_unchecked(
     uint8_t[:, ::1] physical_masks,
     uint8_t[:, ::1] source_counts,
     int64_t[:, :, ::1] source_leaf_ids,
+    uint8_t periodic_mask=0,
 ):
     if leaf_ids.shape[0] == 0 or directions.shape[0] == 0:
         return
@@ -47,6 +48,7 @@ cpdef void fill_balanced_refined_relations_unchecked(
             physical_masks,
             source_counts,
             source_leaf_ids,
+            periodic_mask,
         )
 
 
@@ -65,6 +67,7 @@ cdef void _fill_balanced_refined_relations(
     uint8_t[:, ::1] physical_masks,
     uint8_t[:, ::1] source_counts,
     int64_t[:, :, ::1] source_leaf_ids,
+    uint8_t periodic_mask,
 ) noexcept nogil:
     cdef int64_t primary, direction_index, source_leaf, source_node
     cdef int64_t source_level, scale, extent_x, extent_y, extent_z
@@ -88,7 +91,7 @@ cdef void _fill_balanced_refined_relations(
             ry = dy
             rz = dz
             mask = 0
-            if (
+            if not (periodic_mask & 1) and (
                 (dx < 0 and node_coords[source_node, 0] == 0)
                 or (
                     dx > 0
@@ -97,7 +100,7 @@ cdef void _fill_balanced_refined_relations(
             ):
                 mask |= 1
                 rx = 0
-            if (
+            if not (periodic_mask & 2) and (
                 (dy < 0 and node_coords[source_node, 1] == 0)
                 or (
                     dy > 0
@@ -106,7 +109,7 @@ cdef void _fill_balanced_refined_relations(
             ):
                 mask |= 2
                 ry = 0
-            if (
+            if not (periodic_mask & 4) and (
                 (dz < 0 and node_coords[source_node, 2] == 0)
                 or (
                     dz > 0
@@ -137,6 +140,7 @@ cdef void _fill_balanced_refined_relations(
                 rx,
                 ry,
                 rz,
+                periodic_mask,
             )
             target_leaf = node_leaf_ids[target_node]
             if target_leaf >= 0:

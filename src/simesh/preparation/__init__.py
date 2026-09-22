@@ -46,7 +46,8 @@ def prepare(source, fields=None, *, region=None, leaf_ids=None, scheme,
         Ordered original leaf IDs; mutually exclusive with region.
     scheme : str
         coordinate-phase requires complete coverage; exact-phase supports regions. These
-        schemes have distinct numerical definitions.
+        schemes have distinct numerical definitions. Only exact-phase supports
+        Mesh periodic halo adjacency; coordinate-phase rejects periodic meshes.
     workers : int
         Worker count; exact-phase requires one worker.
     memory_limit : int, optional
@@ -72,7 +73,9 @@ def prepare(source, fields=None, *, region=None, leaf_ids=None, scheme,
     Ghost exchange requires at least two layers; both schemes prepare two. Derived
     fields may retain one valid layer for consumption without further exchange.
     Region support is read from the original Mesh; a region edge is not a physical
-    boundary.
+    boundary. Periodic sides read opposite real leaves and never use physical
+    filling; nonperiodic sides use the explicit per-field Source.boundary rules. This changes
+    halo support only, not coordinate, selection or trajectory semantics.
     """
     if plan is not None:
         from .plans import FillPlan

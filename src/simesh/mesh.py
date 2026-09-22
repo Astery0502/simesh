@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import numpy as np
 
-from ._validation import frozen_array, indices, array_bytes
+from ._validation import frozen_array, indices, array_bytes, periodic_flags
 from ._amr.forest import RefinedForest, refined_forest
 from ._amr.morton import level1_morton
 from ._amr.refined_geometry import refined_leaf_geometry
@@ -79,11 +79,17 @@ class Mesh:
         Interior cells per leaf and root-block counts.
     bounds, spacing : ndarray
         Per-leaf physical bounds (leaf, 2, 3) and cell spacing (leaf, 3).
+    periodic : tuple of bool
+        Three immutable axis flags for ordinary periodic halo adjacency. Defaults
+        to all false; no sign reversal or coordinate wrapping is implied.
 
     Notes
     -----
     Native ownership uses half-open bounds. Region selection retains the original
-    Mesh; its edges are not physical boundaries.
+    Mesh; its edges are not physical boundaries. Periodicity is supported only by
+    exact-phase halo preparation. Point ownership and region selection retain the
+    original finite coordinate domain; trajectory/connectivity semantics are not
+    extended to periodic domains.
     """
 
     lower: np.ndarray
@@ -97,6 +103,10 @@ class Mesh:
     node_upper: np.ndarray
     bounds: np.ndarray
     spacing: np.ndarray
+    periodic: tuple = (False, False, False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "periodic", periodic_flags(self.periodic))
 
     @property
     def children(self):
@@ -151,8 +161,10 @@ class Mesh:
         return Selection(self, leaves)
 
 
-def _from_validated(root_shape, coord_to_rank, forest, lower, upper, block_shape):
+def _from_validated(root_shape, coord_to_rank, forest, lower, upper, block_shape,
+                    *, periodic=(False, False, False)):
     """Publish geometry from an already validated integer forest binding."""
+    periodic = periodic_flags(periodic)
     root = frozen_array(root_shape, np.int64)
     rank = frozen_array(coord_to_rank, np.int64)
     lower, upper = frozen_array(lower, float), frozen_array(upper, float)
@@ -164,7 +176,7 @@ def _from_validated(root_shape, coord_to_rank, forest, lower, upper, block_shape
     block = frozen_array(block, np.int64)
     f = RefinedForest(*(frozen_array(a, np.int64) if isinstance(a, np.ndarray) else a for a in forest))
     validate_refined_all_touch_2to1(root, rank, f.root_node_ids, f.node_levels,
-        f.node_coords, f.child_node_ids, f.node_leaf_ids, f.leaf_node_ids)
+        f.node_coords, f.child_node_ids, f.node_leaf_ids, f.leaf_node_ids, periodic=periodic)
     domain = root * block
     bounds, spacing = refined_leaf_geometry(lower, upper, root, domain, block,
         f.node_levels, f.node_coords, f.leaf_node_ids, np.arange(len(f.leaf_node_ids), dtype=np.int64))
@@ -178,11 +190,34 @@ def _from_validated(root_shape, coord_to_rank, forest, lower, upper, block_shape
     nhi = np.where(upper_indices == domain * scales[:, None], upper, nhi)
     return Mesh(lower, upper, tuple(map(int, block)), root, rank, f,
                 frozen_array(f.root_node_ids[rank], np.int64), frozen_array(nlo, float),
-                frozen_array(nhi, float), frozen_array(bounds, float), frozen_array(spacing, float))
+                frozen_array(nhi, float), frozen_array(bounds, float), frozen_array(spacing, float), periodic)
 
 
-def mesh_from_forest(root_shape, is_leaf, *, lower, upper, block_shape):
-    """Build a balanced Cartesian 3D mesh from depth-first Morton leaf flags."""
+def mesh_from_forest(root_shape, is_leaf, *, lower, upper, block_shape,
+                     periodic=(False, False, False)):
+    """Build a balanced Cartesian 3D mesh from depth-first Morton leaf flags.
+
+    Parameters
+    ----------
+    root_shape : sequence of int
+        Three positive root-block counts.
+    is_leaf : array-like of bool
+        Depth-first Morton forest flags, including parents and leaves.
+    lower, upper : array-like
+        Finite ordered original physical domain bounds (3,).
+    block_shape : sequence of int
+        Three positive interior cell counts per leaf.
+    periodic : sequence of bool, optional
+        Three axis flags for halo topology only; all false by default. Copied to
+        an immutable tuple. All face/edge/corner contacts, including periodic
+        seams, must satisfy two-to-one balance.
+
+    Returns
+    -------
+    Mesh
+        Immutable geometry without field storage. Coordinates stay in the original
+        domain; periodic halos require exact-phase preparation.
+    """
     root = np.asarray(root_shape)
     if root.shape != (3,) or root.dtype.kind not in "iu" or np.any(root < 1):
         raise ValueError("root_shape must contain three positive integers")
@@ -192,7 +227,7 @@ def mesh_from_forest(root_shape, is_leaf, *, lower, upper, block_shape):
         raise ValueError("is_leaf must be a one-dimensional boolean array")
     rank, coordinates = level1_morton(root)
     f = refined_forest(root, rank, coordinates, np.ascontiguousarray(flags))
-    return _from_validated(root, rank, f, lower, upper, block_shape)
+    return _from_validated(root, rank, f, lower, upper, block_shape, periodic=periodic)
 
 
 def select_region(mesh, bounds):

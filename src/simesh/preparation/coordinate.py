@@ -11,7 +11,7 @@ from .._execution import worker_context, run_ranges
 from ..mesh import resolve_selection
 from ..fields import Fields
 
-SCHEME = "canonical-coordinatephase-cont-v2"
+SCHEME = "canonical-coordinatephase-boundary-v3"
 
 
 @dataclass(frozen=True, eq=False)
@@ -34,6 +34,8 @@ class Geometry:
 
 def build_geometry(mesh):
     """Build from the existing flat forest, without another tree object."""
+    if any(mesh.periodic):
+        raise ValueError("coordinate-phase does not support periodic halo preparation; use exact-phase")
     from .._kernels.coordinate import fill_geometry, first_unrepresentable_prolongation
     n = mesh.leaf_count
     block = np.asarray(mesh.block_shape, dtype=np.uint32)
@@ -111,6 +113,8 @@ def prepare(source, fields=None, *, region=None, leaf_ids=None, workers=1,
             backend="threadpool", memory_limit=None):
     from .._kernels.coordinate import openmp_build_info
     source.validate()
+    if any(source.mesh.periodic):
+        raise ValueError("coordinate-phase does not support periodic halo preparation; use exact-phase")
     workers_count(workers)
     if backend not in ("threadpool", "openmp"):
         raise ValueError("coordinate backend must be threadpool or openmp")
@@ -143,6 +147,7 @@ def prepare(source, fields=None, *, region=None, leaf_ids=None, workers=1,
     read_stats = source.read_native_into(ids, chosen, values, storage_halo=2)
     loaded = time.perf_counter()
     workspace = allocate_workspace(geometry, k)
+    workspace.boundary_modes[:] = source._boundary_modes[chosen]
     scratch_bytes = workspace.nbytes
     scratch_ready = time.perf_counter()
     stages = execute(geometry, workspace, values, workers=workers, backend=backend)

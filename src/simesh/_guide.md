@@ -19,6 +19,11 @@ version's public interfaces and docstrings for other suitable paths.
    interiors or needs neighboring support. Inspect `read_fields`, `prepare`,
    and `select_region`. Choose the scheme and coverage for that consumer;
    regional selection is not a new physical boundary.
+   Specify physical boundary parity through Source `boundary` when opening
+   arrays or a snapshot; vector component parity is never inferred.
+   Periodic inputs require `exact-phase` for halo preparation. Coordinates and
+   regions do not wrap; periodic trajectories/connectivity are not supported.
+   AMRVAC/uniform exports and saved AMR slices reject periodic meshes.
 
 4. **Order and reuse the work.** Identify shared preparation, derived fields,
    and geometry before repeating operations. Explore `derive_many`,

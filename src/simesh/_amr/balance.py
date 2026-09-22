@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from simesh._validation import periodic_mask
+
 from simesh._kernels.primitives._balance import first_refined_balance_violation_unchecked
 from simesh._amr.contacts import _require_contact_forest_inputs
 
@@ -17,6 +19,7 @@ def validate_refined_all_touch_2to1(
     child_node_ids: np.ndarray,
     node_leaf_ids: np.ndarray,
     leaf_node_ids: np.ndarray,
+    *, periodic=(False, False, False),
 ) -> None:
     """Raise for the first face/edge/corner leaf-level gap above one."""
     (
@@ -48,6 +51,7 @@ def validate_refined_all_touch_2to1(
             child_node_ids,
             node_leaf_ids,
             leaf_node_ids,
+            periodic_mask(periodic),
         )
     )
     if source_leaf >= 0:

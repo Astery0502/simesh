@@ -5,10 +5,11 @@ import time
 import numpy as np
 
 from .._amr import halo
+from .._validation import periodic_mask
 from .._amr.target_boxes import fill_directed_halo_target_boxes
 from .._kernels.preparation import apply_direct_actions
 
-SCHEME = "rewrite-ratio2-minmod-exactphase-cont-v1"
+SCHEME = "rewrite-ratio2-minmod-exactphase-boundary-v1"
 
 
 def parameters(mesh, field_count, support_capacity):
@@ -38,6 +39,7 @@ class Workspace:
     upper: np.ndarray
     modes: np.ndarray
     normals: np.ndarray
+    periodic_mask: int
 
     @classmethod
     def allocate(cls, mesh, field_count, block, capacity):
@@ -48,7 +50,8 @@ class Workspace:
         fill_directed_halo_target_boxes(lower, upper, zero, block+4,
             halo.CANONICAL_DIRECTIONS, w.target_lower, w.target_upper)
         return cls(mesh, capacity, w, tuple(arrays), lower, upper,
-                   np.zeros((field_count, 6), dtype=np.uint8), np.full(3, -1, dtype=np.int64))
+                   np.zeros((field_count, 6), dtype=np.uint8), np.full(3, -1, dtype=np.int64),
+                   periodic_mask=periodic_mask(mesh.periodic))
 
     @property
     def nbytes(self):
@@ -63,7 +66,8 @@ def plan_chunk(workspace, ordered_targets):
         w, ordered_targets, mesh.root_shape, mesh.coord_to_rank,
         f.root_node_ids, f.node_levels, f.node_coords, f.child_node_ids,
         f.node_leaf_ids, f.leaf_node_ids, workspace.lower, workspace.upper,
-        workspace.modes, workspace.normals, validate_actions=False)
+        workspace.modes, workspace.normals, validate_actions=False,
+        periodic_mask=workspace.periodic_mask)
 
 
 def execute_chunk(workspace, count, selected):
@@ -118,6 +122,9 @@ def copy_halos(payload, output, rows):
 def fill(source, selection, field_ids, output, workspace):
     """Complete private output; a caller may publish only after this returns."""
     source.validate()
+    # Field IDs are validated by the caller; clip avoids NumPy's raise-mode
+    # output buffer while gathering directly into the admitted workspace.
+    np.take(source._boundary_modes, field_ids, axis=0, out=workspace.modes, mode="clip")
     ids = selection.leaf_ids
     cache_before = source.io_stats.get("value_cache_misses")
     order = np.argsort(ids, kind="stable")

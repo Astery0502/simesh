@@ -19,6 +19,8 @@ _BATCH_LEAVES = 256
 
 
 def _export_plan(mesh, metadata, names, root_bounds, retained_bytes, memory_limit):
+    if any(mesh.periodic):
+        raise ValueError("AMRVAC export does not support periodic meshes")
     if not isinstance(metadata, (SnapshotMetadata, dict)):
         raise ValueError('explicit SnapshotMetadata or header dictionary required')
     header = metadata.to_header() if isinstance(metadata, SnapshotMetadata) else deepcopy(metadata)
@@ -140,6 +142,7 @@ def write_amrvac(path, fields, *, metadata, root_bounds=None, overwrite=False, m
     fields : Fields
         Completed ordinary fields covering every exported leaf; extra coverage is
         ignored. Storage order is independent of original leaf IDs. Halo is omitted.
+        The original Mesh must be nonperiodic, including for regional export.
     metadata : SnapshotMetadata or dict
         Explicit model/time header matching the original Fields Mesh.
     root_bounds : array-like, optional

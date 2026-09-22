@@ -34,7 +34,7 @@ def test_final_storage_read_preserves_bits_and_order(tmp_path, endian, partial):
 def test_mapping_cache_order_identity_budget_and_parent_lifetime():
     source, raw = mixed_source()
     mapped = sm.select_source(source, ('b3','b1'))
-    assert mapped.nbytes == source.nbytes + 16
+    assert mapped.nbytes == source.nbytes + 16 + mapped._boundary_modes.nbytes
     assert mapped.identity is source.identity and mapped.field_origins == (2,0)
     with sm.cache_source(mapped, fields=('b1',), capacity=3) as cached:
         assert cached._reader.state.values.shape[1] == 1

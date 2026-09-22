@@ -693,6 +693,7 @@ def _prepare_refined_halo_chunk(
     normal_field_slots: np.ndarray,
     *,
     validate_actions: bool,
+    periodic_mask: int = 0,
 ) -> tuple[int, int]:
     _require_exchange_widths(lower_halo, interior_upper, workspace.payload.shape[2:])
     candidate_count = int(candidates.shape[0])
@@ -711,6 +712,7 @@ def _prepare_refined_halo_chunk(
         workspace.physical_masks[:candidate_count],
         workspace.source_counts[:candidate_count],
         workspace.source_leaf_ids[:candidate_count],
+        periodic_mask,
     )
     primary_count, selected_count = plan_selected_refined_support_prefix_unchecked(
         candidates,

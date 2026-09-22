@@ -40,6 +40,7 @@ cpdef void fill_refined_contact_targets_unchecked(
     const int64_t[::1] source_leaf_ids,
     const int64_t[:, ::1] directions,
     int64_t[::1] target_node_ids,
+    unsigned char periodic_mask=0,
 ):
     cdef int64_t query
 
@@ -57,4 +58,5 @@ cpdef void fill_refined_contact_targets_unchecked(
             <int>directions[query, 0],
             <int>directions[query, 1],
             <int>directions[query, 2],
+            periodic_mask,
         )
