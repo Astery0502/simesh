@@ -1,0 +1,15 @@
+{
+  "project": "SunPy",
+  "version": "7.0.0",
+  "commit": "5915092bf6b790bf792b50dd6814f320b809cc61",
+  "license": "BSD-2-Clause",
+  "source_url": "https://raw.githubusercontent.com/sunpy/sunpy/5915092bf6b790bf792b50dd6814f320b809cc61/sunpy/visualization/colormaps/color_tables.py",
+  "source_sha256": "2bec55dc33d2d91331fa1e0a9c3440033bfb0e4ec05c63f819d1355609570693",
+  "channels": [
+    "FUV",
+    "NUV"
+  ],
+  "convention": "IRIS spectral FUV/NUV colors, also exposed under irissjiFUV/irissjiNUV",
+  "documentation": "https://irispy.readthedocs.io/en/stable/tutorial/data_idiosyncrasies.html",
+  "verification": "4097 scalar samples per channel equal the upstream colormap"
+}

@@ -14,15 +14,18 @@ def magnetic():
         return sm.prepare(source, scheme="exact-phase")
 
 
-def test_diagnostic_selection_is_shared_by_point_surface_bottom_and_batches(magnetic):
-    magnetic = replace(magnetic, valid_halo=1)  # Q-only must not require automatic curl support.
+@pytest.mark.parametrize("method,halo", [("variational",2), ("finite-difference",1)])
+def test_diagnostic_selection_is_shared_by_point_surface_bottom_and_batches(magnetic, method, halo):
+    magnetic = replace(magnetic, valid_halo=halo)
     points = sm.PointSet.boundary(magnetic.mesh, "zmin", (2, 2))
     calls = [lambda **kw: app.connectivity(magnetic, points, **kw),
              lambda **kw: app.surface_diagnostics(magnetic, points, **kw),
              lambda **kw: app.bottom_diagnostics(magnetic, (2,2), **kw),
              lambda **kw: next(app.iter_connectivity(magnetic, points, **kw))]
     for call in calls:
-        named, compatibility = call(quantities="q"), call(twist=False)
+        named = call(quantities="q", method=method)
+        compatibility = call(twist=False, method=method)
+        assert named.data.method == compatibility.data.method == method
         assert compatibility.quantities == ("q",)
         np.testing.assert_array_equal(named.data.q, compatibility.data.q)
         with pytest.raises(ValueError, match="quantities alone"):

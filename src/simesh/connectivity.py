@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from enum import IntEnum
 import numpy as np
 
-from .fields import require_fields
+from .fields import FieldDefinition, publish, require_fields
+from .operators.derivatives import derivative
 from .operators.sampling import sample
 from .slices import _transverse_basis
-from .tracing import Termination, _validate_vector, _resolve_curl
+from .tracing import Termination, _validate_vector, _resolve_curl, _step_controls
 from ._validation import admit, array_bytes, remaining, workers_count
 from ._execution import worker_context, run_ranges
 
@@ -56,7 +57,10 @@ class QSLResult:
         or twist can describe an incomplete accepted segment; inspect complete and
         both termination codes.
     length, complete, valid, stencil_valid : ndarray
-        Coordinate length, whole-line completion, Q validity and stencil flags.
+        Coordinate length, whole-line completion, Q validity and support flags.
+        stencil_valid reports usable transported vectors for variational Q or
+        consistent neighboring endpoints for finite-difference Q; it alone does
+        not establish complete or transverse boundary mapping.
     footpoints, endpoint_fields : ndarray
         Localized positions and endpoint fields (n, 2, 3), against/along order.
     boundary, termination, steps : ndarray
@@ -95,8 +99,39 @@ class QSLResult:
         return self.q if self.local_radius is not None else None
 
 
-def _require_support(fields, *, twist=True, curl_field=None):
+def _unit_gradient(fields, memory_limit, *, workers=1):
+    require_fields(fields, halo=2)
+    block = fields.mesh.block_shape
+    shape = (len(fields.leaf_ids), *(n+4 for n in block), 3)
+    output_bytes = 8*int(np.prod(shape))
+    scratch = 64*int(np.prod(shape[1:4]))
+    admit(fields.mesh.nbytes+fields.nbytes+output_bytes+scratch,
+          memory_limit, "unit-vector nodes")
+    values = np.empty(shape)
+    offset = fields.storage_halo
+    box = tuple(slice(offset-2, offset+n+2) for n in block)
+    backing = fields.values
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        for row, leaf in enumerate(fields.leaf_ids):
+            b = backing[(fields.slot_of_leaf[leaf], *box, slice(None))]
+            norm = np.hypot(np.hypot(b[...,0], b[...,1]), b[...,2])
+            values[row] = b/norm[...,None]
+            del b, norm
+    unit = publish(fields.mesh, values, fields.selection,
+                   tuple(FieldDefinition("unit_"+axis, "1", "prepared-node") for axis in "xyz"),
+                   2, 2, fields.scheme+"/unit-nodes", fields.source)
+    terms = [[(component, axis, 1.)] for component in range(3) for axis in range(3)]
+    definitions = [FieldDefinition(f"dunit_{component}_{axis}", "1 / coordinate-length",
+                                   "centered-derivative")
+                   for component in range(3) for axis in range(3)]
+    return derivative(unit, terms, definitions, workers=workers,
+                      memory_limit=remaining(memory_limit, fields.nbytes))
+
+
+def _require_support(fields, *, compute_q=True, method="variational", twist=True, curl_field=None):
     _validate_vector(fields)
+    if compute_q and method == "variational":
+        require_fields(fields,halo=2,operation="variational QSL")
     if twist and curl_field is None:
         require_fields(fields,halo=2,operation="twist with automatic curl")
     if curl_field is not None:
@@ -105,12 +140,19 @@ def _require_support(fields, *, twist=True, curl_field=None):
 
 def _controls(fields, seeds, bounds, step_fraction, step, max_steps, max_length,
               null_threshold, boundary_tolerance, local_radius, normalization, workers, twist,
-              delta, compute_q=True):
+              method, delta, compute_q=True):
     _validate_vector(fields)
+    if method not in ("variational", "finite-difference"):
+        raise ValueError("method must be 'variational' or 'finite-difference'")
     if not compute_q and delta is not None:
         raise ValueError("delta only applies when Q is requested")
+    if compute_q and method == "variational":
+        require_fields(fields, halo=2)
+        if delta is not None:
+            raise ValueError("delta only applies to finite-difference mapping")
     if delta is not None and (not np.isfinite(delta) or delta <= 0):
         raise ValueError("delta must be a positive finite perturbation distance")
+    _step_controls(step, step_fraction)
     workers_count(workers)
     seeds = np.ascontiguousarray(seeds, dtype=np.float64)
     if seeds.ndim != 2 or seeds.shape[1] != 3 or not np.isfinite(seeds).all():
@@ -120,9 +162,7 @@ def _controls(fields, seeds, bounds, step_fraction, step, max_steps, max_length,
     if (lo.shape != (3,) or hi.shape != (3,) or not np.isfinite([lo,hi]).all() or
             np.any(lo >= hi) or np.any(lo < fields.mesh.lower) or np.any(hi > fields.mesh.upper)):
         raise ValueError("bounds must be a nonempty box inside the physical mesh")
-    if (not np.isfinite(step_fraction) or not 0 < step_fraction <= 1 or
-            (step is not None and (not np.isfinite(step) or step <= 0)) or
-            type(max_steps) is not int or not 0 <= max_steps <= np.iinfo(np.int64).max or
+    if (type(max_steps) is not int or not 0 <= max_steps <= np.iinfo(np.int64).max or
             np.isnan(max_length) or max_length < 0 or not np.isfinite(null_threshold) or
             null_threshold < 0 or type(twist) is not bool):
         raise ValueError("invalid integration controls")
@@ -140,7 +180,7 @@ def _controls(fields, seeds, bounds, step_fraction, step, max_steps, max_length,
     return seeds, lo, hi, tolerance
 
 
-def _squashing(vectors, magnetic, normals, seed_strength, normalization):
+def _squashing(vectors, scales, magnetic, normals, seed_strength, normalization):
     """Evaluate the two endpoint maps without subtracting large Gram products."""
     count = len(vectors)
     logs = np.full(count, np.nan)
@@ -175,31 +215,33 @@ def _squashing(vectors, magnetic, normals, seed_strength, normalization):
         else:
             if not np.isfinite(seed_strength[index]) or seed_strength[index] <= 0:
                 continue
-            logq = (np.log(numerator)+2*np.log(amplitudes).sum()+
+            logq = (np.log(numerator)+2*(scales[index].sum()+np.log(amplitudes).sum())+
                     np.log(np.abs(bn)).sum()+np.log(norms).sum()-2*np.log(seed_strength[index]))
         logs[index] = logq/np.log(10.)
     with np.errstate(over="ignore", invalid="ignore"):
         return np.power(10., logs), logs
 
 
-def _trace_arrays(fields, companion, seeds, lo, hi, tolerance, *, step_fraction,
+def _trace_arrays(fields, gradient, companion, seeds, lo, hi, tolerance, *, step_fraction,
                   step, max_steps, max_length, null_threshold, local_radius, workers, executor, centers=None):
     from ._kernels.connectivity import trace_halves
     n = len(seeds)
     positions = np.full((n,2,3), np.nan)
+    vectors = np.full((n,2,2,3), np.nan)
+    scales = np.zeros((n,2))
     magnetic = np.full((n,2,3), np.nan)
     normals = np.zeros((n,2,3))
     lengths, twists = np.zeros((n,2)), np.zeros((n,2))
     steps, status, faces = (np.zeros((n,2), dtype=np.int64) for _ in range(3))
     def run(first, last):
         s = slice(first,last)
-        trace_halves(fields, companion, seeds[s], seeds[s] if centers is None else centers[s], lo, hi,
-                     step_fraction, np.inf if step is None else step, max_steps,
+        trace_halves(fields, gradient, companion, seeds[s], seeds[s] if centers is None else centers[s], lo, hi,
+                     0. if step_fraction is None else step_fraction, np.inf if step is None else step, max_steps,
                      max_length, null_threshold, tolerance, local_radius or 0.,
-                     positions[s], magnetic[s], normals[s],
+                     positions[s], vectors[s], scales[s], magnetic[s], normals[s],
                      lengths[s], twists[s], steps[s], status[s], faces[s])
     run_ranges(n, workers, run, executor)
-    return positions, magnetic, normals, lengths, twists, steps, status, faces
+    return positions, vectors, scales, magnetic, normals, lengths, twists, steps, status, faces
 
 
 def _sample_seeds(fields, seeds):
@@ -244,10 +286,10 @@ def _stencil(fields, seeds, lo, hi, tolerance, delta, radius):
     return np.ascontiguousarray((seeds[:,None,:]+offsets).reshape(-1,3)), distances, seed_normal_field, valid
 
 
-def _batch(fields, companion, seeds, lo, hi, tolerance, *, normalization, delta,
+def _batch(fields, gradient, companion, seeds, lo, hi, tolerance, *, normalization, method, delta,
            compute_q=True, **controls):
-    positions, magnetic, normals, lengths, twists, steps, status, faces = _trace_arrays(
-        fields, companion, seeds, lo, hi, tolerance, **controls)
+    positions, vectors, scales, magnetic, normals, lengths, twists, steps, status, faces = _trace_arrays(
+        fields, gradient, companion, seeds, lo, hi, tolerance, **controls)
     complete = np.all(np.isin(status, (3,12)), axis=1)
     regular = np.all(np.isin(status, (1,2,3,12)), axis=1)
     total_twist = None if companion is None else twists.sum(axis=1)
@@ -258,38 +300,48 @@ def _batch(fields, companion, seeds, lo, hi, tolerance, *, normalization, delta,
         return QSLResult(seeds.copy(),None,None,None,None,total_twist,lengths.sum(axis=1),
                          positions,magnetic,faces,status,steps,complete,valid,normalization,
                          controls["local_radius"],"twist-only",np.zeros(len(seeds),dtype=bool))
-    launches, distances, seed_strength, stencil_valid = _stencil(
-        fields, seeds, lo, hi, tolerance, delta, controls["local_radius"])
-    stencil_valid &= regular
-    rows = np.flatnonzero(stencil_valid)
-    vectors = np.full((len(seeds),2,2,3), np.nan)
-    if len(rows):
-        neighbors = _trace_arrays(fields, None, launches.reshape(-1,4,3)[rows].reshape(-1,3),
-            lo, hi, tolerance, centers=np.repeat(seeds[rows],4,axis=0), **controls)
-        ends = neighbors[0].reshape(len(rows),4,2,3)
-        vectors[rows,:,0,:] = (ends[:,0]-ends[:,1])/(2*distances[rows,None,None])
-        vectors[rows,:,1,:] = (ends[:,2]-ends[:,3])/(2*distances[rows,None,None])
-        stencil_valid[rows] &= np.all(neighbors[6].reshape(-1,4,2) == status[rows,None,:], axis=(1,2))
-        stencil_valid[rows] &= np.all(neighbors[7].reshape(-1,4,2) == faces[rows,None,:], axis=(1,2))
-        del neighbors, ends
-    del launches
-    q, logq = _squashing(vectors, magnetic, normals, seed_strength, normalization)
+    if method == "finite-difference":
+        launches, distances, seed_strength, stencil_valid = _stencil(
+            fields, seeds, lo, hi, tolerance, delta, controls["local_radius"])
+        stencil_valid &= regular
+        rows = np.flatnonzero(stencil_valid)
+        vectors.fill(np.nan)
+        scales.fill(0.)
+        if len(rows):
+            (ends, *_, neighbor_status, neighbor_faces) = _trace_arrays(
+                fields, None, None, launches.reshape(-1,4,3)[rows].reshape(-1,3),
+                lo, hi, tolerance, centers=np.repeat(seeds[rows],4,axis=0), **controls)
+            ends = ends.reshape(len(rows),4,2,3)
+            vectors[rows,:,0,:] = (ends[:,0]-ends[:,1])/(2*distances[rows,None,None])
+            vectors[rows,:,1,:] = (ends[:,2]-ends[:,3])/(2*distances[rows,None,None])
+            stencil_valid[rows] &= np.all(neighbor_status.reshape(-1,4,2) == status[rows,None,:], axis=(1,2))
+            stencil_valid[rows] &= np.all(neighbor_faces.reshape(-1,4,2) == faces[rows,None,:], axis=(1,2))
+            del ends, neighbor_status, neighbor_faces, _
+        del launches
+    else:
+        # Transport can remain usable on an incomplete accepted trajectory.
+        stencil_valid = regular & np.isfinite(vectors).all(axis=(1,2,3))
+        seed_strength = None
+        if normalization == "flux":
+            bseed, _, _ = _sample_seeds(fields, seeds)
+            seed_strength = np.hypot(np.hypot(bseed[:,0], bseed[:,1]), bseed[:,2])
+    q, logq = _squashing(vectors, scales, magnetic, normals, seed_strength, normalization)
     norms = np.hypot(np.hypot(magnetic[...,0], magnetic[...,1]), magnetic[...,2])
     with np.errstate(invalid="ignore", divide="ignore"):
         perpendicular = magnetic/norms[...,None]
-    qp, logqp = _squashing(vectors, magnetic, perpendicular, seed_strength, normalization)
+    qp, logqp = _squashing(vectors, scales, magnetic, perpendicular, seed_strength, normalization)
     valid = complete & stencil_valid & np.all(np.isin(faces, (1,2,3,4,5,6,9)), axis=1) & ~np.isnan(logq)
     q[~valid], logq[~valid] = np.nan, np.nan
     qp[~regular | ~stencil_valid], logqp[~regular | ~stencil_valid] = np.nan, np.nan
     return QSLResult(seeds.copy(), q, logq, qp, logqp, total_twist, lengths.sum(axis=1),
                      positions, magnetic, faces, status, steps, complete, valid,
-                     normalization, controls["local_radius"], "finite-difference", stencil_valid)
+                     normalization, controls["local_radius"], method, stencil_valid)
 
 
 def _iter_diagnostics(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
              max_steps=10000, max_length=np.inf, null_threshold=0.,
              boundary_tolerance=None, local_radius=None, normalization="mapping",
-             delta=None, twist=True, curl_field=None,
+             method="variational", delta=None, twist=True, curl_field=None,
              workers=1, seed_batch=256, memory_limit=None, compute_q=True):
     """Yield owned squashing/twist results from completed Cartesian 3D Fields.
 
@@ -299,14 +351,14 @@ def _iter_diagnostics(fields, seeds, *, bounds=None, step_fraction=.25, step=Non
     local_radius replaces distant surfaces by a sphere centered on each seed.
 
     Finite differences trace four neighboring seeds and differentiate the actual
-    endpoint map.
+    endpoint map. The variational method uses centered gradients of unit nodes.
     'mapping' normalizes by transported areas; 'flux' uses the divergence-free
     magnetic-flux identity used by FastQSL. Neither is a separatrix detector.
     """
-    _require_support(fields,twist=twist,curl_field=curl_field)
+    _require_support(fields,compute_q=compute_q,method=method,twist=twist,curl_field=curl_field)
     seeds, lo, hi, tolerance = _controls(fields, seeds, bounds, step_fraction, step,
         max_steps, max_length, null_threshold, boundary_tolerance, local_radius,
-        normalization, workers, twist, delta, compute_q)
+        normalization, workers, twist, method, delta, compute_q)
     if type(seed_batch) is not int or seed_batch < 1:
         raise ValueError("seed_batch must be a positive integer")
     reserve = seeds.nbytes + min(seed_batch,len(seeds))*(8192 if compute_q else 2048) + workers*8192
@@ -314,17 +366,20 @@ def _iter_diagnostics(fields, seeds, *, bounds=None, step_fraction=.25, step=Non
     if not len(seeds):
         return
     companion = _resolve_curl(fields, curl_field, twist, limit)
-    inputs = [value for value in (fields, companion) if value is not None]
+    gradient = (_unit_gradient(fields, remaining(limit, 0 if companion is None else companion.nbytes),
+                               workers=workers)
+                if compute_q and method == "variational" else None)
+    inputs = [value for value in (fields, gradient, companion) if value is not None]
     required = fields.mesh.nbytes + array_bytes(array for value in inputs
         for array in (value.values, value.leaf_ids, value.slot_of_leaf)) + reserve
     admit(required, memory_limit, "QSL batches")
     with worker_context(workers) as executor:
         for start in range(0,len(seeds),seed_batch):
             fields._check()
-            yield _batch(fields, companion, seeds[start:start+seed_batch], lo, hi, tolerance,
+            yield _batch(fields, gradient, companion, seeds[start:start+seed_batch], lo, hi, tolerance,
                          step_fraction=step_fraction, step=step, max_steps=max_steps,
                          max_length=max_length, null_threshold=null_threshold, local_radius=local_radius,
-                         normalization=normalization, delta=delta, workers=workers,
+                         normalization=normalization, method=method, delta=delta, workers=workers,
                          executor=executor,compute_q=compute_q)
 
 
@@ -336,7 +391,7 @@ def _quantities(quantities):
 
 
 def iter_line_diagnostics(fields, seeds, *, quantities=("q","twist"), **controls):
-    """Compute only requested diagnostics; twist-only skips Q stencils.
+    """Compute only requested diagnostics; twist-only skips Q transport/stencils.
 
     Parameters
     ----------
@@ -345,7 +400,7 @@ def iter_line_diagnostics(fields, seeds, *, quantities=("q","twist"), **controls
     seeds : array-like
         Seed positions with shape (n, 3).
     quantities : sequence of str
-        q, twist, or both; twist-only skips Q stencils.
+        q, twist, or both; twist-only skips Q stencils/transport.
     **controls : object
         Controls from [qsl][simesh.qsl], except quantities selects diagnostics;
         backend/schedule are not accepted.
@@ -365,9 +420,9 @@ def iter_line_diagnostics(fields, seeds, *, quantities=("q","twist"), **controls
 def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
              max_steps=10000, max_length=np.inf, null_threshold=0.,
              boundary_tolerance=None, local_radius=None, normalization="mapping",
-             delta=None, twist=True, curl_field=None,
+             method="variational", delta=None, twist=True, curl_field=None,
              workers=1, seed_batch=256, memory_limit=None):
-    """Yield QSL batches, with optional twist. Q uses neighboring-seed footpoint differences.
+    """Yield QSL batches using single-line variational transport by default.
 
     Parameters
     ----------
@@ -377,10 +432,11 @@ def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
         Seed positions with shape (n, 3).
     bounds : array-like, optional
         Lower and upper physical bounds; defaults to the original domain.
-    step_fraction : float
-        Positive step cap as a fraction of local AMR spacing.
+    step_fraction : float, optional
+        Local cell-size fraction in (0, 1], default 0.25; RK stages in finer
+        cells reduce the step and restart it. None selects fixed steps.
     step : float, optional
-        Explicit positive coordinate step, constrained by the local step_fraction.
+        Positive coordinate-length cap; required when step_fraction is None.
     max_steps : int
         Maximum accepted integration steps per branch.
     max_length : float
@@ -395,6 +451,12 @@ def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
     normalization : str
         mapping uses mapped area; flux uses the magnetic-flux relation. These definitions
         can differ.
+    method : {"variational", "finite-difference"}, optional
+        variational (default) transports two transverse vectors along each field
+        line, using centered gradients of the unit-vector nodes and two valid
+        primary halo layers. It retains a nine-component gradient field.
+        finite-difference uses four neighboring-seed footpoints and one valid
+        primary halo layer when twist does not require additional support.
     delta : float, optional
         Positive neighbor-seed perturbation distance, only for finite-difference Q.
     twist : bool
@@ -416,19 +478,19 @@ def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
 
     Notes
     -----
-    Automatic curl requires two primary halo layers; a supplied matching curl needs interpolation support.
+    The variational method requires two primary halo layers. With automatic curl, twist also requires two; a supplied matching curl needs interpolation support.
     """
     return _iter_diagnostics(fields,seeds,bounds=bounds,step_fraction=step_fraction,step=step,
         max_steps=max_steps,max_length=max_length,null_threshold=null_threshold,
         boundary_tolerance=boundary_tolerance,local_radius=local_radius,normalization=normalization,
-        delta=delta,twist=twist,curl_field=curl_field,workers=workers,
+        method=method,delta=delta,twist=twist,curl_field=curl_field,workers=workers,
         seed_batch=seed_batch,memory_limit=memory_limit)
 
 
 def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
         max_steps=10000, max_length=np.inf, null_threshold=0.,
         boundary_tolerance=None, local_radius=None, normalization="mapping",
-        delta=None, twist=True, curl_field=None,
+        method="variational", delta=None, twist=True, curl_field=None,
         workers=1, seed_batch=256, memory_limit=None):
     """Collect QSL batches; use iter_qsl for outputs too large to retain.
 
@@ -440,10 +502,11 @@ def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
         Seed positions with shape (n, 3).
     bounds : array-like, optional
         Lower and upper physical bounds; defaults to the original domain.
-    step_fraction : float
-        Positive step cap as a fraction of local AMR spacing.
+    step_fraction : float, optional
+        Local cell-size fraction in (0, 1], default 0.25; RK stages in finer
+        cells reduce the step and restart it. None selects fixed steps.
     step : float, optional
-        Explicit positive coordinate step, constrained by the local step_fraction.
+        Positive coordinate-length cap; required when step_fraction is None.
     max_steps : int
         Maximum accepted integration steps per branch.
     max_length : float
@@ -458,6 +521,12 @@ def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
     normalization : str
         mapping uses mapped area; flux uses the magnetic-flux relation. These definitions
         can differ.
+    method : {"variational", "finite-difference"}, optional
+        variational (default) transports two transverse vectors along each field
+        line, using centered gradients of the unit-vector nodes and two valid
+        primary halo layers. It retains a nine-component gradient field.
+        finite-difference uses four neighboring-seed footpoints and one valid
+        primary halo layer when twist does not require additional support.
     delta : float, optional
         Positive neighbor-seed perturbation distance, only for finite-difference Q.
     twist : bool
@@ -479,7 +548,7 @@ def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
 
     Notes
     -----
-    Automatic curl requires two primary halo layers; a supplied matching curl needs interpolation support.
+    The variational method requires two primary halo layers. With automatic curl, twist also requires two; a supplied matching curl needs interpolation support.
     """
     if type(twist) is not bool:
         raise ValueError("twist must be boolean")
@@ -487,7 +556,7 @@ def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
         bounds=bounds, step_fraction=step_fraction, step=step,
         max_steps=max_steps, max_length=max_length, null_threshold=null_threshold,
         boundary_tolerance=boundary_tolerance, local_radius=local_radius, normalization=normalization,
-        delta=delta, curl_field=curl_field, workers=workers,
+        method=method, delta=delta, curl_field=curl_field, workers=workers,
         seed_batch=seed_batch, memory_limit=memory_limit)
 
 
@@ -501,7 +570,7 @@ def line_diagnostics(fields, seeds, *, quantities=("q","twist"), memory_limit=No
     seeds : array-like
         Seed positions with shape (n, 3).
     quantities : sequence of str
-        q, twist, or both; twist-only skips Q stencils.
+        q, twist, or both; twist-only skips Q stencils/transport.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
     **controls : object
@@ -515,7 +584,8 @@ def line_diagnostics(fields, seeds, *, quantities=("q","twist"), memory_limit=No
         completion and validity.
     """
     names = _quantities(quantities)
-    _require_support(fields,twist="twist" in names,curl_field=controls.get("curl_field"))
+    _require_support(fields,compute_q="q" in names,twist="twist" in names,
+                     method=controls.get("method","variational"),curl_field=controls.get("curl_field"))
     seeds = np.ascontiguousarray(seeds,dtype=float)
     batches = iter_line_diagnostics(fields,seeds,quantities=names,
         memory_limit=remaining(memory_limit,len(seeds)*512),**controls)
@@ -527,7 +597,7 @@ def line_diagnostics(fields, seeds, *, quantities=("q","twist"), memory_limit=No
             np.empty((0,2,3)), np.empty((0,2,3)), np.empty((0,2),np.int64),
             np.empty((0,2),np.int64), np.empty((0,2),np.int64), np.empty(0,bool), np.empty(0,bool),
             controls.get("normalization","mapping"),controls.get("local_radius"),
-            "finite-difference" if "q" in names else "twist-only", np.empty(0,bool))
+            controls.get("method","variational") if "q" in names else "twist-only", np.empty(0,bool))
     try:
         arrays = {name: np.empty((len(seeds), *value.shape[1:]), dtype=value.dtype)
                   for name,value in vars(first).items() if isinstance(value,np.ndarray)}

@@ -71,13 +71,15 @@ Core object contracts are in the [developer API](../dev/api.md).
     options:
       members: [from_plane, iter_plane, boundary, select, reshape, nbytes]
 
+::: simesh.native_bottom_seeds
+
 ::: simesh.RaySet
     options:
       members: [from_plane, select, nbytes]
 
 ::: simesh.LineSet
     options:
-      members: [branch, line, nbytes]
+      members: [branch, line, select, nbytes]
       merge_init_into_class: false
 
 ::: simesh.LineProfile
@@ -138,6 +140,27 @@ Core object contracts are in the [developer API](../dev/api.md).
 ::: simesh.sample_line_profiles
 
 ::: simesh.iter_line_profiles
+
+::: simesh.current_proxy
+
+::: simesh.iter_current_proxy
+
+::: simesh.current_proxy_from_lines
+
+::: simesh.CurrentProxyDiagnostics
+    options:
+      members: false
+      merge_init_into_class: false
+
+::: simesh.CurrentProxyBatch
+    options:
+      members: [diagnostics]
+      merge_init_into_class: false
+
+::: simesh.CurrentProxyResult
+    options:
+      members: false
+      merge_init_into_class: false
 
 ::: simesh.QSLResult
     options:
@@ -326,3 +349,37 @@ Core object contracts are in the [developer API](../dev/api.md).
 ::: simesh.tools.configurations.fan_slab
 
 ::: simesh.tools.configurations.curl_slab
+
+## Display palettes
+
+::: simesh.colormaps.aia_colormap
+
+::: simesh.colormaps.iris_colormap
+
+::: simesh.colormaps.eis_intensity_colormap
+
+## Trajectory and integral results
+
+For choosing between reusable paths, diagnostic values, and along-line
+integrals, see [along-line workflows](index.md#compose-along-line-calculations).
+
+::: simesh.trace
+
+::: simesh.iter_traces
+
+::: simesh.TraceResult
+    options:
+      members: [point_counts]
+      merge_init_into_class: false
+
+::: simesh.Termination
+    options:
+      members: true
+      show_if_no_docstring: true
+      merge_init_into_class: false
+
+## Sampled-curve calculus
+
+::: simesh.line_integral
+
+::: simesh.line_derivative

@@ -61,3 +61,14 @@ cdef int64_t owner(
     const int64_t[::1] leaves, const double[:, ::1] nlo,
     const double[:, ::1] nhi,
 ) noexcept nogil
+
+
+cdef int64_t owner_node(
+    const double* p, const double[::1] lo, const double[::1] hi,
+    const int64_t[:, :, ::1] roots, const int64_t[:, ::1] children,
+    const int64_t[::1] leaves, const double[:, ::1] nlo,
+    const double[:, ::1] nhi,
+) noexcept nogil
+
+cdef bint contains_point(const double* p, const double* lo,
+                         const double* hi) noexcept nogil

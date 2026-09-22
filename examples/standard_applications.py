@@ -48,7 +48,7 @@ def run(output, plot):
     div_map = app.field_map(div_b,diagnostics.points,workers=4)
     selected = diagnostics.threshold(q_min=4.,abs_twist_min=.09)
     # The default traces both branches; only selected seeds are reintegrated.
-    lines = app.trace(magnetic,selected,step=float(magnetic.mesh.spacing.min())*.125,
+    lines = app.trace(magnetic,selected,step_fraction=.125,
                       max_steps=4000,workers=4)
 
     direction = (.3,.2,1.)

@@ -10,6 +10,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
+GUIDE = ROOT / "src/simesh/_guide.md"
+GUIDE_REFERENCE = re.compile(r"`(simesh(?:\.[A-Za-z_]\w*)+)`")
 DIRECTIVE = re.compile(r"^::: (simesh[\w.]*)[ \t]*$", re.MULTILINE)
 ENTRY = re.compile(r"^::: (simesh[\w.]*)\n((?:[ \t]+[^\n]*\n)*)", re.MULTILINE)
 LINK = re.compile(r"\[[^\]\n]*\]\(([^\s)]+)\)")
@@ -30,13 +32,26 @@ def section_names(obj, kind):
     }
 
 
+def check_guide_references(package, content):
+    """Resolve explicit guide references without prescribing workflow coverage."""
+    references = set(GUIDE_REFERENCE.findall(content))
+    errors = []
+    for name in sorted(references):
+        try:
+            target(package[name.removeprefix("simesh.")])
+        except (KeyError, ValueError) as exc:
+            errors.append(f"src/simesh/_guide.md: cannot resolve {name}: {exc}")
+    return references, errors
+
+
 def main():
     loader = GriffeLoader(search_paths=[ROOT / "src"], allow_inspection=False,
                           docstring_parser=Parser.numpy)
     package = loader.load("simesh")
     loader.resolve_aliases(implicit=True)
-    errors, documented = [], {}
-    paths = [ROOT / "README.md", ROOT / "ASSETS.md", ROOT / "legacy/README.md", *DOCS.rglob("*.md")]
+    guide_references, errors = check_guide_references(package, GUIDE.read_text())
+    documented = {}
+    paths = [ROOT / "README.md", ROOT / "ASSETS.md", ROOT / "legacy/README.md", GUIDE, *DOCS.rglob("*.md")]
     for path in DOCS.rglob("*.md"):
         for name, settings in ENTRY.findall(path.read_text()):
             try:
@@ -115,7 +130,7 @@ def main():
                     errors.append(f"{path.relative_to(ROOT)}: missing anchor {url}")
     if errors:
         raise SystemExit("\n".join(errors))
-    print(f"Checked {len(documented)} source API entries, public coverage, parameters and {links} local links.")
+    print(f"Checked {len(documented)} source API entries, public coverage, parameters, {len(guide_references)} guide references and {links} local links.")
 
 
 if __name__ == "__main__":

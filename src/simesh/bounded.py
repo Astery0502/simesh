@@ -42,15 +42,22 @@ def iter_prepared(source, fields=None, *, region=None, leaf_ids=None, scheme,
 from ._pool import PreparedPool, CurlPool
 
 
-def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
+def iter_traces_bounded(pool, seeds, *, seed_ids=None, step=None, step_fraction=.25, max_steps=1000,
                         max_length=np.inf, null_threshold=0., direction=1, workers=1,
-                        seed_batch=256, trajectories=False, twist=False,
+                        seed_batch=256, trajectories=False, twist=False, integrands=None,
                         memory_limit=None, backend="threadpool", schedule="static"):
-    """Explicit missing-coverage coordination around the shared RK state machine."""
+    """Coordinate missing primary coverage around the shared RK state machine.
+
+    Optional integrands are resident continuous Fields covering the entire Mesh
+    with one valid halo. They are included in the memory budget but are not loaded
+    by the primary pool. Their components accumulate positive-arc-length RK
+    integrals as in tracing.iter_traces; incomplete branches retain partial values.
+    """
     from contextlib import nullcontext
     from .tracing import _validate_inputs, _new_state, _advance_state, _result, _trace_batch_bytes, Termination
     from ._validation import admit, remaining
     from ._execution import native_dispatch, worker_context
+    from .fields import require_continuous
     coupled = isinstance(pool,CurlPool)
     primary = pool.primary if coupled else pool
     if not isinstance(primary,PreparedPool) or primary._closed:
@@ -58,10 +65,17 @@ def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
     if len(primary.fields)!=3 or len({f.units for f in primary.fields})!=1:
         raise ValueError("tracing requires three ordered vector components with common units")
     seeds,seed_ids = _validate_inputs(seeds,seed_ids,step,max_steps,max_length,null_threshold,
-                                    direction,workers,seed_batch,trajectories,twist)
+                                    direction,workers,seed_batch,trajectories,twist,step_fraction)
     native,dispatch = native_dispatch(backend,schedule)
+    integral_count = 0
+    if integrands is not None:
+        require_continuous(integrands, operation="bounded line integrals")
+        if integrands.mesh is not primary.mesh or np.any(integrands.slot_of_leaf < 0):
+            raise ValueError("resident integrands must cover the entire pool Mesh")
+        integral_count = len(integrands.fields)
     seed_batch = min(seed_batch,primary.capacity)
-    reserve = _trace_batch_bytes(seeds,seed_ids,min(seed_batch,len(seeds)),max_steps,trajectories)
+    reserve = _trace_batch_bytes(seeds,seed_ids,min(seed_batch,len(seeds)),max_steps,trajectories,integral_count,workers)
+    reserve += 0 if integrands is None else integrands.nbytes
     temporary = None
     if twist and not coupled:
         pool = temporary = CurlPool(primary,memory_limit=remaining(memory_limit,reserve))
@@ -74,20 +88,20 @@ def iter_traces_bounded(pool, seeds, *, seed_ids=None, step, max_steps=1000,
             for first in range(0,len(seeds),seed_batch):
                 last = min(first+seed_batch,len(seeds))
                 state = _new_state(primary.mesh,seeds[first:last],seed_ids[first:last],
-                                   max_steps,max_length,trajectories,twist)
+                                   max_steps,max_length,trajectories,twist,integral_count=integral_count)
                 while np.any(state.status==Termination.RUNNING):
                     with pool.borrow(primary.resident_leaf_ids) as product:
                         field,companion = product if twist else (product,None)
-                        _advance_state(field,companion,state,step=step,max_steps=max_steps,max_length=max_length,
+                        _advance_state(field,companion,state,step=step,step_fraction=step_fraction,max_steps=max_steps,max_length=max_length,
                             null_threshold=null_threshold,direction=direction,workers=workers,executor=executor,
-                            native=native,dispatch=dispatch)
+                            native=native,dispatch=dispatch,integrands=integrands)
                     missing = np.unique(state.requested[(state.status==Termination.RUNNING)&(state.requested>=0)])
                     if len(missing):
                         with pool.borrow(missing):
                             pass
                     elif np.any(state.status==Termination.RUNNING):
                         raise RuntimeError("tracer made no progress without a preparation request")
-                yield _result(state,trajectories,twist)
+                yield _result(state,trajectories,twist,integrands)
                 del state
     finally:
         if temporary is not None:
@@ -102,10 +116,15 @@ def trace_bounded(pool, seeds, *, max_steps=1000, trajectories=False, twist=Fals
     from ._validation import remaining
     if type(max_steps) is not int or max_steps<0 or type(trajectories) is not bool or type(twist) is not bool:
         raise ValueError("invalid trace output settings")
-    output = _trace_output_bytes(len(seeds),max_steps,trajectories,twist)
+    integrands = kwargs.get("integrands")
+    if integrands is not None:
+        from .fields import require_continuous
+        require_continuous(integrands, operation="bounded line integrals")
+    output = _trace_output_bytes(len(seeds),max_steps,trajectories,twist,
+                                0 if integrands is None else len(integrands.fields))
     batches = iter_traces_bounded(pool,seeds,max_steps=max_steps,trajectories=trajectories,
         twist=twist,memory_limit=remaining(memory_limit,output),**kwargs)
-    return _collect(batches,len(seeds),max_steps,trajectories,twist)
+    return _collect(batches,len(seeds),max_steps,trajectories,twist,integrands)
 
 
 def retrace_bounded(pool,result,selected_seed_ids,**kwargs):

@@ -1,0 +1,13 @@
+{
+  "EIS_intensity": {
+    "palette": "Blues_r",
+    "source_url": "https://raw.githubusercontent.com/USNavalResearchLaboratory/eispac/92b6bbaeacb481d6b1e9a39afafce0435b273499/eispac/core/eismap.py",
+    "commit": "92b6bbaeacb481d6b1e9a39afafce0435b273499",
+    "source_sha256": "f604e8511e52bbf216b3a34a8b544774936f75a44b83b7ac77366ef18d454a79",
+    "scope": "EISPAC intensity default; not a wavelength-specific standard; normalization separate"
+  },
+  "IRIS_1354": {
+    "palette": "irissjiFUV",
+    "scope": "IRIS FUV spectral detector family"
+  }
+}

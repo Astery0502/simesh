@@ -408,7 +408,7 @@ def _validate_qsl(data):
     _codes(data["termination"], ConnectivityTermination, "connectivity termination")
     _require(np.all(data["steps"] >= 0), "negative integration steps")
     _require(data["normalization"] in ("mapping", "flux"), "unknown Q normalization")
-    expected_methods = ("finite-difference",) if has_q else ("twist-only",)
+    expected_methods = ("finite-difference", "variational") if has_q else ("twist-only",)
     _require(data["method"] in expected_methods, "inconsistent diagnostic method")
     radius = data["local_radius"]
     _require(radius is None or (type(radius) in (int, float) and math.isfinite(radius) and radius > 0),

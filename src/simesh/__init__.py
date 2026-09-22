@@ -30,7 +30,7 @@ from .tracing import Termination, TraceResult, trace, iter_traces, retrace
 from .projection import LOSResult, LOSStatus, integrate_los, integrate_los_views, orthographic_plane
 from .physics.thermal import AIA171, EUV, CoronalComposition, ThermalLOSResult, thermal_fields, emissivity_fields, integrate_thermal_los
 from .physics.radiation import HHeAbsorption, RadioFreeFree, radiation_fields
-from .geometry import PointSet, RaySet, LineSet
+from .geometry import PointSet, RaySet, LineSet, native_bottom_seeds
 from .line_profiles import LineProfile, LineProfiles, sample_line_profiles, iter_line_profiles
 from .reductions import (LengthUnits, AxisAlignedSurface, volume_integral,
                          weighted_mean, extrema, histogram, surface_flux)
@@ -63,3 +63,10 @@ __all__ += ["iter_line_profiles", "ResultShards", "save_result_shards", "open_re
 __all__ += ["select_roots", "crop_amrvac"]
 from .applications import RadiationResult, radiative_los
 __all__ += ["EUV", "HHeAbsorption", "RadioFreeFree", "radiation_fields", "RadiationResult", "radiative_los"]
+from .current_proxy import (current_proxy, iter_current_proxy, current_proxy_from_lines,
+                            CurrentProxyDiagnostics, CurrentProxyBatch, CurrentProxyResult)
+__all__ += ["native_bottom_seeds", "current_proxy", "iter_current_proxy", "current_proxy_from_lines",
+            "CurrentProxyDiagnostics", "CurrentProxyBatch", "CurrentProxyResult"]
+
+from .operators.line import line_integral, line_derivative
+__all__ += ["line_integral", "line_derivative"]

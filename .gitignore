@@ -1,4 +1,12 @@
-# directories
+# Local research belongs in these directories, independent of experiment names
+# and output formats. Existing tracked historical files remain tracked.
+/paper/
+/legacy/core-development/
+/data/
+/reference/
+/output
+
+# Build products, environments and local application output
 .ipynb_checkpoints/
 __pycache__/
 /figs/
@@ -10,6 +18,7 @@ dist/
 *.egg-info/
 .venv/
 .venv-smoke/
+.venv-figures/
 .benchmark-data/
 benchmark-results/
 report/
@@ -34,4 +43,5 @@ report/
 
 # Active package test and build logs
 .pytest_cache/
+.ruff_cache/
 *.log

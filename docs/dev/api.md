@@ -83,22 +83,10 @@ Scientific and application functions are in the [user API](../user/api.md).
 
 ## Native consumers
 
-::: simesh.trace
-
-::: simesh.iter_traces
+Trajectory and along-line integration interfaces are in the
+[user API](../user/api.md#trajectory-and-integral-results).
 
 ::: simesh.retrace
-
-::: simesh.TraceResult
-    options:
-      members: [point_counts]
-      merge_init_into_class: false
-
-::: simesh.Termination
-    options:
-      members: true
-      show_if_no_docstring: true
-      merge_init_into_class: false
 
 ::: simesh.SliceResult
     options:

@@ -27,6 +27,11 @@ Register each interface once with `::: simesh.object` in the
 selected members and links, including the LOS wrapper's forwarded keyword names.
 User-facing scientific functions must provide a Parameters section; the deferred
 array-tool documentation is excluded from that completeness requirement.
+The packaged workflow guide stays lightweight: write interface references as
+fully qualified inline names, such as `simesh.applications.trace`. The checker
+resolves those names without requiring a catalog of applications, copied
+signatures, or fixed analysis choices. Update its decision points only when a
+common user-facing choice changes.
 
 ### Docstring content
 
@@ -106,3 +111,28 @@ Substitute the produced wheel filename and use a new target directory. The
 checker loads the extracted wheel with isolated Python path handling, runs the
 active tests against it, and checks that package modules come from that wheel.
 Neither an editable checkout nor an archived provider may supply simesh code.
+
+
+## Extending the trajectory kernel
+
+`_kernels/rk4.pxd` exposes `StageFunction` and `rk4_trial` to compiled Cython
+consumers. A stage function receives an opaque caller-owned context, the trial
+state, an output derivative buffer, the attempted step and the stage index.
+It must be `noexcept nogil`; errors are returned as codes. `RK_RETRY` requires a
+strictly smaller positive finite step and restarts the trial. Other nonzero
+codes preserve completed stages for the driver to interpret or resume.
+
+The caller allocates accepted/candidate/scratch buffers of `size` doubles and
+`4*size` slopes, with a stage index initially zero. A successful trial leaves the
+accepted state untouched. The driver admits the candidate and commits all
+requested quantities together, then resets the stage and the step proposal for
+the next step. Rejected event trials must restart from the last accepted state;
+only retry-independent observational counters may change during evaluation.
+Inputs and outputs must not alias these scratch buffers. State/context storage
+must remain alive during each call, and all mutable context is thread-private.
+
+The prepared-field adapter in `streamlines.pyx` demonstrates positive-arc-length
+scalar integrands. `connectivity.pyx` demonstrates a state-dependent variational
+right-hand side and accepted-state rescaling. These adapters retain different
+boundary policies while using the same numerical stage loop. Adding a new
+compiled right-hand side requires no changes to that loop or to `_execution`.

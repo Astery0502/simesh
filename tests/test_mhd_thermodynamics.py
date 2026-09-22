@@ -393,7 +393,7 @@ def test_recovered_temperature_thermal_los_and_velocity_tracing():
         np.testing.assert_allclose(image.values, expected_emissivity*image.depth*length_cm, rtol=2e-13)
     velocity = mhd_fields(ready, model=config, outputs="velocity")
     assert tuple(f.name for f in velocity.fields) == ("vx", "vy", "vz")
-    lines = app.trace(velocity, sm.PointSet([[.25, .25, .5], [1.5, .5, .5]]), step=.025, max_steps=8)
+    lines = app.trace(velocity, sm.PointSet([[.25, .25, .5], [1.5, .5, .5]]), step=.025, step_fraction=None, max_steps=8)
     for seed_id, seed in zip(lines.seeds.ids, lines.seeds.positions):
         for direction in (-1, 1):
             branch = lines.branch(seed_id, direction)
