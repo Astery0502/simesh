@@ -12,6 +12,7 @@ follow the user guide to carry out an analysis.
 | [User guide](user/index.md) | Combine interfaces into analysis workflows and save their results |
 | [Application guide (Chinese)](application-overview.md) | Choose a scientific workflow, including root-block regional analysis |
 | [User API](user/api.md) | Exact signatures, parameters, results and constraints generated from source |
+| [Manuscript figures](../reproduction/README.md) | Download retained plotting data and reproduce Figures 1–7 |
 
 ## Development and maintenance
 

@@ -1,4 +1,5 @@
 site_name: simesh
+site_url: https://astery0502.github.io/simesh/
 site_description: Native AMR scientific analysis interfaces
 repo_url: https://github.com/Astery0502/simesh/
 edit_uri: edit/main/docs/
@@ -16,6 +17,7 @@ nav:
       - Guide: user/index.md
       - Applications (Chinese): application-overview.md
       - API: user/api.md
+  - Manuscript figures: https://github.com/Astery0502/simesh/blob/main/reproduction/README.md
   - Developer:
       - Start: dev/index.md
       - Architecture: dev/architecture.md

@@ -7,8 +7,8 @@ observations while preserving the simulation's original AMR hierarchy and cell
 scales. Reusable Python interfaces connect the workflow; compiled Cython kernels
 perform the numerical calculations.
 
-[Get started](#install-and-run) · [User guide](docs/user/index.md) ·
-[Examples](docs/user/index.md#examples) · [API reference](docs/user/api.md)
+[Get started](#install-and-run) · [Documentation](https://astery0502.github.io/simesh/index.html) ·
+[Examples](https://astery0502.github.io/simesh/user/index.html#examples) · [API reference](https://astery0502.github.io/simesh/user/api.html)
 
 ## Explore the mesh, structures, and observables
 
@@ -84,7 +84,7 @@ Result round trip: values and point IDs match
 Choose a new output directory each time you run the example. Its physical scales
 are synthetic teaching values. Optional `.[plot]` adds PNG rendering dependencies;
 `.[fft]` adds FFT convolution support. See the
-[build instructions](docs/dev/cython-build.md) for compiler and development setup.
+[build instructions](https://astery0502.github.io/simesh/dev/cython-build.html) for compiler and development setup.
 
 ## From a snapshot to a magnetic map
 
@@ -109,7 +109,7 @@ sm.save_result("example-output/user-quickstart/bz-plane.result.npz", result)
 scheme. The resulting fields remain usable after the source is closed, and the
 saved map retains its sampling geometry. For your own snapshot, select the field
 names, geometry, preparation scheme, and physical scales appropriate to the
-simulation. Continue with the [user guide](docs/user/index.md) to combine maps,
+simulation. Continue with the [user guide](https://astery0502.github.io/simesh/user/index.html) to combine maps,
 trajectories, regional measurements, and projected results.
 
 ## Supported data and numerical scope
@@ -121,7 +121,7 @@ trajectories, regional measurements, and projected results.
   regional AMRVAC snapshots; and uniform-volume VTK products.
 - **Boundary support:** physical halos use explicit per-field `continuous`,
   `symmetric`, or `asymmetric` (odd reflection) rules through Source `boundary`.
-  See the [input guide](docs/user/index.md) for an example.
+  See the [input guide](https://astery0502.github.io/simesh/user/index.html) for an example.
 - **Periodic input:** exact-phase halo preparation connects opposite real leaves,
   including balanced AMR seams. Coordinates, sampling, regions and integrals
   retain finite-domain semantics. Coordinate-phase, AMRVAC/uniform exports and
@@ -133,7 +133,7 @@ trajectories, regional measurements, and projected results.
 Physical scales and model assumptions must match the simulation. Results expose
 coverage, validity, or tracing-termination information; check these before using
 incomplete results for physical interpretation. The
-[API reference](docs/user/api.md) documents each operation's requirements.
+[API reference](https://astery0502.github.io/simesh/user/api.html) documents each operation's requirements.
 
 ## Use with an AI assistant
 
@@ -165,9 +165,9 @@ the original simulations or the full scientific analysis pipeline.
 
 ## Development and license
 
-See the [developer guide](docs/dev/index.md) for architecture and the
-[build instructions](docs/dev/cython-build.md) for compilation, tests, and local
-documentation builds. The [documentation map](docs/index.md) lists the available
+See the [developer guide](https://astery0502.github.io/simesh/dev/index.html) for architecture and the
+[build instructions](https://astery0502.github.io/simesh/dev/cython-build.html) for compilation, tests, and local
+documentation builds. The [documentation map](https://astery0502.github.io/simesh/index.html) lists the available
 guides; API descriptions are generated from source docstrings.
 
 The active package, tests, and examples live in `src/`, `tests/`, and `examples/`.

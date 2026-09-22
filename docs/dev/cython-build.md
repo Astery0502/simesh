@@ -19,6 +19,17 @@ not import simesh or require compiled extensions. To install only documentation
 tools without building simesh, install the `docs` extra's tool requirements
 listed in `pyproject.toml` into a separate environment.
 
+The `Documentation` GitHub Actions workflow runs `make docs` for pull requests
+and updates to `main`. Successful builds on `main` publish `site/` to
+[the documentation site](https://astery0502.github.io/simesh/); pull requests
+only validate the build. A manual run on `main` can republish the site.
+Repository maintainers must select **GitHub Actions** under **Settings > Pages >
+Build and deployment > Source** before the first deployment. The workflow installs
+the documentation tools from `pyproject.toml` without compiling the package.
+Keep Markdown links between pages in `docs/` relative; MkDocs converts them to
+HTML links. Links to repository files outside `docs/` are converted to GitHub
+source links by `scripts/docs_hooks.py`.
+
 Register each interface once with `::: simesh.object` in the
 [user](../user/api.md) or [developer](api.md) page. Keep executable examples in
 `examples/` and follow the [content rules](#docstring-content) below.
