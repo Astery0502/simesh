@@ -1,28 +1,24 @@
-"""Explicit EUV responses and H/He thermodynamics on ready fields."""
+"""Thermal line-of-sight integration and historical thermal API aliases.
+
+Response models and prepared thermal fields are defined in emission and
+thermodynamics. This module composes them with sampling and ray integration.
+"""
+
 from dataclasses import dataclass, replace
 from contextlib import nullcontext
 import numpy as np
-from ._aia171_table import LOG_T, RESPONSE, UPSTREAM_COMMIT
-from . import _euv_tables
-from ..fields import FieldDefinition, Fields, require_fields, publish, require_continuous
+
+from .composition import (CoronalComposition as CoronalComposition,
+                          PROTON_MASS_G as PROTON_MASS_G, BOLTZMANN_ERG_K as BOLTZMANN_ERG_K)
+from .emission import AIA171, EUV
+from .thermodynamics import thermal_fields as thermal_fields, emissivity_fields, _check_thermal
 from .._validation import frozen_array, admit, remaining, workers_count
 from .._execution import native_dispatch, worker_context, run_ranges
 from ..operators.sampling import sample
-from ..projection import LOSResult, LOSStatus, integrate_los
-from ..slices import Plane
-from ..field_ops import _layout
+from ..operators.rays import LOSStatus, ray_segments, ray_nodes, _run_ray_batches
+from ..projection import LOSResult, integrate_los
+from ..spatial import Plane
 
-PROTON_MASS_G = 1.67262192369e-24
-BOLTZMANN_ERG_K = 1.380649e-16
-_RESPONSE_GRID = frozen_array(LOG_T, float)
-_LOG_RESPONSE = frozen_array(np.log10(RESPONSE), float)
-_RESPONSE_SLOPES = frozen_array(np.diff(_LOG_RESPONSE)/np.diff(_RESPONSE_GRID), float)
-_EUV_TABLES = {}
-for _wave, (_grid, _values, _logarithmic) in _euv_tables.RESPONSES.items():
-    _ordinates = np.log10(np.maximum(_values, 1e-99)) if _logarithmic else np.asarray(_values)
-    _EUV_TABLES[_wave] = (frozen_array(_grid, float), frozen_array(_ordinates, float),
-                        frozen_array(np.diff(_ordinates)/np.diff(_grid), float),
-                        0 if _logarithmic else 1)
 
 @dataclass(frozen=True)
 class ThermalLOSResult(LOSResult):
@@ -48,188 +44,10 @@ class ThermalLOSResult(LOSResult):
         return self.depth*self.length_unit_cm
 
 
-@dataclass(frozen=True)
-class CoronalComposition:
-    """Fully ionized H/He, ignoring electron mass; abundance is n_He/n_H."""
-    helium_abundance: float = .1
-
-    def __post_init__(self):
-        if not np.isfinite(self.helium_abundance) or self.helium_abundance < 0:
-            raise ValueError("helium abundance must be finite and nonnegative")
-
-    def number_density(self, mass_density_cgs, *, convention="electron"):
-        """Convert g/cm³ to n_e, n_H, or sqrt(n_e n_H) in cm^-3.
-
-        Conventions are electron, amrvac-hydrogen and electron-hydrogen,
-        respectively, for the explicitly fully ionized composition.
-        """
-        rho = np.asarray(mass_density_cgs, dtype=float)
-        if not np.isfinite(rho).all() or np.any(rho < 0):
-            raise ValueError("mass density must be finite and nonnegative")
-        h = self.helium_abundance
-        nh = rho / ((1 + 4*h)*PROTON_MASS_G)
-        return nh*self._number_density_factor(convention)
-
-    def _number_density_factor(self, convention):
-        factors = {"electron": 1+2*self.helium_abundance, "amrvac-hydrogen": 1.,
-                   "electron-hydrogen": np.sqrt(1+2*self.helium_abundance)}
-        try:
-            return factors[convention]
-        except KeyError:
-            raise ValueError("unknown number-density convention") from None
-
-    def temperature(self, mass_density_cgs, thermal_pressure_cgs):
-        """p = (2+3a) n_H k_B T. Pressure is thermal, not total energy."""
-        nh = self.number_density(mass_density_cgs, convention="amrvac-hydrogen")
-        p = np.asarray(thermal_pressure_cgs, dtype=float)
-        if not np.isfinite(p).all() or np.any(p <= 0) or np.any(nh <= 0):
-            raise ValueError("EOS temperature requires positive density and thermal pressure")
-        return p / ((2+3*self.helium_abundance)*nh*BOLTZMANN_ERG_K)
-
-
-@dataclass(frozen=True)
-class AIA171:
-    """Historical response, log10(T)-log10(R) interpolation, zero outside table.
-
-    R has DN cm^5 s^-1 pixel^-1 under the selected emission-measure convention.
-    electron is the explicit physical baseline; amrvac-hydrogen reproduces the
-    upstream eq_state_units=True H/He density factor. Neither fixes the table's
-    undocumented original calibration settings.
-    """
-    density_convention: str = "electron"
-    composition: CoronalComposition = CoronalComposition()
-
-    def __post_init__(self):
-        if self.density_convention not in ("electron", "amrvac-hydrogen", "electron-hydrogen"):
-            raise ValueError("unknown emission-measure density convention")
-        if not isinstance(self.composition, CoronalComposition):
-            raise TypeError("composition must be a CoronalComposition")
-
-    @property
-    def _table(self):
-        return _RESPONSE_GRID, _LOG_RESPONSE, _RESPONSE_SLOPES, 0
-
-    @property
-    def emissivity_name(self):
-        """Prepared emissivity field name."""
-        return "aia171_emissivity"
-
-    @property
-    def identity(self):
-        """Response, density-convention and composition identity used to check compatible thermal fields."""
-        return f"amrvac-{UPSTREAM_COMMIT}-171-{self.density_convention}-He{self.composition.helium_abundance:g}"
-
-    def response(self, temperature_k):
-        """Interpolate the selected response table; EUV defines each instrument's interpolation axes."""
-        t = np.asarray(temperature_k, dtype=float)
-        if not np.isfinite(t).all() or np.any(t <= 0):
-            raise ValueError("temperature must be finite and positive in kelvin")
-        grid, ordinates, _, mode = self._table
-        lookup = np.log10(t) if mode == 0 else t
-        value = np.interp(lookup, grid, ordinates)
-        value = np.where(value > -99., 10.**value, 0.) if mode == 0 else value
-        return np.where((lookup >= grid[0]) & (lookup <= grid[-1]), value, 0.)
-
-    def emissivity(self, mass_density_cgs, temperature_k):
-        """Evaluate emission from mass density in g/cm³ and positive kelvin temperature."""
-        n = self.composition.number_density(mass_density_cgs, convention=self.density_convention)
-        return self.from_number_density(n, temperature_k)
-
-    def from_number_density(self, number_density_cm3, temperature_k):
-        """Evaluate n² R(T) for number density in cm^-3 under this model convention."""
-        n = np.asarray(number_density_cm3, dtype=float)
-        if not np.isfinite(n).all() or np.any(n < 0):
-            raise ValueError("number density must be finite and nonnegative")
-        with np.errstate(over="ignore", invalid="ignore"):
-            value = n*n*self.response(temperature_k)
-        if not np.isfinite(value).all():
-            raise ValueError("unrepresentable thermal emissivity")
-        return value
-
-
-@dataclass(frozen=True)
-class EUV(AIA171):
-    """Upstream EUV response with explicit fully ionized emission measure.
-
-    Parameters
-    ----------
-    density_convention : str
-        electron-hydrogen uses n_e n_H R(T), as in AMRVAC 3.3. electron and
-        amrvac-hydrogen select n_e² and n_H² explicitly.
-    composition : CoronalComposition
-        Fully ionized H/He composition for emission-measure conversion.
-    wavelength : int
-        AIA 94, 131, 171, 193, 211, 304, 335; IRIS 1354; or EIS 192, 255,
-        263, 264, in Angstrom. Supply by keyword.
-
-    Notes
-    -----
-    AIA/IRIS interpolate log10(T)-log10(R); EIS interpolates T-R linearly.
-    Responses vanish outside their tables; original calibration settings are
-    unspecified. This model does not recover a partially ionized simulation EOS.
-    Response and emissivity methods are inherited from [AIA171][simesh.AIA171].
-    """
-    density_convention: str = "electron-hydrogen"
-    wavelength: int = 171
-
-    def __post_init__(self):
-        super().__post_init__()
-        if type(self.wavelength) is not int or self.wavelength not in _EUV_TABLES:
-            raise ValueError("unsupported EUV wavelength")
-
-    @property
-    def _table(self):
-        return _EUV_TABLES[self.wavelength]
-
-    @property
-    def identity(self):
-        """Pinned response, wavelength, composition and emission-measure identity."""
-        return (f"amrvac-{_euv_tables.UPSTREAM_COMMIT}-{self.wavelength}-"
-                f"{self.density_convention}-He{self.composition.helium_abundance:g}")
-
-    @property
-    def emissivity_name(self):
-        """Prepared emissivity field name."""
-        return f"euv{self.wavelength}_emissivity"
-
-
 def _native_response(model):
     if type(model) not in (AIA171, EUV):
         raise ValueError("native response requires AIA171 or EUV; use reference for customized models")
     return model._table
-
-
-def ray_segments(mesh, origin, direction, near, far):
-    """Independent vectorized leaf intersections, ordered in physical arclength."""
-    first = np.full(mesh.leaf_count, near, dtype=float)
-    last = np.full(mesh.leaf_count, far, dtype=float)
-    inside = np.ones(mesh.leaf_count, dtype=bool)
-    for a in range(3):
-        if direction[a] == 0:
-            inside &= (origin[a] >= mesh.bounds[:, 0, a]) & (origin[a] < mesh.bounds[:, 1, a])
-        else:
-            x = (mesh.bounds[:, 0, a]-origin[a])/direction[a]
-            y = (mesh.bounds[:, 1, a]-origin[a])/direction[a]
-            first = np.maximum(first, np.minimum(x, y))
-            last = np.minimum(last, np.maximum(x, y))
-    leaves = np.flatnonzero(inside & (first < last))
-    leaves = leaves[np.argsort(first[leaves], kind="stable")]
-    return leaves, first[leaves], last[leaves]
-
-
-def ray_nodes(mesh, leaf, origin, direction, first, last, subdivisions):
-    """Split at thermodynamic interpolation knots, then composite two-point Gauss."""
-    knots = [first, last]
-    for a, n in enumerate(mesh.block_shape):
-        if direction[a] != 0:
-            times = (mesh.bounds[leaf, 0, a]+(np.arange(n)+.5)*mesh.spacing[leaf, a]-origin[a])/direction[a]
-            knots.extend(times[(times > first) & (times < last)])
-    knots = np.unique(knots)
-    lo, width = knots[:-1], np.diff(knots)/subdivisions
-    starts = (lo[:, None]+width[:, None]*np.arange(subdivisions)).ravel()
-    weights = np.repeat(width, subdivisions)/2
-    nodes = (starts[:, None]+weights[:, None]*(1+np.array([-1., 1.])/np.sqrt(3))).ravel()
-    return nodes, np.repeat(weights, 2)
 
 
 def integrate_thermal_los(thermodynamics, plane, direction, *, length_unit_cm,
@@ -388,10 +206,11 @@ def _native_los(fields,plane,direction,near,far,subdivisions,max_samples,
         np.ascontiguousarray(near.ravel()),np.ascontiguousarray(far.ravel()),starts,ends,flags)
     output,counts = values.ravel(),samples.ravel()
     output[flags >= LOSStatus.MISSING_COVERAGE] = np.nan
+    backing = fields.values
     def run(first,last):
         span = slice(first,last)
         integrate_ready(mesh.roots,mesh.children,mesh.node_leaves,mesh.node_lower,mesh.node_upper,
-            mesh.bounds,mesh.spacing,fields.slot_of_leaf,fields.values,fields.storage_halo,
+            mesh.bounds,mesh.spacing,fields.slot_of_leaf,backing,fields.storage_halo,
             origins[span],direction,starts[span],ends[span],subdivisions,max_samples,
             grid,ordinates,slopes,output[span],flags[span],counts[span],
             workers if native else 1,dispatch,mode)
@@ -422,142 +241,31 @@ def _physical_result(result, length_unit_cm, quadrature, thermodynamics, model):
 
 
 
-def thermal_fields(density,temperature,*,density_unit_g_cm3,model=AIA171(),density_component=0,
-                   temperature_component=0,temperature_label,memory_limit=None):
-    """Detach number-density and kelvin nodes using the common valid input support.
+def _integrate_thermal_rays(fields, rays, model, subdivisions, max_samples,
+                            workers, ray_batch, memory_limit):
+    """Bind a tabulated response and native fields to validated ray geometry."""
+    from .._kernels.native import initialize_ray_set
+    from .._kernels.thermal_rays import integrate_ray_set_ready
 
-    Parameters
-    ----------
-    density : Fields
-        Mass-density values with explicit physical conversion.
-    temperature : float or Fields
-        Positive kelvin scalar or kelvin field covering density on the same Mesh.
-    density_unit_g_cm3 : float
-        Grams per cubic centimeter per stored mass-density value.
-    model : AIA171, EUV or RadioFreeFree
-        Selected emitting model, composition and number-density convention. Radio
-        thermal nodes are consumed by radiation_fields and radiative_los.
-    density_component : str or int
-        Mass-density field name or local component index.
-    temperature_component : str or int
-        Kelvin temperature field name or local component index; unused for a scalar temperature.
-    temperature_label : str
-        Explicit provenance/interpretation of the kelvin temperature input.
-    memory_limit : int, optional
-        Accounted-array budget in bytes for this call, not a process RSS limit.
+    grid, ordinates, slopes, mode = _native_response(model)
+    mesh = fields.mesh
+    count = len(rays.origins)
+    admit(mesh.nbytes+fields.nbytes+rays.nbytes+count*96+min(count, ray_batch)*128+workers*65536,
+          memory_limit, "ray-set thermal LOS")
+    values, entry, exit = (np.zeros(count) for _ in range(3))
+    status, samples, misses = (np.zeros(count, dtype=np.int64) for _ in range(3))
+    backing = fields.values
 
-    Returns
-    -------
-    Fields
-        Independent number-density (cm^-3) and temperature (K) with common valid support.
-    """
-    require_fields(density)
-    if (not isinstance(temperature_label,str) or not temperature_label.strip() or
-            not np.isfinite(density_unit_g_cm3) or density_unit_g_cm3<=0):
-        raise ValueError("positive density units, component and temperature provenance are required")
-    density_component, = require_continuous(density,(density_component,),halo=0,operation="thermal density")
-    tproduct=isinstance(temperature,Fields)
-    if tproduct:
-        require_fields(temperature)
-        temperature_component, = require_continuous(temperature,(temperature_component,),halo=0,
-                                                    operation="thermal temperature")
-        if (temperature.mesh is not density.mesh or
-                temperature.fields[temperature_component].units!='K' or
-                np.any(temperature.slot_of_leaf[density.leaf_ids]<0)):
-            raise ValueError("temperature must be kelvin on the same mesh and prepared coverage")
-    else:
-        try:
-            value=float(temperature)
-        except (TypeError,ValueError):
-            raise ValueError("temperature must be a positive kelvin scalar or prepared field") from None
-        if np.ndim(temperature)!=0 or not np.isfinite(value) or value<=0:
-            raise ValueError("temperature must be a positive kelvin scalar or prepared field")
-        temperature=value
-    h, spatial_shape, boxes = _layout((density,temperature) if tproduct else (density,))
-    shape=(len(density.leaf_ids),*spatial_shape,2)
-    extra=temperature.nbytes if tproduct and temperature is not density else 0
-    scratch=128*int(np.prod(shape[1:4]))
-    required=density.nbytes+extra+density.mesh.nbytes+8*int(np.prod(shape))+scratch
-    admit(required,memory_limit,"thermal fields")
-    values=np.empty(shape)
-    # Binding is invariant over this immutable group. Do not revalidate the
-    # public window/selector contract for every block in a large snapshot.
-    density_values=density.values
-    density_slots=density.slot_of_leaf[density.leaf_ids]
-    density_box=boxes[0]
-    if tproduct:
-        temperature_values=temperature.values
-        temperature_slots=temperature.slot_of_leaf[density.leaf_ids]
-        temperature_box=boxes[1]
-    for row,slot in enumerate(density_slots):
-        rho=density_values[(slot,*density_box,density_component)]*density_unit_g_cm3
-        values[row,...,0]=model.composition.number_density(rho,convention=model.density_convention)
-        t=(temperature_values[(temperature_slots[row],*temperature_box,temperature_component)]
-           if tproduct else temperature)
-        model.response(t)
-        values[row,...,1]=t
-    definitions=(FieldDefinition("emission_measure_density","cm^-3","prepared-node"),
-                 FieldDefinition("temperature","K","prepared-node"))
-    return publish(density.mesh,values,density.selection,definitions,h,h,
-        density.scheme+'/thermal-nodes',(density.source,model.identity,temperature_label),
-        {"model":model.identity,"temperature":temperature_label,
-         "density_unit_g_cm3":float(density_unit_g_cm3),"controlled_upper_bytes":required})
+    def consume(span, origins, directions, near, far):
+        initialize_ray_set(mesh.lower, mesh.upper, origins, directions, near, far,
+                           entry[span], exit[span], status[span])
+        output = values[span]
+        output[status[span] >= LOSStatus.MISSING_COVERAGE] = np.nan
+        integrate_ray_set_ready(mesh.roots, mesh.children, mesh.node_leaves,
+            mesh.node_lower, mesh.node_upper, mesh.bounds, mesh.spacing,
+            fields.slot_of_leaf, backing, fields.storage_halo,
+            origins, directions, entry[span], exit[span], subdivisions, max_samples,
+            grid, ordinates, slopes, values[span], status[span], samples[span], mode)
 
-
-def _check_thermal(fields,model,*,halo=1):
-    require_continuous(fields,halo=halo,operation="thermal LOS" if halo else "emissivity")
-    if (len(fields.fields)!=2 or tuple(f.units for f in fields.fields)!=('cm^-3','K') or
-            not isinstance(fields.source,tuple) or len(fields.source)!=3 or fields.source[1]!=model.identity):
-        raise ValueError("thermal fields and response model must have matching physical identity")
-
-
-def emissivity_fields(thermodynamics,*,model=AIA171(),memory_limit=None):
-    """Apply response to prepared nodes before interpolation, retaining that order.
-
-    Parameters
-    ----------
-    thermodynamics : Fields
-        Number-density and kelvin fields produced by thermal_fields with the same model.
-    model : AIA171 or EUV
-        Response matching the supplied thermal fields.
-    memory_limit : int, optional
-        Accounted-array budget in bytes for this call, not a process RSS limit.
-
-    Returns
-    -------
-    Fields
-        Node emissivity in DN s^-1 pixel^-1 cm^-1, preserving valid support.
-
-    Notes
-    -----
-    Response-before-interpolation defines emissivity-first reconstruction; it is not interchangeable with thermodynamics-first.
-    """
-    _check_thermal(thermodynamics,model,halo=0)
-    definitions = (FieldDefinition(model.emissivity_name,'DN s^-1 pixel^-1 cm^-1','prepared-node'),)
-    return _map_thermal(thermodynamics, definitions,
-        lambda data: model.from_number_density(data[...,0], data[...,1])[...,None],
-        'response-before-interpolation', memory_limit)
-
-
-def _map_thermal(thermodynamics, definitions, transform, operation, memory_limit, *,
-                 stats=None, scratch_per_node=128):
-    h=thermodynamics.valid_halo
-    block=thermodynamics.mesh.block_shape
-    shape=(len(thermodynamics.leaf_ids),*(n+2*h for n in block),len(definitions))
-    required=(thermodynamics.nbytes+thermodynamics.mesh.nbytes+8*int(np.prod(shape))+
-              scratch_per_node*int(np.prod(shape[1:4])))
-    admit(required,memory_limit,operation)
-    values=np.empty(shape)
-    backing=thermodynamics.values
-    slots=thermodynamics.slot_of_leaf[thermodynamics.leaf_ids]
-    offset=thermodynamics.storage_halo
-    box=tuple(slice(offset-h,offset+n+h) for n in block)
-    for row,slot in enumerate(slots):
-        data=backing[(slot,*box,slice(None))]
-        transformed = transform(data)
-        if not np.isfinite(transformed).all() or np.any(transformed < 0):
-            raise ValueError("radiation coefficients must be finite and nonnegative")
-        values[row]=transformed
-    return publish(thermodynamics.mesh,values,thermodynamics.selection,
-        definitions,h,h,thermodynamics.scheme+'/'+operation,thermodynamics.source,
-        {**thermodynamics.preparation_stats, **(stats or {}), "controlled_upper_bytes": required})
+    _run_ray_batches(rays, ray_batch, workers, consume)
+    return values, entry, exit, status, samples, misses

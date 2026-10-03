@@ -144,7 +144,7 @@ def export_uniform(source, resolution, *, fields=None, bounds=None, interpolatio
                     write_blocks(mesh, ids, slots[:len(ids)], batch, 0, columns, lower, step,
                                  interpolation, values, valid, workers=workers, executor=executor)
         current.validate()
-        from ..applications import UniformResult
+        from .._uniform import UniformResult
         return UniformResult(values, valid, lower, upper,
             tuple(current.fields[i] for i in selected), current.value_identity(selected, value_scheme))
 

@@ -2,127 +2,14 @@
 
 from dataclasses import dataclass, field
 from math import prod
-from numbers import Real
 import numpy as np
 
-from ._validation import frozen_array, admit
+from ._validation import admit, workers_count
 from .fields import FieldDefinition, require_fields, require_continuous, _input_arrays, _component_indices
-from .mesh import Mesh, _axis_candidates, _cell_edges, _cell_index
+from .spatial import Plane
+from .geometry import AxisSlice, _uniform_geometry
 from ._execution import worker_context
 from .operators.sampling import _sample, _sample_output
-
-
-@dataclass(frozen=True, eq=False)
-class AxisSlice:
-    """Describe complete native block sections on an axis-aligned plane.
-
-    Parameters
-    ----------
-    mesh : Mesh
-        Shared immutable original geometry; no field storage is retained.
-    axis : int or str
-        Normal axis: 0, 1, 2 or x, y, z. Stored as an integer.
-    coordinate : float
-        Finite plane position in mesh coordinates, including domain faces.
-    side : str
-        Positive or negative coordinate-side cell at internal interfaces,
-        spelled 'positive' or 'negative'. Domain faces always use the interior.
-
-    Attributes
-    ----------
-    leaf_ids, cell_indices : ndarray
-        Read-only int64 arrays (nblocks,): ascending original leaf IDs and
-        corresponding normal-axis interior-cell indices, excluding halo.
-
-    Notes
-    -----
-    Geometry covers the full domain section, independently of supplied fields.
-    There is no transverse clipping or new two-dimensional AMR tree.
-    """
-
-    mesh: Mesh
-    axis: int | str
-    coordinate: float
-    side: str = "positive"
-    leaf_ids: np.ndarray = field(init=False)
-    cell_indices: np.ndarray = field(init=False)
-
-    def __post_init__(self):
-        if not isinstance(self.mesh, Mesh):
-            raise TypeError("axis slice requires a Mesh")
-        axis = self.axis
-        if isinstance(axis, str) and axis in ("x", "y", "z"):
-            axis = "xyz".index(axis)
-        if isinstance(axis, (bool, np.bool_)) or not isinstance(axis, (int, np.integer)) or axis not in (0, 1, 2):
-            raise ValueError("axis must be x, y, z or 0, 1, 2")
-        if (isinstance(self.coordinate, (bool, np.bool_)) or not isinstance(self.coordinate, Real)
-                or not np.isfinite(self.coordinate)):
-            raise ValueError("slice coordinate must be finite")
-        if self.side not in ("positive", "negative"):
-            raise ValueError("side must be positive or negative")
-        mesh, coordinate = self.mesh, float(self.coordinate)
-        if not mesh.lower[axis] <= coordinate <= mesh.upper[axis]:
-            raise ValueError("slice coordinate outside original domain")
-        active, side = _axis_candidates(mesh, axis, coordinate, self.side)
-        ids = np.flatnonzero(active)
-        offsets = np.arange(mesh.block_shape[axis] + 1)
-        indices = np.empty(len(ids), dtype=np.int64)
-        for row, leaf in enumerate(ids):
-            indices[row] = _cell_index(_cell_edges(mesh, leaf, axis, offsets), coordinate, side)
-        object.__setattr__(self, "axis", int(axis))
-        object.__setattr__(self, "coordinate", coordinate)
-        ids.flags.writeable = indices.flags.writeable = False
-        object.__setattr__(self, "leaf_ids", ids)
-        object.__setattr__(self, "cell_indices", indices)
-
-    @property
-    def axes(self):
-        """Transverse axis indices in XYZ order, without display transposition."""
-        return tuple(a for a in range(3) if a != self.axis)
-
-    @property
-    def block_shape(self):
-        """Interior cell counts (nu, nv), shared by all output blocks."""
-        return tuple(self.mesh.block_shape[a] for a in self.axes)
-
-    @property
-    def bounds(self):
-        """Read-only block bounds (nblocks, lower/upper, u/v), in mesh coordinates."""
-        bounds = self.mesh.bounds[np.ix_(self.leaf_ids, (0, 1), self.axes)]
-        bounds.flags.writeable = False
-        return bounds
-
-    @property
-    def spacing(self):
-        """Read-only transverse cell spacing (nblocks, 2), in mesh coordinates."""
-        spacing = self.mesh.spacing[np.ix_(self.leaf_ids, self.axes)]
-        spacing.flags.writeable = False
-        return spacing
-
-    @property
-    def levels(self):
-        """Read-only original refinement levels (nblocks,), with root level one."""
-        levels = self.mesh.forest.node_levels[self.mesh.leaf_nodes[self.leaf_ids]]
-        levels.flags.writeable = False
-        return levels
-
-    def cell_edges(self, row):
-        """Return read-only u/v cell-edge vectors for an output row, not a leaf ID."""
-        if (isinstance(row, (bool, np.bool_)) or not isinstance(row, (int, np.integer))
-                or not 0 <= row < len(self.leaf_ids)):
-            raise ValueError("row outside slice blocks")
-        leaf = self.leaf_ids[row]
-        result = []
-        for axis in self.axes:
-            edges = _cell_edges(self.mesh, leaf, axis)
-            edges.flags.writeable = False
-            result.append(edges)
-        return tuple(result)
-
-    @property
-    def nbytes(self):
-        """Accounted geometry arrays, including the shared original Mesh."""
-        return self.mesh.nbytes + self.leaf_ids.nbytes + self.cell_indices.nbytes
 
 
 @dataclass(frozen=True, eq=False)
@@ -241,45 +128,6 @@ def slice_axis(fields, axis, coordinate, *, components=None, side="positive", me
                           fields.value_identity)
 
 
-def _transverse_basis(direction):
-    basis = np.eye(3)[np.argmin(np.abs(direction))]
-    u = basis-np.dot(basis,direction)*direction
-    u /= np.linalg.norm(u)
-    return u, np.cross(direction,u)
-
-
-@dataclass(frozen=True)
-class Plane:
-    """Own a pixel-center sampling plane.
-
-    Parameters
-    ----------
-    origin : array-like
-        Physical corner (3,); sampling uses pixel centers within the span vectors.
-    u, v : array-like
-        Independent full-image span vectors (3,); not per-pixel spacing.
-    shape : tuple of int
-        Positive pixel counts along u and v.
-    """
-    origin: np.ndarray
-    u: np.ndarray
-    v: np.ndarray
-    shape: tuple
-
-    def __post_init__(self):
-        for name in ("origin", "u", "v"):
-            value = frozen_array(getattr(self, name), float)
-            if value.shape != (3,) or not np.isfinite(value).all():
-                raise ValueError("plane vectors must be finite triplets")
-            object.__setattr__(self, name, value)
-        if np.linalg.norm(np.cross(self.u, self.v)) == 0:
-            raise ValueError("plane spans must be independent")
-        shape = tuple(self.shape)
-        if len(shape) != 2 or any(type(n) is not int or n < 1 for n in shape):
-            raise ValueError("plane shape requires two positive integer extents")
-        object.__setattr__(self, "shape", shape)
-
-
 @dataclass(frozen=True)
 class SliceResult:
     """Raw plane samples; not directly accepted by save_result.
@@ -370,17 +218,6 @@ def sample_plane(fields,plane,*,components=None,output=None,tile_rows=64,workers
             workers=workers,executor=executor,memory_limit=memory_limit,output=output,direct=True)
 
 
-def _uniform_geometry(mesh,resolution,bounds):
-    resolution=tuple(resolution)
-    if len(resolution)!=3 or any(not isinstance(n,(int,np.integer)) or n<1 for n in resolution):
-        raise ValueError("resolution needs three positive integer extents")
-    lower,upper=(mesh.lower,mesh.upper) if bounds is None else bounds
-    lower,upper=np.asarray(lower,dtype=float),np.asarray(upper,dtype=float)
-    if lower.shape!=(3,) or upper.shape!=(3,) or not np.isfinite([lower,upper]).all() or np.any(upper<=lower):
-        raise ValueError("uniform bounds must be finite ordered triplets")
-    return tuple(map(int,resolution)),lower,upper
-
-
 def iter_uniform(fields,resolution,*,components=None,bounds=None,interpolation="linear",tile_rows=64,workers=1,memory_limit=None):
     """Yield owned (z index, SliceResult) slabs without materializing a volume.
 
@@ -416,8 +253,7 @@ def iter_uniform(fields,resolution,*,components=None,bounds=None,interpolation="
     if type(tile_rows) is not int or tile_rows < 1:
         raise ValueError("tile_rows must be positive")
     if interpolation != "linear":
-        from ._uniform import slabs
-        yield from slabs(fields, resolution, components, bounds, interpolation, workers, memory_limit)
+        yield from _interior_slabs(fields, resolution, components, bounds, interpolation, workers, memory_limit)
         return
     from ._validation import remaining
     selected=np.asarray(require_continuous(fields,components,operation="iter_uniform"),dtype=np.int64)
@@ -434,3 +270,56 @@ def iter_uniform(fields,resolution,*,components=None,bounds=None,interpolation="
             yield iz,_plane_result(plane,len(selected),fields.mesh.nbytes+fields.nbytes,
                 lambda points,w,e,out:_sample(fields,points,w,e,selected,out),tile_rows=tile_rows,
                 workers=workers,executor=executor,memory_limit=limit,direct=True)
+
+
+def _interior_slabs(fields, resolution, components, bounds, interpolation, workers, memory_limit):
+    from ._uniform import geometry, output_arrays, write_blocks
+    require_fields(fields)
+    selected = np.asarray(_component_indices(fields, components), dtype=np.int64)
+    workers_count(workers)
+    shape, lower, upper, step = geometry(fields.mesh, resolution, bounds, interpolation)
+    nx, ny, nz = shape
+    slots = fields.slot_of_leaf[fields.leaf_ids]
+    # Include the previously yielded slab while constructing its successor.
+    retained = nx*ny*(8*len(selected)+9)
+    native_scratch = 48*len(slots) if interpolation == "native" else 0
+    footprint = (fields.nbytes+fields.mesh.nbytes+slots.nbytes+8*len(selected)
+                 + retained+nx*ny*8+128*ny+144+native_scratch)
+    admit(footprint, memory_limit, "uniform slab geometry")
+    if interpolation == "native":
+        nodes = fields.mesh.leaf_nodes[fields.leaf_ids]
+        starts = fields.mesh.node_lower[nodes, 2]
+        starts = np.rint((starts-lower[2])/step[2])
+        stops = starts+fields.mesh.block_shape[2]
+        del nodes
+    with worker_context(workers) as executor:
+        for iz in range(nz):
+            fields._check()
+            values, valid = output_arrays((nx, ny, 1), len(selected), None, (), footprint, memory_limit)
+            values.fill(np.nan)
+            valid.fill(False)
+            owners = np.full((nx, ny, 1), -1, dtype=np.int64)
+            ids, active_slots = fields.leaf_ids, slots
+            if interpolation == "native":
+                active = (starts <= iz) & (iz < stops)
+                ids, active_slots = ids[active], slots[active]
+            # Zero-order ownership stays in the kernel: fused coordinate arithmetic
+            # can round differently from a Python prefilter at a block face.
+            write_blocks(fields.mesh, ids, active_slots, fields.values, fields.storage_halo,
+                         selected, lower, step, interpolation, values, valid,
+                         workers=workers, executor=executor, owners=owners, z_offset=iz)
+            origin = lower.copy()
+            origin[2] = lower[2]+(iz+.5)*step[2]
+            plane = Plane(origin, [upper[0]-lower[0], 0., 0.], [0., upper[1]-lower[1], 0.], (nx, ny))
+            # Owners describe geometry even when the supplied Fields lack coverage.
+            # Fill missing owners using geometry alone, one row at a time.
+            for ix in range(nx):
+                missing = np.flatnonzero(~valid[ix, :, 0])
+                if len(missing):
+                    points = np.empty((len(missing), 3))
+                    points[:, 0] = lower[0]+(ix+.5)*step[0]
+                    points[:, 1] = lower[1]+(missing+.5)*step[1]
+                    points[:, 2] = origin[2]
+                    owners[ix, missing, 0] = fields.mesh.locate(points)
+            yield iz, SliceResult(plane, values[:, :, 0], valid[:, :, 0], owners[:, :, 0])
+            del values, valid, owners, ids, active_slots

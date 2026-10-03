@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from enum import IntEnum
 import numpy as np
 
-from .fields import FieldDefinition, publish, require_fields
-from .operators.derivatives import derivative
+from .fields import FieldDefinition, publish, require_fields, _publication_bytes
 from .operators.sampling import sample
-from .slices import _transverse_basis
+from .spatial import _transverse_basis
 from .tracing import Termination, _validate_vector, _resolve_curl, _step_controls
 from ._validation import admit, array_bytes, remaining, workers_count
 from ._execution import worker_context, run_ranges
@@ -100,32 +99,43 @@ class QSLResult:
 
 
 def _unit_gradient(fields, memory_limit, *, workers=1):
+    from ._kernels.native import differentiate_block
+
     require_fields(fields, halo=2)
+    workers_count(workers)
     block = fields.mesh.block_shape
-    shape = (len(fields.leaf_ids), *(n+4 for n in block), 3)
-    output_bytes = 8*int(np.prod(shape))
-    scratch = 64*int(np.prod(shape[1:4]))
-    admit(fields.mesh.nbytes+fields.nbytes+output_bytes+scratch,
-          memory_limit, "unit-vector nodes")
-    values = np.empty(shape)
+    node_shape = tuple(n+4 for n in block)
+    shape = (len(fields.leaf_ids), *(n+2 for n in block), 9)
+    terms = np.array([(3*component+axis, component, axis)
+                      for component in range(3) for axis in range(3)], dtype=np.int64)
+    coefficients = np.ones(9)
+    scratch = min(workers, len(fields.leaf_ids))*40*int(np.prod(node_shape))
+    required = (fields.mesh.nbytes+fields.nbytes+8*int(np.prod(shape))+scratch+
+                _publication_bytes(fields.mesh, len(fields.leaf_ids))+terms.nbytes+coefficients.nbytes)
+    admit(required, memory_limit, "unit-vector gradient")
+    output = np.empty(shape)
     offset = fields.storage_halo
     box = tuple(slice(offset-2, offset+n+2) for n in block)
     backing = fields.values
-    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-        for row, leaf in enumerate(fields.leaf_ids):
-            b = backing[(fields.slot_of_leaf[leaf], *box, slice(None))]
-            norm = np.hypot(np.hypot(b[...,0], b[...,1]), b[...,2])
-            values[row] = b/norm[...,None]
-            del b, norm
-    unit = publish(fields.mesh, values, fields.selection,
-                   tuple(FieldDefinition("unit_"+axis, "1", "prepared-node") for axis in "xyz"),
-                   2, 2, fields.scheme+"/unit-nodes", fields.source)
-    terms = [[(component, axis, 1.)] for component in range(3) for axis in range(3)]
-    definitions = [FieldDefinition(f"dunit_{component}_{axis}", "1 / coordinate-length",
-                                   "centered-derivative")
-                   for component in range(3) for axis in range(3)]
-    return derivative(unit, terms, definitions, workers=workers,
-                      memory_limit=remaining(memory_limit, fields.nbytes))
+
+    def fill(first, last):
+        unit = np.empty((*node_shape, 3))
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            for row in range(first, last):
+                leaf = fields.leaf_ids[row]
+                b = backing[(fields.slot_of_leaf[leaf], *box, slice(None))]
+                norm = np.hypot(np.hypot(b[...,0], b[...,1]), b[...,2])
+                np.divide(b, norm[...,None], out=unit)
+                differentiate_block(unit, fields.mesh.spacing[leaf], terms, coefficients, output[row])
+                del b, norm
+
+    with worker_context(workers) as executor:
+        run_ranges(len(fields.leaf_ids), workers, fill, executor)
+    definitions = tuple(FieldDefinition(f"dunit_{component}_{axis}", "1 / coordinate-length",
+                                         "centered-derivative")
+                        for component in range(3) for axis in range(3))
+    return publish(fields.mesh, output, fields.selection, definitions, 1, 1,
+                   fields.scheme+"/unit-nodes/centered-extended", fields.source)
 
 
 def _require_support(fields, *, compute_q=True, method="variational", twist=True, curl_field=None):

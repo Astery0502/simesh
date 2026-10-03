@@ -212,7 +212,9 @@ def sample_plane_bounded(pool,plane,*,tile_rows=64,workers=1,memory_limit=None):
 def iter_uniform_bounded(pool,resolution,*,bounds=None,tile_rows=64,workers=1,memory_limit=None):
     """Yield owned (z_index, SliceResult) outputs while bounding prepared input slots.
     """
-    from .slices import _uniform_geometry,_plane_result,Plane
+    from .slices import _plane_result
+    from .spatial import Plane
+    from .geometry import _uniform_geometry
     from ._validation import remaining
     from ._execution import worker_context
     if not isinstance(pool,PreparedPool) or pool._closed:

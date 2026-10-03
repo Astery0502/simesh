@@ -1,5 +1,6 @@
 from libc.stdint cimport int64_t
 from libc.math cimport floor, isfinite
+from .interpolation cimport trilinear
 
 # Interval ownership remains in native.pyx; all consumers share this stencil.
 cdef inline bint interpolation_stencil(
@@ -24,14 +25,10 @@ cdef inline double interpolate_component(
     const int64_t* base, const double* t,
 ) noexcept nogil:
     cdef int64_t x = base[0], y = base[1], z = base[2]
-    cdef double v00, v01, v10, v11, v0, v1
-    v00 = data[slot,x,y,z,c]*(1-t[0]) + data[slot,x+1,y,z,c]*t[0]
-    v01 = data[slot,x,y,z+1,c]*(1-t[0]) + data[slot,x+1,y,z+1,c]*t[0]
-    v10 = data[slot,x,y+1,z,c]*(1-t[0]) + data[slot,x+1,y+1,z,c]*t[0]
-    v11 = data[slot,x,y+1,z+1,c]*(1-t[0]) + data[slot,x+1,y+1,z+1,c]*t[0]
-    v0 = v00*(1-t[1]) + v10*t[1]
-    v1 = v01*(1-t[1]) + v11*t[1]
-    return v0*(1-t[2]) + v1*t[2]
+    return trilinear(data[slot,x,y,z,c], data[slot,x+1,y,z,c],
+                     data[slot,x,y,z+1,c], data[slot,x+1,y,z+1,c],
+                     data[slot,x,y+1,z,c], data[slot,x+1,y+1,z,c],
+                     data[slot,x,y+1,z+1,c], data[slot,x+1,y+1,z+1,c], t)
 
 
 cdef inline bint interpolate(
@@ -69,6 +66,3 @@ cdef int64_t owner_node(
     const int64_t[::1] leaves, const double[:, ::1] nlo,
     const double[:, ::1] nhi,
 ) noexcept nogil
-
-cdef bint contains_point(const double* p, const double* lo,
-                         const double* hi) noexcept nogil

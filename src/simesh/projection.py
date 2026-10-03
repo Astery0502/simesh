@@ -2,27 +2,13 @@
 
 from contextlib import nullcontext
 from dataclasses import dataclass
-from enum import IntEnum
 import numpy as np
 
 from .fields import require_continuous, _field_index
-from .slices import Plane
+from .spatial import Plane
+from .operators.rays import LOSStatus
 from ._validation import admit, workers_count
 from ._execution import worker_context, run_ranges, native_dispatch
-
-class LOSStatus(IntEnum):
-    """Ray states. COMPLETE and EMPTY are valid; missing coverage, sample limits and numerical failures are not.
-    """
-    RUNNING = 0
-    COMPLETE = 1
-    EMPTY = 2
-    MISSING_COVERAGE = 3
-    NONFINITE_SCALAR = 4
-    GEOMETRY_FAILURE = 5
-    SAMPLE_LIMIT = 6
-    UNREPRESENTABLE_INTEGRAL = 7
-    UNREPRESENTABLE_SAMPLE = 8
-
 
 @dataclass(frozen=True)
 class LOSResult:
@@ -92,7 +78,7 @@ def orthographic_plane(lower,upper,direction,shape):
         raise ValueError("finite ordered bounds and a nonzero direction are required")
     d = d/np.max(np.abs(d))
     d = d/np.sqrt(np.dot(d,d))
-    from .slices import _transverse_basis
+    from .spatial import _transverse_basis
     u,v = _transverse_basis(d)
     corners = lower+(upper-lower)*np.indices((2,2,2)).reshape(3,-1).T
     pu,pv,pd = corners@u,corners@v,corners@d

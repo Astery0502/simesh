@@ -286,7 +286,8 @@ def test_shard_delivery_freezes_requested_ids(tmp_path):
     np.testing.assert_array_equal(saved.load(0).result.seeds.ids,[10])
 
 
-def test_volume_rejects_output_aliasing_bounds():
+@pytest.mark.parametrize("interpolation", ["linear", "zero"])
+def test_volume_rejects_output_aliasing_bounds(interpolation):
     with mixed_source()[0] as source:
         fields=sm.prepare(source,scheme='exact-phase')
     values=np.zeros((2,2,2,1))
@@ -294,7 +295,7 @@ def test_volume_rejects_output_aliasing_bounds():
     before=values.copy()
     with pytest.raises(ValueError,match='alias'):
         app.uniform_grid(fields,(2,2,2),components='b1',
-            bounds=(values.ravel()[:3],values.ravel()[3:6]),
+            bounds=(values.ravel()[:3],values.ravel()[3:6]), interpolation=interpolation,
             output=(values,np.empty((2,2,2),dtype=bool)),tile_rows=1)
     np.testing.assert_array_equal(values,before)
 

@@ -18,6 +18,22 @@ def mixed_source(function=None):
     return sm.source_from_arrays(mesh, values, ("b1", "b2", "b3"), copy=False), values
 
 
+def nested_source(depth, *, block_shape=(8, 8, 8)):
+    """Affine vector field on a balanced forest refined toward the lower corner."""
+    def subtree(level):
+        return [True] if level == 0 else [False, *subtree(level-1), *([True]*7)]
+
+    mesh = sm.mesh_from_forest((1, 1, 1), np.array(subtree(depth)),
+        lower=(0, 0, 0), upper=(1, 1, 1), block_shape=block_shape)
+    local = np.indices(block_shape)+.5
+    values = np.empty((mesh.leaf_count, 3, *block_shape))
+    for leaf in range(mesh.leaf_count):
+        x, y, z = (mesh.bounds[leaf, 0, :, None, None, None]
+                   + local*mesh.spacing[leaf, :, None, None, None])
+        values[leaf] = (y+2*z, 3*z+4*x, 5*x+6*y)
+    return sm.source_from_arrays(mesh, values, ("b1", "b2", "b3"), copy=False)
+
+
 def write_dat(path, mesh, values, *, byte_order="<", staggered=False, saved_ghosts=False,
               geometry="Cartesian_3D"):
     """Write a minimal v5 fixture directly from the documented binary layout."""

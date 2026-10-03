@@ -107,40 +107,47 @@ def _as_positive_int(value, name: str) -> int:
 
 
 def _compute_potential_field(b3_bottom: np.ndarray, geometry: PotentialFieldGeometry, backend: str) -> np.ndarray:
-    if backend == "direct":
-        return _convolved_potential_field(b3_bottom, geometry, _direct_convolve2d_same)
+    convolve = None
+    if backend != "direct":
+        try:
+            convolve = _fft_convolver(b3_bottom)
+        except ImportError:
+            if backend == "fft":
+                raise
+    if convolve is None:
+        convolve = lambda kernel: _direct_convolve2d_same(b3_bottom, kernel)
 
-    if backend == "fft":
-        fftconvolve = _require_fftconvolve()
-        return _convolved_potential_field(
-            b3_bottom,
-            geometry,
-            lambda source, kernel: fftconvolve(source, kernel, mode="same"),
-        )
-
-    try:
-        fftconvolve = _require_fftconvolve()
-    except ImportError:
-        return _convolved_potential_field(b3_bottom, geometry, _direct_convolve2d_same)
-
-    return _convolved_potential_field(
-        b3_bottom,
-        geometry,
-        lambda source, kernel: fftconvolve(source, kernel, mode="same"),
-    )
-
-
-def _convolved_potential_field(b3_bottom: np.ndarray, geometry: PotentialFieldGeometry, convolve2d) -> np.ndarray:
     nx, ny, nz = geometry.domain_nx
     bfield = np.empty((3, nx, ny, nz), dtype=np.float64)
-
     for iz in range(nz):
         z_offset = (iz + 0.5) * geometry.dz
         kernels = _green_kernels(nx, ny, geometry.dx, geometry.dy, z_offset)
         for component in range(3):
-            bfield[component, :, :, iz] = convolve2d(b3_bottom, kernels[component])
-
+            bfield[component, :, :, iz] = convolve(kernels[component])
     return bfield
+
+
+def _fft_convolver(source):
+    """Retain one bottom-field spectrum for all heights and vector components."""
+    try:
+        from scipy.fft import next_fast_len, rfftn, irfftn
+    except ImportError as exc:
+        raise ImportError("backend='fft' requires scipy.fft") from exc
+
+    axes = tuple(axis for axis, size in enumerate(source.shape) if size > 1)
+    if not axes:
+        return lambda kernel: source*kernel
+    shape = tuple(next_fast_len(3*source.shape[axis]-2, real=True) for axis in axes)
+    spectrum = rfftn(source, shape, axes=axes)
+    # A (2*n-1)-wide Green kernel centers the linear-convolution crop at n-1.
+    window = tuple(slice(size-1, 2*size-1) for size in source.shape)
+
+    def convolve(kernel):
+        transformed = rfftn(kernel, shape, axes=axes)
+        values = irfftn(spectrum*transformed, shape, axes=axes)
+        return values[window]
+
+    return convolve
 
 
 def _green_kernels(nx: int, ny: int, dx: float, dy: float, z_offset: float) -> np.ndarray:
@@ -172,12 +179,3 @@ def _direct_convolve2d_same(source: np.ndarray, kernel: np.ndarray) -> np.ndarra
             output[ix, iy] = total
 
     return output
-
-
-def _require_fftconvolve():
-    try:
-        from scipy.signal import fftconvolve
-    except ImportError as exc:
-        raise ImportError("backend='fft' requires scipy.signal.fftconvolve") from exc
-
-    return fftconvolve

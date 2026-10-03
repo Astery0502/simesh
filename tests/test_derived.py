@@ -58,7 +58,7 @@ def test_invalid_combinations_and_recipe_failures():
     partial = sm.prepare(source, leaf_ids=[0], scheme="exact-phase")
     with pytest.raises(ValueError, match="coverage"):
         sm.derive({"a": ready, "b": partial}, "bad", lambda ctx: 0.)
-    with pytest.raises(ValueError, match="block shape"):
+    with pytest.raises(ValueError, match="batch shape"):
         sm.derive(ready, "bad", lambda ctx: np.zeros((2, 2)))
     with pytest.raises(ValueError, match="exactly one"):
         sm.derive(ready, "bad", lambda ctx: ctx.field("absent"))

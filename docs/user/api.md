@@ -61,6 +61,10 @@ Core object contracts are in the [developer API](../dev/api.md).
 
 ## Geometry
 
+::: simesh.spatial
+    options:
+      show_root_heading: false
+
 ::: simesh.Plane
 
 ::: simesh.AxisSlice

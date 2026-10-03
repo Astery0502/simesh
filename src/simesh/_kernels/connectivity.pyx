@@ -7,7 +7,8 @@ ownership and trilinear interpolation are shared with the native N4 consumers.
 
 from libc.math cimport fabs, fmin, fmax, hypot, isfinite, log, nextafter, INFINITY
 from libc.stdint cimport int64_t
-from .native cimport owner_node, contains_point, interpolate
+from .native cimport owner_node, interpolate
+from .cartesian cimport contains_point
 from .tracing_step cimport cell_width, trace_step, finer_step
 from .rk4 cimport rk4_trial
 from .line_quantities cimport twist_density

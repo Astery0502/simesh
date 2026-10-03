@@ -45,9 +45,15 @@ def prepare(source, fields=None, *, region=None, leaf_ids=None, scheme,
     leaf_ids : sequence of int, optional
         Ordered original leaf IDs; mutually exclusive with region.
     scheme : str
-        coordinate-phase requires complete coverage; exact-phase supports regions. These
-        schemes have distinct numerical definitions. Only exact-phase supports
-        Mesh periodic halo adjacency; coordinate-phase rejects periodic meshes.
+        Both schemes copy same-level neighbors, average 2x2x2 fine cells for
+        restriction, and use slope-limited linear coarse-to-fine reconstruction.
+        exact-phase places coarse/fine samples by integer refinement phase with
+        offsets of +/-1/4 coarse cell; it supports regions and periodic halo
+        adjacency. "Exact" describes placement, not exact recovery of the
+        continuous solution. coordinate-phase computes reconstruction offsets
+        from floating physical coordinates and requires the full nonperiodic
+        domain. These remain distinct numerical choices; retain the same scheme
+        when comparing full-domain and regional analyses.
     workers : int
         Worker count; exact-phase requires one worker.
     memory_limit : int, optional

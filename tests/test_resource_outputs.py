@@ -1,6 +1,7 @@
 """Resource fixes preserve accepted paths and recoverable shard publication."""
 
 import json
+import gc
 import tracemalloc
 
 import numpy as np
@@ -54,6 +55,52 @@ def test_segment_termination_for_missing_and_null_fields(subset,null):
     np.testing.assert_array_equal(actual.branch(0,1),expected.trajectories[0,:expected.point_counts[0]])
 
 
+@pytest.mark.parametrize('backend,workers', [('threadpool',1),('threadpool',4),('openmp',4)])
+def test_compact_paths_own_complete_branches_after_workers_and_inputs_release(backend,workers):
+    if backend == 'openmp':
+        from simesh._kernels.native import openmp_build_info
+        if not openmp_build_info()['enabled']:
+            pytest.skip('OpenMP is not enabled')
+    fields=vector_fields()
+    points=sm.PointSet([[.2,.2,.2],[.3,.2,.95],[1.4,.4,.6],[3.,.2,.2]],ids=[9,-2,0,83])
+    options=dict(step=.0017,max_steps=130)
+    expected=[]
+    for direction in (-1,1):
+        dense=sm.trace(fields,points.positions,trajectories=True,direction=direction,**options)
+        expected.append([dense.trajectories[row,:count].copy()
+                         for row,count in enumerate(dense.point_counts)])
+    actual=app.trace(fields,points,seed_batch=3,backend=backend,workers=workers,
+                     schedule='dynamic',**options)
+    app.trace(fields,points,direction='along',step=.03,max_steps=10,
+              seed_batch=2,backend=backend,workers=workers)
+    del fields,points,dense
+    gc.collect()
+    for row,seed_id in enumerate(actual.seeds.ids):
+        for side,direction in enumerate((-1,1)):
+            np.testing.assert_array_equal(actual.branch(seed_id,direction),expected[side][row])
+    assert actual.positions.flags.owndata
+    for array in (actual.positions,actual.offsets,actual.termination):
+        assert not array.flags.writeable
+
+
+@pytest.mark.parametrize('backend', ['threadpool','openmp'])
+def test_parallel_prefix_collection_keeps_complete_paths(backend):
+    from simesh._kernels.native import openmp_build_info
+    if backend == 'openmp' and not openmp_build_info()['enabled']:
+        pytest.skip('OpenMP is not enabled')
+    fields=vector_fields()
+    seed=np.array([[.2,.2,.2]])
+    points=sm.PointSet(np.repeat(seed,256,axis=0))
+    controls=dict(step=.0017,max_steps=320)
+    result=app.trace(fields,points,backend=backend,workers=4,
+                     schedule='dynamic',seed_batch=len(points),**controls)
+    for direction in (-1,1):
+        dense=sm.trace(fields,seed,direction=direction,trajectories=True,**controls)
+        expected=dense.trajectories[0,:dense.point_counts[0]]
+        for seed_id in points.ids:
+            np.testing.assert_array_equal(result.branch(seed_id,direction),expected)
+
+
 def test_short_trace_memory_is_independent_of_max_steps():
     fields=vector_fields()
     points=sm.PointSet(np.tile([.2,.2,.5],(32,1)))
@@ -76,6 +123,65 @@ def test_short_trace_memory_is_independent_of_max_steps():
     with pytest.raises(MemoryError):
         app.trace(fields,points,step=.00001,max_steps=100000,
             memory_limit=fields.mesh.nbytes+fields.nbytes+300_000)
+
+
+def test_short_trace_adapts_delivery_storage_to_the_memory_budget():
+    fields=vector_fields(null=True)
+    points=sm.PointSet(np.tile([.2,.2,.5],(32,1)))
+    reference=app.trace(fields,points,step=.001,max_steps=10**8,workers=2)
+    # The full delivery buffer cannot fit, but these null-field paths can.
+    actual=app.trace(fields,points,step=.001,max_steps=10**8,workers=2,
+        memory_limit=fields.mesh.nbytes+fields.nbytes+100_000)
+    np.testing.assert_array_equal(actual.positions,reference.positions)
+    np.testing.assert_array_equal(actual.offsets,reference.offsets)
+    np.testing.assert_array_equal(actual.termination,reference.termination)
+
+
+@pytest.mark.parametrize('max_length', [.04,.06])
+def test_budget_admits_delivery_and_nonempty_compact_prefix_together(max_length):
+    fields=vector_fields()
+    points=sm.PointSet(np.tile([.2,.2,.2],(32,1)))
+    controls=dict(direction='along',step=.0017,max_steps=10**8,
+                  max_length=max_length,workers=2)
+    reference=app.trace(fields,points,**controls)
+    actual=app.trace(fields,points,**controls,
+        memory_limit=fields.mesh.nbytes+fields.nbytes+100_000)
+    np.testing.assert_array_equal(actual.positions,reference.positions)
+    np.testing.assert_array_equal(actual.offsets,reference.offsets)
+    np.testing.assert_array_equal(actual.termination,reference.termination)
+
+
+def test_delivery_storage_shrinks_as_complete_paths_are_retained():
+    mesh=sm.mesh_from_forest((1,1,1),np.array([True]),lower=(0,0,0),upper=(1,1,1),
+                            block_shape=(4,4,4))
+    values=np.zeros((1,3,4,4,4))
+    values[:,2]=1.
+    with sm.source_from_arrays(mesh,values,('bx','by','bz')) as source:
+        fields=sm.prepare(source,scheme='exact-phase')
+    points=sm.PointSet(np.tile([.5,.5,.5],(32,1)))
+    controls=dict(direction='along',step=.01,max_steps=1000,workers=2)
+    reference=app.trace(fields,points,**controls)
+    actual=app.trace(fields,points,**controls,
+        memory_limit=fields.mesh.nbytes+fields.nbytes+100_000)
+    np.testing.assert_array_equal(actual.positions,reference.positions)
+    np.testing.assert_array_equal(actual.offsets,reference.offsets)
+    np.testing.assert_array_equal(actual.termination,reference.termination)
+
+
+def test_budget_limited_segments_keep_a_sparse_active_branch_complete():
+    fields=vector_fields()
+    seeds=np.tile([3.,.2,.2],(32,1))
+    seeds[-1]=[.2,.2,.2]
+    points=sm.PointSet(seeds)
+    controls=dict(step=.0017,max_steps=1000)
+    expected=sm.trace(fields,seeds,trajectories=True,**controls)
+    actual=app.trace(fields,points,direction='along',workers=4,schedule='dynamic',
+        memory_limit=fields.mesh.nbytes+fields.nbytes+100_000,**controls)
+    assert expected.steps[-1] > _PATH_SEGMENT_STEPS
+    np.testing.assert_array_equal(actual.termination[:,1],expected.termination)
+    for row,seed_id in enumerate(points.ids):
+        np.testing.assert_array_equal(actual.branch(seed_id,1),
+                                     expected.trajectories[row,:expected.point_counts[row]])
 
 
 def empty_batch(ids):

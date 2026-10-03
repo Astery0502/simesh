@@ -6,18 +6,19 @@ traced separately using the existing accepted-prefix integration contract.
 """
 
 from dataclasses import dataclass, field
-import math
 import numpy as np
 
-from .geometry import PointSet, RaySet, LineSet
+from .spatial import Plane, PointSet, RaySet, LineSet
 from .fields import require_fields, require_continuous, _input_arrays
 from .operators.sampling import sample as sample_values
 from .connectivity import line_diagnostics, iter_line_diagnostics, QSLResult
-from .slices import Plane, _uniform_geometry
-from .tracing import _iter_path_segments, Termination, _validate_vector, _validate_inputs
-from ._validation import admit, remaining, workers_count, array_bytes
-from ._execution import worker_context, run_ranges, native_dispatch
-from .projection import LOSStatus
+from .geometry import _uniform_geometry
+from ._uniform import UniformResult
+from .tracing import _trace_lines, _validate_vector
+from .tracing import Termination as Termination
+from ._validation import remaining, workers_count
+from ._execution import worker_context
+from .operators.rays import LOSStatus, _integrate_scalar_rays
 
 __all__ = ["PointSet","RaySet","LineSet","SampledPoints","ConnectivityMap","RayResult",
            "UniformResult","sample","field_map","uniform_grid","surface_diagnostics","bottom_diagnostics",
@@ -418,49 +419,6 @@ def bottom_diagnostics(fields, shape=(128,128), *, quantities=None, ids=None,
     return connectivity(fields,points,quantities=names,memory_limit=memory_limit,**controls)
 
 
-@dataclass(frozen=True)
-class UniformResult:
-    """Collected cell-center uniform volume with coverage.
-
-    Attributes
-    ----------
-    values : ndarray
-        Float64 values (nx, ny, nz, component).
-    valid : ndarray
-        Coverage mask (nx, ny, nz).
-    lower, upper : ndarray
-        Physical sampling bounds.
-    definitions : tuple of FieldDefinition
-        Output components and units.
-    source_identity : object
-        In-memory value association.
-    """
-    values: np.ndarray
-    valid: np.ndarray
-    lower: np.ndarray
-    upper: np.ndarray
-    definitions: tuple
-    source_identity: object
-
-    @property
-    def usable(self):
-        """Coverage-valid cells whose sampled components are all finite."""
-        return self.valid & np.isfinite(self.values).all(axis=-1)
-
-    @property
-    def spacing(self):
-        """Physical uniform-cell spacing along x, y and z.
-        """
-        return (self.upper-self.lower)/np.asarray(self.valid.shape)
-
-    @property
-    def axes(self):
-        """Cell-center coordinate arrays along x, y and z.
-        """
-        return tuple(lo+(np.arange(count)+.5)*step
-                     for lo,count,step in zip(self.lower,self.valid.shape,self.spacing))
-
-
 def uniform_grid(fields, resolution, *, components=None, output=None, bounds=None,
                  interpolation="linear", workers=1, tile_rows=64, memory_limit=None):
     """Write a sampled volume directly to final arrays, optionally caller-owned.
@@ -504,11 +462,12 @@ def uniform_grid(fields, resolution, *, components=None, output=None, bounds=Non
         return resident(fields, resolution, components, output, bounds, interpolation, workers, memory_limit)
     from .operators.sampling import _sample
     selected=np.asarray(require_continuous(fields,components,operation="uniform_grid"),dtype=np.int64)
+    bounds = None if bounds is None else tuple(bounds)
     resolution,lower,upper = _uniform_geometry(fields.mesh,resolution,bounds)
     nx,ny,nz=resolution
     count=len(selected)
     scratch=min(nx,tile_rows)*ny*128
-    values,valid=output_arrays(resolution,count,output,(*_input_arrays(fields),lower,upper),
+    values,valid=output_arrays(resolution,count,output,(*_input_arrays(fields),*(bounds or ()),lower,upper),
         fields.nbytes+fields.mesh.nbytes+scratch,memory_limit)
     width=upper-lower
     v=(np.arange(ny)+.5)/ny
@@ -574,85 +533,11 @@ def trace(fields, points, *, direction="both", step=None, step_fraction=.25, max
     Exact upper-face seeds are evaluated at the nearest interior representable coordinate; stored initial positions remain unchanged.
     """
     _points(points)
-    _validate_vector(fields)
-    if direction not in ("both","along","against","inward"):
-        raise ValueError("direction must be both/along/against/inward")
-    if type(seed_batch) is not int or seed_batch < 1:
-        raise ValueError("seed_batch must be positive")
-    _validate_inputs(points.positions,points.ids,step,max_steps,max_length,null_threshold,
-                     1,workers,seed_batch,True,False,step_fraction)
-    native_dispatch(backend,schedule)
-    base = fields.mesh.nbytes+fields.nbytes+points.nbytes+len(points)*256
-    admit(base,memory_limit,"trace geometry")
-    positions = points.positions.copy()
-    for axis in range(3):
-        upper = positions[:,axis] == fields.mesh.upper[axis]
-        positions[upper,axis] = np.nextafter(fields.mesh.upper[axis],fields.mesh.lower[axis])
-    requested = np.zeros((len(points),2),dtype=bool)
-    status = np.full((len(points),2),LineSet.NOT_REQUESTED,dtype=np.int64)
-    if direction == "both":
-        requested[:] = True
-    elif direction in ("along","against"):
-        requested[:,int(direction == "along")] = True
-    else:
-        lo,hi = fields.mesh.lower,fields.mesh.upper
-        tolerance = 32*np.finfo(float).eps*max(np.max(np.abs([lo,hi])),np.max(hi-lo))
-        near_lo = np.abs(points.positions-lo) <= tolerance
-        near_hi = np.abs(points.positions-hi) <= tolerance
-        if np.any(points.positions<lo) or np.any(points.positions>hi) or np.any((near_lo|near_hi).sum(axis=1) != 1):
-            raise ValueError("inward requires points on exactly one physical box face")
-        normals = near_hi.astype(float)-near_lo.astype(float)
-        b,_,valid = sample_values(fields,positions)
-        with np.errstate(over="ignore",invalid="ignore"):
-            dot = np.sum(normals*b,axis=1)
-            norm = np.hypot(np.hypot(b[:,0],b[:,1]),b[:,2])
-        tangent = valid & np.isfinite(norm) & (norm > null_threshold) & (dot == 0)
-        status[tangent] = LineSet.TANGENT_SEED
-        requested[:,0] = (dot > 0) & ~tangent
-        requested[:,1] = (~(dot > 0)) & ~tangent
-    pieces = [[] for _ in range(2*len(points))]
-    counts = np.zeros(2*len(points),dtype=np.int64)
-    retained = 0
-    for side in range(2):
-        rows = np.flatnonzero(requested[:,side])
-        for start in range(0,len(rows),seed_batch):
-            selected = rows[start:start+seed_batch]
-            segments = _iter_path_segments(fields,np.ascontiguousarray(positions[selected]),points.ids[selected],
-                step=step,step_fraction=step_fraction,max_steps=max_steps,direction=2*side-1,
-                max_length=max_length,null_threshold=null_threshold,workers=workers,backend=backend,schedule=schedule,
-                memory_limit=remaining(memory_limit,base-fields.nbytes-fields.mesh.nbytes+retained))
-            try:
-                for state,paths,point_counts in segments:
-                    raw_bytes = array_bytes(vars(state).values())
-                    new_bytes = int(point_counts.sum())*24
-                    admit(base+retained+raw_bytes+new_bytes,memory_limit,"packed trace output")
-                    for index,row in enumerate(selected):
-                        count = int(point_counts[index])
-                        branch = 2*int(row)+side
-                        if count:
-                            path = paths[index,:count].copy()
-                            if counts[branch] == 0:
-                                path[0] = points.positions[row]
-                            pieces[branch].append(path)
-                            counts[branch] += count
-                        status[row,side] = state.status[index]
-                    retained += new_bytes
-            finally:
-                segments.close()
-            del state,paths
-    # Packing overlaps retained segments; validation starts after their release.
-    admit(base+2*retained+retained//8,memory_limit,"collected trace output")
-    offsets = np.r_[np.int64(0),np.cumsum(counts,dtype=np.int64)]
-    packed = np.empty((int(offsets[-1]),3))
-    for index,segments in enumerate(pieces):
-        cursor = int(offsets[index])
-        for path in segments:
-            packed[cursor:cursor+len(path)] = path
-            cursor += len(path)
-        segments.clear()
-    pieces.clear()
-    path = None
-    return LineSet(points,packed,offsets,status,fields.value_identity)
+    arrays = _trace_lines(fields, points, direction=direction, step=step, step_fraction=step_fraction,
+        max_steps=max_steps, max_length=max_length, null_threshold=null_threshold,
+        workers=workers, backend=backend, schedule=schedule, seed_batch=seed_batch,
+        memory_limit=memory_limit)
+    return LineSet(points, *arrays, fields.value_identity)
 
 
 def los(fields, rays, *, component=0, quadrature="gauss2", step_fraction=.5,
@@ -686,7 +571,6 @@ def los(fields, rays, *, component=0, quadrature="gauss2", step_fraction=.5,
         Identified values and clipping intervals in field units times coordinate length;
         RayResult.valid interprets COMPLETE/EMPTY statuses.
     """
-    from ._kernels.native import integrate_ray_set
     component, = require_continuous(fields,(component,),operation="LOS")
     if not isinstance(rays,RaySet):
         raise TypeError("rays must be a RaySet")
@@ -696,27 +580,10 @@ def los(fields, rays, *, component=0, quadrature="gauss2", step_fraction=.5,
             type(max_samples) is not int or not 1 <= max_samples <= np.iinfo(np.int64).max or
             type(ray_batch) is not int or ray_batch < 1):
         raise ValueError("invalid LOS component, quadrature or batch controls")
-    n = len(rays.origins)
-    admit(fields.mesh.nbytes+fields.nbytes+rays.nbytes+n*48+min(n,ray_batch)*384,
-          memory_limit,"ray-set LOS")
-    values,entry,exit = (np.empty(n) for _ in range(3))
-    status,samples,misses = (np.empty(n,dtype=np.int64) for _ in range(3))
-    m = fields.mesh
-    all_directions = np.broadcast_to(rays.directions,(n,3))
-    with worker_context(workers) as executor:
-        for start in range(0,n,ray_batch):
-            stop = min(start+ray_batch,n)
-            directions = np.ascontiguousarray(all_directions[start:stop])
-            def run(first,last):
-                s = slice(start+first,start+last)
-                integrate_ray_set(m.lower,m.upper,m.roots,m.children,m.node_leaves,m.node_lower,m.node_upper,
-                    m.bounds,m.spacing,fields.slot_of_leaf,fields.values,fields.storage_halo,
-                    rays.origins.positions[s],directions[first:last],rays.near[s],rays.far[s],
-                    component,step_fraction,int(quadrature=="gauss2"),max_samples,
-                    values[s],entry[s],exit[s],status[s],samples[s],misses[s])
-            run_ranges(stop-start,workers,run,executor)
-    return RayResult(rays,values,entry,exit,status,samples,misses,
-                     fields.fields[component].units+" * coordinate-length",quadrature,fields.value_identity)
+    arrays = _integrate_scalar_rays(fields, rays, component, quadrature, step_fraction,
+                                    max_samples, workers, ray_batch, memory_limit)
+    return RayResult(rays, *arrays, fields.fields[component].units+" * coordinate-length",
+                     quadrature, fields.value_identity)
 
 
 def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
@@ -759,13 +626,11 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
     These orders define different reconstructions. Composite Gauss2 for nonlinear response is an approximation; check convergence and result status.
     """
     from dataclasses import replace
-    from .physics.thermal import (AIA171, _check_thermal, emissivity_fields,
-                                  _native_response, _scale_thermal_values)
-    from ._kernels.native import initialize_ray_set
-    from ._kernels.thermal_rays import integrate_ray_set_ready
+    from .physics.emission import AIA171
+    from .physics.thermodynamics import _check_thermal, emissivity_fields
+    from .physics.thermal import _native_response, _scale_thermal_values, _integrate_thermal_rays
     model = AIA171() if model is None else model
     _check_thermal(thermodynamics,model)
-    grid, ordinates, slopes, mode = _native_response(model)
     if not isinstance(rays,RaySet):
         raise TypeError("rays must be a RaySet")
     workers_count(workers)
@@ -776,6 +641,7 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
             type(ray_batch) is not int or ray_batch < 1):
         raise ValueError("positive units and valid quadrature/batch controls are required")
     if order == "emissivity-first":
+        _native_response(model)
         emissivity = emissivity_fields(thermodynamics,model=model,
                                       memory_limit=remaining(memory_limit,rays.nbytes+len(rays.origins)*32))
         result = los(emissivity,rays,max_samples=max_samples,workers=workers,ray_batch=ray_batch,
@@ -783,32 +649,10 @@ def thermal_los(thermodynamics, rays, *, length_unit_cm, model=None,
         result = replace(result,source_identity=thermodynamics.value_identity,
                          quadrature="emissivity-first/gauss2")
     else:
-        n = len(rays.origins)
-        mesh = thermodynamics.mesh
-        admit(mesh.nbytes+thermodynamics.nbytes+rays.nbytes+n*96+min(n,ray_batch)*128+workers*65536,
-              memory_limit,"ray-set thermal LOS")
-        values,entry,exit = (np.zeros(n) for _ in range(3))
-        status,samples,misses = (np.zeros(n,dtype=np.int64) for _ in range(3))
-        all_directions = np.broadcast_to(rays.directions,(n,3))
-        with worker_context(workers) as executor:
-            for start in range(0,n,ray_batch):
-                stop = min(start+ray_batch,n)
-                directions = np.ascontiguousarray(all_directions[start:stop])
-                def run(first,last):
-                    s = slice(start+first,start+last)
-                    origins = rays.origins.positions[s]
-                    direction = directions[first:last]
-                    initialize_ray_set(mesh.lower,mesh.upper,origins,direction,rays.near[s],rays.far[s],
-                                       entry[s],exit[s],status[s])
-                    output = values[s]
-                    output[status[s] >= LOSStatus.MISSING_COVERAGE] = np.nan
-                    integrate_ray_set_ready(mesh.roots,mesh.children,mesh.node_leaves,mesh.node_lower,mesh.node_upper,
-                        mesh.bounds,mesh.spacing,thermodynamics.slot_of_leaf,thermodynamics.values,
-                        thermodynamics.storage_halo,origins,direction,entry[s],exit[s],subdivisions,max_samples,
-                        grid,ordinates,slopes,values[s],status[s],samples[s],mode)
-                run_ranges(stop-start,workers,run,executor)
-        result = RayResult(rays,values,entry,exit,status,samples,misses,"DN s^-1 pixel^-1",
-                           f"thermodynamics-first/composite-gauss2/{subdivisions}",thermodynamics.value_identity)
+        arrays = _integrate_thermal_rays(thermodynamics, rays, model, subdivisions,
+                                         max_samples, workers, ray_batch, memory_limit)
+        result = RayResult(rays, *arrays, "DN s^-1 pixel^-1",
+                           f"thermodynamics-first/composite-gauss2/{subdivisions}", thermodynamics.value_identity)
     values,flags = _scale_thermal_values(result.values,result.status,result.valid,length_unit_cm)
     return replace(result,values=values,status=flags,units="DN s^-1 pixel^-1",
                    metadata={"model":model.identity,"temperature_label":thermodynamics.source[2],
@@ -891,8 +735,7 @@ def radiative_los(coefficients, rays, *, length_unit_cm, background=0., subdivis
     increase subdivisions to check convergence. Region edges are not physical boundaries.
     """
     from dataclasses import replace
-    from ._kernels.native import initialize_ray_set
-    from ._kernels.thermal_rays import integrate_transfer_ray_set_ready
+    from .operators.transfer import _integrate_transfer_rays
 
     require_continuous(coefficients, operation="radiative LOS")
     if not isinstance(rays, RaySet):
@@ -911,48 +754,9 @@ def radiative_los(coefficients, rays, *, length_unit_cm, background=0., subdivis
         raise ValueError("positive units, nonnegative background and valid integration controls are required")
     if implementation == "reference" and workers != 1:
         raise ValueError("reference implementation requires one worker")
-    n = len(rays.origins)
-    mesh = coefficients.mesh
-    scratch = (mesh.leaf_count*128+2*subdivisions*(sum(mesh.block_shape)+1)*384
-               if implementation == "reference" else min(n,ray_batch)*128)
-    admit(mesh.nbytes+coefficients.nbytes+rays.nbytes+n*160+scratch+workers*65536,
-          memory_limit, "radiative LOS")
-    values, entry, exit, tau, thin = (np.zeros(n) for _ in range(5))
-    status, samples, misses = (np.zeros(n, dtype=np.int64) for _ in range(3))
-    directions = np.broadcast_to(rays.directions, (n, 3))
-    if implementation == "reference":
-        _reference_transfer(coefficients, rays, directions, length_unit_cm, subdivisions,
-                            max_samples, values, entry, exit, tau, thin, status, samples)
-    else:
-        backing = coefficients.values
-        with worker_context(workers) as executor:
-            for start in range(0, n, ray_batch):
-                stop = min(start+ray_batch, n)
-                direction_batch = np.ascontiguousarray(directions[start:stop])
-                def run(first, last):
-                    s = slice(start+first, start+last)
-                    origins = rays.origins.positions[s]
-                    direction = direction_batch[first:last]
-                    initialize_ray_set(mesh.lower, mesh.upper, origins, direction, rays.near[s], rays.far[s],
-                                       entry[s], exit[s], status[s])
-                    integrate_transfer_ray_set_ready(mesh.roots, mesh.children, mesh.node_leaves,
-                        mesh.node_lower, mesh.node_upper, mesh.bounds, mesh.spacing,
-                        coefficients.slot_of_leaf, backing, coefficients.storage_halo,
-                        origins, direction, entry[s], exit[s], subdivisions, max_samples, length_unit_cm,
-                        values[s], status[s], samples[s], tau[s], thin[s])
-                run_ranges(stop-start, workers, run, executor)
-    valid = np.isin(status, (LOSStatus.COMPLETE, LOSStatus.EMPTY))
-    # Compute before adding background: subtracting a bright background later
-    # can erase the emitted signal and corrupt the absorption diagnostic.
-    fraction = np.ones_like(thin)
-    np.divide(values, thin, out=fraction, where=thin > 0)
-    fraction = np.clip(1-fraction, 0., 1.)
-    with np.errstate(over="ignore", invalid="ignore"):
-        values += float(background)*np.exp(-tau)
-    bad = valid & ~(np.isfinite(values) & np.isfinite(tau) & np.isfinite(thin))
-    status[bad] = LOSStatus.UNREPRESENTABLE_INTEGRAL
-    for data in (values, tau, thin, fraction):
-        data[~valid | bad] = np.nan
+    values, entry, exit, status, samples, misses, tau, thin, fraction = _integrate_transfer_rays(
+        coefficients, rays, length_unit_cm, background, subdivisions, max_samples,
+        workers, ray_batch, memory_limit, implementation)
     metadata = {key: coefficients.preparation_stats[key] for key in
                 ("model", "temperature", "density_unit_g_cm3", "absorption")}
     metadata.update(length_unit_cm=float(length_unit_cm), background=float(background),
@@ -963,53 +767,6 @@ def radiative_los(coefficients, rays, *, length_unit_cm, background=0., subdivis
                            replace(intensity, values=thin), fraction)
 
 
-def _reference_transfer(fields, rays, directions, length, subdivisions, limit,
-                        values, entry, exit, tau, thin, status, samples):
-    from .physics.thermal import ray_segments, ray_nodes
-
-    mesh = fields.mesh
-    for row, (origin, direction) in enumerate(zip(rays.origins.positions, directions)):
-        leaves, first, last = ray_segments(mesh, origin, direction, rays.near[row], rays.far[row])
-        status[row] = LOSStatus.EMPTY
-        if not len(leaves):
-            continue
-        entry[row], exit[row] = first[0], last[-1]
-        status[row] = LOSStatus.COMPLETE
-        if not np.allclose(first[1:], last[:-1], rtol=2e-13, atol=2e-13):
-            status[row] = LOSStatus.GEOMETRY_FAILURE
-        for leaf, lo, hi in zip(leaves, first, last):
-            if status[row] != LOSStatus.COMPLETE:
-                break
-            if fields.slot_of_leaf[leaf] < 0:
-                status[row] = LOSStatus.MISSING_COVERAGE
-                break
-            nodes, weights = ray_nodes(mesh, leaf, origin, direction, lo, hi, subdivisions)
-            nodes = nodes.reshape(-1, 2).mean(axis=1)
-            widths = weights.reshape(-1, 2).sum(axis=1)*length
-            if samples[row]+len(nodes) > limit:
-                status[row] = LOSStatus.SAMPLE_LIMIT
-                break
-            points = origin+nodes[:, None]*direction
-            points = np.maximum(mesh.bounds[leaf, 0], np.minimum(points,
-                                np.nextafter(mesh.bounds[leaf, 1], mesh.bounds[leaf, 0])))
-            data, owners, valid = sample_values(fields, points)
-            if not np.all(valid) or not np.all(owners == leaf):
-                status[row] = LOSStatus.UNREPRESENTABLE_SAMPLE
-                break
-            if not np.isfinite(data).all() or np.any(data < 0):
-                status[row] = LOSStatus.NONFINITE_SCALAR
-                break
-            with np.errstate(over="ignore", invalid="ignore"):
-                for (j, kappa), ds in zip(data, widths):
-                    dtau = kappa*ds
-                    emission = j*ds
-                    thin[row] += emission
-                    slab = -np.expm1(-dtau)/dtau if dtau > 0 else 1.
-                    values[row] += np.exp(-tau[row])*emission*slab
-                    tau[row] += dtau
-                if not np.isfinite([values[row], tau[row], thin[row]]).all():
-                    status[row] = LOSStatus.UNREPRESENTABLE_INTEGRAL
-            samples[row] += len(nodes)
 
 
 def iter_lines(fields, points, *, seed_batch=128, memory_limit=None, **controls):

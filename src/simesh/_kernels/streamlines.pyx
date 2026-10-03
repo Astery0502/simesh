@@ -3,12 +3,139 @@
 
 import numpy as np
 from libc.math cimport hypot, isfinite
-from libc.stdint cimport int64_t
+from libc.stdint cimport int64_t, uintptr_t
+from libc.string cimport memcpy
 from cython.parallel cimport prange, threadid
-from .native cimport owner_node, contains_point, interpolate
+from .native cimport owner_node, interpolate
+from .cartesian cimport contains_point
 from .tracing_step cimport cell_width, trace_step, finer_step
 from .rk4 cimport rk4_trial, RK_RETRY
 from .line_quantities cimport twist_density
+
+
+cdef void _copy_prefixes(const double[:, :, :] paths, const int64_t[::1] offsets,
+                        double[:, ::1] output, const double[:, ::1] initial,
+                        int64_t first, int64_t last) noexcept nogil:
+    cdef int64_t seed, count, cursor
+    cdef int axis
+    for seed in range(first,last):
+        cursor, count = offsets[seed], offsets[seed+1]-offsets[seed]
+        if count:
+            memcpy(&output[cursor,0], &paths[seed,0,0], count*3*sizeof(double))
+            if initial is not None:
+                for axis in range(3):
+                    output[cursor,axis] = initial[seed,axis]
+
+
+def _copy_path_segment(const double[:, :, :] paths, const int64_t[::1] offsets,
+                       double[:, ::1] output, const double[:, ::1] initial,
+                       int64_t first, int64_t last, int workers=1):
+    """Copy borrowed accepted prefixes into disjoint, already admitted ranges."""
+    cdef int64_t seed, count, task, begin, end, n = paths.shape[0]
+    if (paths.shape[2] != 3 or paths.strides[2] != sizeof(double) or
+            paths.strides[1] != 3*sizeof(double) or offsets.shape[0] != n+1 or
+            output.shape[1] != 3 or offsets[0] != 0 or offsets[n] != output.shape[0] or
+            first < 0 or last < first or last > n or workers < 1 or
+            (initial is not None and
+            (initial.shape[0] != n or initial.shape[1] != 3))):
+        raise ValueError("invalid path segment layout")
+    if offsets[first] < 0 or offsets[last] > output.shape[0]:
+        raise ValueError("path prefix is outside its output range")
+    for seed in range(first,last):
+        count = offsets[seed+1]-offsets[seed]
+        if count < 0 or count > paths.shape[1]:
+            raise ValueError("invalid accepted path prefix")
+    if workers > 1:
+        from .native import openmp_build_info
+        if not openmp_build_info()['enabled']:
+            raise RuntimeError("native analysis was built without OpenMP")
+    with nogil:
+        if workers == 1:
+            _copy_prefixes(paths,offsets,output,initial,first,last)
+        else:
+            for task in prange(workers, schedule='static', num_threads=workers):
+                begin = first+(last-first)*task//workers
+                end = first+(last-first)*(task+1)//workers
+                _copy_prefixes(paths,offsets,output,initial,begin,end)
+
+
+cdef class _PathSegments:
+    """Retain segment arrays while disjoint workers gather complete branches."""
+    cdef object _owners
+    cdef uintptr_t[::1] _values, _offsets
+    cdef const int64_t[::1] _branches
+    cdef int64_t _count, _seeds
+
+    def __init__(self, values, offsets, const int64_t[::1] branches):
+        cdef const double[:, ::1] data
+        cdef const int64_t[::1] starts
+        cdef int64_t segment, seed
+        self._count, self._seeds = len(values), branches.shape[0]
+        if len(offsets) != self._count:
+            raise ValueError("path segment arrays must have matching offsets")
+        # The pointers borrow storage from these retained NumPy owners.
+        self._owners = (tuple(values), tuple(offsets))
+        self._branches = branches
+        self._values = np.empty(self._count, dtype=np.uintp)
+        self._offsets = np.empty(self._count, dtype=np.uintp)
+        for segment in range(self._count):
+            data, starts = self._owners[0][segment], self._owners[1][segment]
+            if (data.shape[1] != 3 or starts.shape[0] != self._seeds+1 or
+                    starts[0] != 0 or starts[self._seeds] != data.shape[0]):
+                raise ValueError("invalid packed path segment")
+            for seed in range(self._seeds):
+                if starts[seed+1] < starts[seed]:
+                    raise ValueError("path offsets must be nondecreasing")
+            self._values[segment] = <uintptr_t>&data[0,0] if data.shape[0] else 0
+            self._offsets[segment] = <uintptr_t>&starts[0]
+
+    cdef void _copy(self, double[:, ::1] output, const int64_t[::1] offsets,
+                    int64_t first, int64_t last) noexcept nogil:
+        cdef int64_t seed, segment, cursor, count
+        cdef const int64_t* starts
+        cdef const double* values
+        for seed in range(first,last):
+            cursor = offsets[self._branches[seed]]
+            for segment in range(self._count):
+                starts = <const int64_t*>self._offsets[segment]
+                count = starts[seed+1]-starts[seed]
+                if count:
+                    values = <const double*>self._values[segment]
+                    memcpy(&output[cursor,0], values+3*starts[seed], count*3*sizeof(double))
+                    cursor += count
+
+    def copy_range(self, double[:, ::1] output, const int64_t[::1] offsets,
+                   int64_t first, int64_t last, int workers=1):
+        """Gather whole branches into already admitted, disjoint output ranges."""
+        cdef int64_t seed, segment, branch, count, task, begin, end
+        cdef const int64_t* starts
+        if (first < 0 or last < first or last > self._seeds or workers < 1 or
+                output.shape[1] != 3 or offsets.shape[0] < 1 or
+                offsets[0] != 0 or offsets[offsets.shape[0]-1] != output.shape[0]):
+            raise ValueError("invalid final path output layout")
+        for seed in range(first,last):
+            branch = self._branches[seed]
+            if branch < 0 or branch+1 >= offsets.shape[0]:
+                raise ValueError("path branch is outside the final output")
+            count = 0
+            for segment in range(self._count):
+                starts = <const int64_t*>self._offsets[segment]
+                count += starts[seed+1]-starts[seed]
+            if (offsets[branch] < 0 or offsets[branch+1] > output.shape[0] or
+                    offsets[branch+1]-offsets[branch] != count):
+                raise ValueError("path branch count differs from its output range")
+        if workers > 1:
+            from .native import openmp_build_info
+            if not openmp_build_info()['enabled']:
+                raise RuntimeError("native analysis was built without OpenMP")
+        with nogil:
+            if workers == 1:
+                self._copy(output,offsets,first,last)
+            else:
+                for task in prange(workers, schedule='static', num_threads=workers):
+                    begin = first+(last-first)*task//workers
+                    end = first+(last-first)*(task+1)//workers
+                    self._copy(output,offsets,begin,end)
 
 
 cdef class _Inputs:
@@ -139,7 +266,8 @@ cdef int _stage(void* context, const double* state, double* out,
 cdef void _advance_range(_Inputs data, _Batch batch, int64_t first, int64_t last,
                          double* scratch, double step, double fraction,
                          int64_t max_steps, double max_length, double null_threshold,
-                         int direction, int64_t path_start) noexcept nogil:
+                         int direction, int64_t path_start,
+                         const int64_t[::1] active) noexcept nogil:
     cdef int size = 3+data.twist+data.extra
     cdef int offset = 3+data.twist
     cdef double* y = scratch
@@ -147,14 +275,15 @@ cdef void _advance_range(_Inputs data, _Batch batch, int64_t first, int64_t last
     cdef double* point = scratch+2*size
     cdef double* slopes = scratch+3*size
     cdef _Context context
-    cdef int64_t seed, stage
+    cdef int64_t index, seed, stage
     cdef int a, j, code
     cdef double h
     cdef bint save_paths = batch.paths.shape[0] > 0
     context.inputs = <void*>data
     context.cap, context.fraction = step, fraction
     context.null_threshold, context.direction = null_threshold, direction
-    for seed in range(first,last):
+    for index in range(first,last):
+        seed = index if active is None else active[index]
         context.node_hint = -1
         context.requested, context.samples, context.misses = -1, 0, 0
         stage, h = batch.stages[seed], batch.step_size[seed]
@@ -222,31 +351,52 @@ cdef void _advance_range(_Inputs data, _Batch batch, int64_t first, int64_t last
         batch.misses[seed] += context.misses
 
 
-def advance_lines(fields, companion, integrands, state, int64_t first, int64_t last,
-                  double step, double step_fraction, int64_t max_steps,
-                  double max_length, double null_threshold, int direction,
-                  int workers=1, int dispatch=0, int64_t path_start=0):
-    from .native import openmp_build_info
-    if workers < 1 or dispatch not in (0,1):
-        raise ValueError("invalid native worker/dispatch setting")
-    if workers > 1 and not openmp_build_info()['enabled']:
-        raise RuntimeError("native analysis was built without OpenMP")
-    cdef _Inputs data = _Inputs(fields, companion, integrands)
-    cdef _Batch batch = _Batch(state)
-    cdef double[:, ::1] scratch = np.empty((workers, 7*(3+data.twist+data.extra)))
-    cdef int64_t task, start, stop, count = last-first
-    with nogil:
-        if workers == 1:
-            _advance_range(data,batch,first,last,&scratch[0,0],step,step_fraction,max_steps,
-                           max_length,null_threshold,direction,path_start)
-        elif dispatch == 0:
-            for task in prange(workers, schedule='static', num_threads=workers):
-                start, stop = first+count*task//workers, first+count*(task+1)//workers
-                _advance_range(data,batch,start,stop,&scratch[threadid(),0],step,step_fraction,max_steps,
-                               max_length,null_threshold,direction,path_start)
-        else:
-            for task in prange((count+7)//8, schedule='dynamic', chunksize=1, num_threads=workers):
-                start = first+task*8
-                stop = min(start+8,last)
-                _advance_range(data,batch,start,stop,&scratch[threadid(),0],step,step_fraction,max_steps,
-                               max_length,null_threshold,direction,path_start)
+cdef class _AdvanceLines:
+    """Bind shared inputs and disjoint state rows before worker dispatch."""
+    cdef _Inputs _data
+    cdef _Batch _batch
+    cdef const int64_t[::1] _active
+    cdef int64_t _count
+
+    def __init__(self, fields, companion, integrands, state, const int64_t[::1] active=None):
+        cdef int64_t row
+        self._data = _Inputs(fields, companion, integrands)
+        self._batch = _Batch(state)
+        self._active = active
+        self._count = self._batch.positions.shape[0] if active is None else active.shape[0]
+        if active is not None:
+            for row in range(self._count):
+                if active[row] < 0 or active[row] >= self._batch.positions.shape[0]:
+                    raise ValueError("active seed is outside the line state")
+
+    def advance(self, int64_t first, int64_t last, double step, double step_fraction,
+                int64_t max_steps, double max_length, double null_threshold, int direction,
+                int workers=1, int dispatch=0, int64_t path_start=0):
+        if workers < 1 or dispatch not in (0,1):
+            raise ValueError("invalid native worker/dispatch setting")
+        if first < 0 or last < first or last > self._count:
+            raise ValueError("invalid active seed range")
+        if workers > 1:
+            from .native import openmp_build_info
+            if not openmp_build_info()['enabled']:
+                raise RuntimeError("native analysis was built without OpenMP")
+        cdef _Inputs data = self._data
+        cdef _Batch batch = self._batch
+        cdef const int64_t[::1] active = self._active
+        cdef double[:, ::1] scratch = np.empty((workers, 7*(3+data.twist+data.extra)))
+        cdef int64_t task, start, stop, count = last-first
+        with nogil:
+            if workers == 1:
+                _advance_range(data,batch,first,last,&scratch[0,0],step,step_fraction,max_steps,
+                               max_length,null_threshold,direction,path_start,active)
+            elif dispatch == 0:
+                for task in prange(workers, schedule='static', num_threads=workers):
+                    start, stop = first+count*task//workers, first+count*(task+1)//workers
+                    _advance_range(data,batch,start,stop,&scratch[threadid(),0],step,step_fraction,max_steps,
+                                   max_length,null_threshold,direction,path_start,active)
+            else:
+                for task in prange((count+7)//8, schedule='dynamic', chunksize=1, num_threads=workers):
+                    start = first+task*8
+                    stop = min(start+8,last)
+                    _advance_range(data,batch,start,stop,&scratch[threadid(),0],step,step_fraction,max_steps,
+                                   max_length,null_threshold,direction,path_start,active)

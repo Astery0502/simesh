@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from .._validation import admit, workers_count, indices
 from .._execution import worker_context, run_ranges
-from ..fields import FieldDefinition, publish, require_fields, _field_index, require_continuous, _input_arrays
+from ..fields import FieldDefinition, publish, require_fields, _field_index, require_continuous, _input_arrays, _publication_bytes
 
 
 def derivative(fields, terms, definitions, *, output=None, workers=1, memory_limit=None):
@@ -69,7 +69,7 @@ def derivative(fields, terms, definitions, *, output=None, workers=1, memory_lim
     h = fields.valid_halo - 1
     shape = (len(fields.leaf_ids), *(n+2*h for n in fields.mesh.block_shape), len(definitions))
     required = (fields.mesh.nbytes + fields.nbytes + 8*int(np.prod(shape)) +
-                fields.slot_of_leaf.nbytes + rows.nbytes + weights.nbytes)
+                _publication_bytes(fields.mesh, len(fields.leaf_ids)) + rows.nbytes + weights.nbytes)
     admit(required, memory_limit, "derivative")
     owned = output is None
     if owned:

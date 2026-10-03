@@ -8,6 +8,7 @@ No file, cache, Dataset or Python callback participates in a value query.
 from libc.math cimport floor, isfinite, NAN, sqrt, hypot, ceil, nextafter, INFINITY
 from libc.stdint cimport int64_t
 from cython.parallel cimport prange
+from .cartesian cimport contains_point
 
 cdef extern from *:
     """
@@ -35,9 +36,9 @@ cdef inline int64_t owner_node(
     cdef int a, bit
     cdef int64_t r[3]
     cdef int64_t node, child
+    if not contains_point(p, &lo[0], &hi[0]):
+        return -1
     for a in range(3):
-        if not isfinite(p[a]) or p[a] < lo[a] or p[a] >= hi[a]:
-            return -1
         r[a] = <int64_t>floor((p[a]-lo[a])/(hi[a]-lo[a])*roots.shape[a])
         if r[a] == roots.shape[a]:
             r[a] -= 1
@@ -67,14 +68,6 @@ cdef inline int64_t owner(
 ) noexcept nogil:
     cdef int64_t node = owner_node(p,lo,hi,roots,children,leaves,nlo,nhi)
     return leaves[node] if node >= 0 else -1
-
-
-cdef inline bint contains_point(
-    const double* p, const double* lo, const double* hi,
-) noexcept nogil:
-    # Ordered comparisons reject NaN and keep the exact half-open ownership.
-    return (lo[0] <= p[0] < hi[0] and lo[1] <= p[1] < hi[1] and
-            lo[2] <= p[2] < hi[2])
 
 
 cpdef void locate(
@@ -117,6 +110,44 @@ cpdef void sample_ready(
                                     if valid[i] else NAN)
 
 
+cdef void _differentiate_block(
+    const double[:, :, :, ::1] data, const double[::1] spacing,
+    const int64_t[:, ::1] terms, const double[::1] coefficients,
+    double[:, :, :, ::1] output, int offset,
+) noexcept nogil:
+    cdef int64_t i,j,k,c,t,axis,component,out
+    cdef int x,y,z
+    cdef double delta, denominator, coefficient
+    for i in range(output.shape[0]):
+        for j in range(output.shape[1]):
+            for k in range(output.shape[2]):
+                for c in range(output.shape[3]):
+                    output[i,j,k,c] = 0.
+    for t in range(terms.shape[0]):
+        out,component,axis = terms[t,0],terms[t,1],terms[t,2]
+        x = 1 if axis == 0 else 0
+        y = 1 if axis == 1 else 0
+        z = 1 if axis == 2 else 0
+        denominator = 2.*spacing[axis]
+        coefficient = coefficients[t]
+        for i in range(output.shape[0]):
+            for j in range(output.shape[1]):
+                for k in range(output.shape[2]):
+                    delta = (data[i+offset+x,j+offset+y,k+offset+z,component] -
+                             data[i+offset-x,j+offset-y,k+offset-z,component])/denominator
+                    output[i,j,k,out] = output[i,j,k,out] + coefficient*delta
+
+
+cpdef void differentiate_block(
+    const double[:, :, :, ::1] data, const double[::1] spacing,
+    const int64_t[:, ::1] terms, const double[::1] coefficients,
+    double[:, :, :, ::1] output, int offset=1,
+):
+    """Differentiate one admitted block, including transient derived nodes."""
+    with nogil:
+        _differentiate_block(data,spacing,terms,coefficients,output,offset)
+
+
 cpdef void differentiate(
     const double[:, :, :, :, ::1] data, const int64_t[::1] slots,
     const int64_t[::1] ids, const double[:, ::1] spacing,
@@ -124,31 +155,11 @@ cpdef void differentiate(
     double[:, :, :, :, ::1] output, int offset=1,
 ):
     """Same per-output operation tree; invariant term metadata stays outside cells."""
-    cdef int64_t s, slot, leaf, i,j,k,c,t,axis,component,out
-    cdef int x,y,z
-    cdef double delta, denominator, coefficient
+    cdef int64_t s, leaf
     with nogil:
         for s in range(output.shape[0]):
             leaf = ids[s]
-            slot = slots[leaf]
-            for i in range(output.shape[1]):
-                for j in range(output.shape[2]):
-                    for k in range(output.shape[3]):
-                        for c in range(output.shape[4]):
-                            output[s,i,j,k,c] = 0.
-            for t in range(terms.shape[0]):
-                out,component,axis = terms[t,0],terms[t,1],terms[t,2]
-                x = 1 if axis == 0 else 0
-                y = 1 if axis == 1 else 0
-                z = 1 if axis == 2 else 0
-                denominator = 2.*spacing[leaf,axis]
-                coefficient = coefficients[t]
-                for i in range(output.shape[1]):
-                    for j in range(output.shape[2]):
-                        for k in range(output.shape[3]):
-                            delta = (data[slot,i+offset+x,j+offset+y,k+offset+z,component] -
-                                     data[slot,i+offset-x,j+offset-y,k+offset-z,component])/denominator
-                            output[s,i,j,k,out] = output[s,i,j,k,out] + coefficient*delta
+            _differentiate_block(data[slots[leaf]],spacing[leaf],terms,coefficients,output[s],offset)
 
 
 cdef inline bint interpolate_scalar(

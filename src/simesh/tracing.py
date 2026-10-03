@@ -3,10 +3,13 @@
 from contextlib import nullcontext
 from dataclasses import dataclass
 from enum import IntEnum
+from functools import partial
 import numpy as np
 
 from .fields import require_fields, require_continuous
-from ._validation import admit, workers_count, remaining
+from .spatial import LineSet
+from .operators.sampling import sample as sample_values
+from ._validation import admit, workers_count, remaining, array_bytes
 from ._execution import worker_context, run_ranges, native_dispatch
 
 
@@ -95,14 +98,21 @@ class _LineState:
     integral_slopes: np.ndarray
 
 
-def _new_state(mesh, seeds, ids, max_steps, max_length, trajectories, twist, *, path_capacity=None, integral_count=0):
+def _new_state(mesh, seeds, ids, max_steps, max_length, trajectories, twist, *, path_capacity=None,
+               integral_count=0, initialize_paths=True):
     n = len(seeds)
     capacity = max_steps+1 if path_capacity is None else path_capacity
+    if not trajectories:
+        paths = np.empty((0,0,3))
+    elif initialize_paths:
+        paths = np.full((n,capacity,3),np.nan)
+    else:
+        paths = np.empty((n,capacity,3))
     state = _LineState(ids.copy(), seeds.copy(), seeds.copy(), np.zeros(n),
         np.zeros(n, np.int64), np.zeros(n, np.int64), np.zeros(n, np.int64),
         np.empty((n,4,3)), np.full(n,-1,np.int64), np.zeros(n,np.int64), np.zeros(n,np.int64),
         np.empty((n if twist else 0,4)), np.zeros(n if twist else 0),
-        np.full((n,capacity,3),np.nan) if trajectories else np.empty((0,0,3)), np.zeros(n),
+        paths, np.zeros(n),
         np.zeros((n,integral_count)), np.empty((n,4,integral_count)))
     owners = mesh.locate(seeds)
     state.status[owners < 0] = Termination.OUTSIDE_SEED
@@ -117,21 +127,28 @@ def _new_state(mesh, seeds, ids, max_steps, max_length, trajectories, twist, *, 
 
 def _advance_state(fields, companion, state, *, step, step_fraction, max_steps, max_length,
                    null_threshold, direction, workers, executor, native=False, dispatch=0,
-                   path_start=0, integrands=None):
+                   path_start=0, integrands=None, active_seeds=None):
     """Advance private RK state; missing data is returned to the coordinator."""
-    from ._kernels.streamlines import advance_lines
+    from ._kernels.streamlines import _AdvanceLines
+    count = len(state.seeds) if active_seeds is None else len(active_seeds)
+    if not count:
+        return
+    bound = _AdvanceLines(fields, companion, integrands, state, active_seeds)
     def advance(first, last):
-        advance_lines(fields, companion, integrands, state, first, last,
+        bound.advance(first, last,
             np.inf if step is None else step, 0. if step_fraction is None else step_fraction,
             max_steps, max_length, null_threshold, direction,
             workers if native else 1, dispatch, path_start)
-    run_ranges(len(state.seeds), 1 if native else workers*(8 if dispatch and workers>1 else 1),
+    tasks = workers*(8 if dispatch and workers>1 else 1)
+    if active_seeds is not None and dispatch:
+        tasks = min(tasks,max(1,(count+31)//32))
+    run_ranges(count, 1 if native else tasks,
                advance, None if native else executor)
 
 
 # A delivery segment is independent of the integration limit. Slot zero holds
 # the initial seed only in the first segment; later segments skip that slot.
-_PATH_SEGMENT_STEPS = 64
+_PATH_SEGMENT_STEPS = 256
 
 
 def _trace_batch_bytes(seeds, seed_ids, count, max_steps, trajectories, integral_count=0, workers=1):
@@ -145,31 +162,54 @@ def _trace_output_bytes(count, max_steps, trajectories, twist, integral_count=0)
 
 def _iter_path_segments(fields, seeds, seed_ids, *, step, step_fraction, max_steps, max_length,
                         null_threshold, direction, workers, backend, schedule,
-                        memory_limit=None):
+                        memory_limit=None, executor=None):
     """Yield borrowed path views and persistent state for one admitted seed batch.
 
-    The consumer copies accepted points before advancing this iterator. Missing
-    coverage terminates a line; a full segment only pauses it between RK steps.
+    The consumer retains copies of accepted points and releases the borrowed views
+    before advancing. Missing coverage terminates a line; a full segment only pauses
+    it between RK steps.
+    Only accepted prefixes are valid; unused delivery capacity is unspecified.
     """
     native, dispatch = native_dispatch(backend, schedule)
-    capacity = min(max_steps, _PATH_SEGMENT_STEPS)+1
-    reserve = seeds.nbytes+seed_ids.nbytes+len(seeds)*(640+24*capacity)+workers*56*3
-    admit(fields.mesh.nbytes+fields.nbytes+reserve,memory_limit,"trace segment")
-    state = _new_state(fields.mesh,seeds,seed_ids,max_steps,max_length,True,False,
-                       path_capacity=capacity)
-    context = nullcontext(None) if native else worker_context(workers)
+    fixed = seeds.nbytes+seed_ids.nbytes+len(seeds)*648+workers*56*3
+    metadata = (len(seeds)+1)*8
+    state = None
+    retained = 0
+    active_count = len(seeds)
+    context = (nullcontext(executor) if native or executor is not None
+               else worker_context(workers))
     path_start = 0
     with context as executor:
         while True:
             fields._check()
+            segment_steps = min(max_steps-path_start, _PATH_SEGMENT_STEPS)
+            # Raw capacity overlaps the new compact prefix and all earlier copies.
+            reserve = (fields.mesh.nbytes+fields.nbytes+fixed+retained+metadata+
+                       len(seeds)*24*(2 if state is None else 1))
+            step_bytes = (len(seeds)+active_count)*24
+            if memory_limit is not None and step_bytes:
+                segment_steps = min(segment_steps,max(min(segment_steps,1),
+                                   (memory_limit-reserve)//step_bytes))
+            admit(reserve+segment_steps*step_bytes,memory_limit,"trace segment")
+            capacity = segment_steps+1
+            if state is None:
+                state = _new_state(fields.mesh,seeds,seed_ids,max_steps,max_length,True,False,
+                                   path_capacity=capacity,initialize_paths=False)
+            elif state.paths.shape[1] != capacity:
+                # Yielded views have been released; no accepted point needs this storage.
+                state.paths = np.empty((0,0,3))
+                state.paths = np.empty((len(seeds),capacity,3))
+            # Keep original state rows stable; schedule only unfinished branches.
+            active_seeds = np.flatnonzero(state.status == Termination.RUNNING)
             _advance_state(fields,None,state,step=step,step_fraction=step_fraction,max_steps=max_steps,max_length=max_length,
                 null_threshold=null_threshold,direction=direction,workers=workers,executor=executor,
-                native=native,dispatch=dispatch,path_start=path_start)
+                native=native,dispatch=dispatch,path_start=path_start,active_seeds=active_seeds)
+            del active_seeds
             pending = state.status == Termination.RUNNING
             missing = pending & (state.requested >= 0)
             state.status[missing] = Termination.MISSING_COVERAGE
             pending &= ~missing
-            if np.any(pending & (state.steps != path_start+_PATH_SEGMENT_STEPS)):
+            if np.any(pending & (state.steps != path_start+segment_steps)):
                 raise RuntimeError("tracer made no progress and requested no coverage")
             if path_start == 0:
                 counts = np.where(state.status == Termination.OUTSIDE_SEED,0,state.steps+1)
@@ -177,10 +217,15 @@ def _iter_path_segments(fields, seeds, seed_ids, *, step, step_fraction, max_ste
             else:
                 counts = np.maximum(state.steps-path_start,0)
                 paths = state.paths[:,1:]
+            copied_bytes = int(counts.sum())*24
+            if copied_bytes:
+                retained += copied_bytes+metadata
             yield state, paths, counts
+            del paths
             if not np.any(pending):
                 return
-            path_start += _PATH_SEGMENT_STEPS
+            path_start += segment_steps
+            active_count = np.count_nonzero(pending)
 
 
 def _result(state, trajectories, twist, integrands=None):
@@ -276,8 +321,8 @@ def iter_traces(fields, seeds, *, seed_ids=None, step=None, step_fraction=.25, m
     step : float, optional
         Positive coordinate-length cap; required only for fixed-step tracing.
     step_fraction : float, optional
-        Local cell-size fraction in (0, 1], default 0.25. RK stages entering finer
-        cells reduce the step and restart it. None selects fixed steps using step.
+        Local cell-size fraction or None for fixed steps; see [trace][simesh.trace]
+        for the shared step policy.
     max_steps : int
         Maximum accepted integration steps per branch.
     max_length : float
@@ -395,8 +440,10 @@ def trace(fields, seeds, *, seed_ids=None, step=None, step_fraction=.25, max_ste
     step : float, optional
         Positive coordinate-length cap; required only for fixed-step tracing.
     step_fraction : float, optional
-        Local cell-size fraction in (0, 1], default 0.25. RK stages entering finer
-        cells reduce the step and restart it. None selects fixed steps using step.
+        Fraction in (0, 1] of the smallest local cell edge. RK stages entering
+        finer cells reduce the step and restart it. None selects fixed steps using
+        step. This is a spatial cap, not an estimate of integration error; smaller
+        steps may require a larger max_steps to reach the boundary.
     max_steps : int
         Maximum accepted integration steps per branch.
     max_length : float
@@ -420,7 +467,9 @@ def trace(fields, seeds, *, seed_ids=None, step=None, step_fraction=.25, max_ste
         Each component is integrated against positive branch arc length using
         the trajectory RK stages. Missing or nonfinite samples stop the branch;
         results then retain the accepted partial integrals. The caller establishes
-        compatible coordinates, snapshot and units; no Source is read.
+        compatible coordinates, snapshot and units; no Source is read. Nonlinear
+        transforms computed on nodes are interpolated afterward, which differs
+        from transforming the interpolated values.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
     backend : str
@@ -493,3 +542,108 @@ def retrace(fields, result, selected_seed_ids, **kwargs):
     kwargs.pop("trajectories",None)
     return trace(fields,seeds,seed_ids=ids,
                  trajectories=True,memory_limit=limit,**kwargs)
+
+
+def _trace_lines(fields, points, *, direction, step, step_fraction, max_steps, max_length,
+                 null_threshold, workers, backend, schedule, seed_batch, memory_limit):
+    """Collect compact branches from validated point geometry and prepared fields."""
+    _validate_vector(fields)
+    if direction not in ("both","along","against","inward"):
+        raise ValueError("direction must be both/along/against/inward")
+    if type(seed_batch) is not int or seed_batch < 1:
+        raise ValueError("seed_batch must be positive")
+    _validate_inputs(points.positions,points.ids,step,max_steps,max_length,null_threshold,
+                     1,workers,seed_batch,True,False,step_fraction)
+    native,_ = native_dispatch(backend,schedule)
+    base = fields.mesh.nbytes+fields.nbytes+points.nbytes+len(points)*256
+    admit(base,memory_limit,"trace geometry")
+    positions = points.positions.copy()
+    for axis in range(3):
+        upper = positions[:,axis] == fields.mesh.upper[axis]
+        positions[upper,axis] = np.nextafter(fields.mesh.upper[axis],fields.mesh.lower[axis])
+    requested = np.zeros((len(points),2),dtype=bool)
+    status = np.full((len(points),2),LineSet.NOT_REQUESTED,dtype=np.int64)
+    if direction == "both":
+        requested[:] = True
+    elif direction in ("along","against"):
+        requested[:,int(direction == "along")] = True
+    else:
+        lo,hi = fields.mesh.lower,fields.mesh.upper
+        tolerance = 32*np.finfo(float).eps*max(np.max(np.abs([lo,hi])),np.max(hi-lo))
+        near_lo = np.abs(points.positions-lo) <= tolerance
+        near_hi = np.abs(points.positions-hi) <= tolerance
+        if np.any(points.positions<lo) or np.any(points.positions>hi) or np.any((near_lo|near_hi).sum(axis=1) != 1):
+            raise ValueError("inward requires points on exactly one physical box face")
+        normals = near_hi.astype(float)-near_lo.astype(float)
+        b,_,valid = sample_values(fields,positions)
+        with np.errstate(over="ignore",invalid="ignore"):
+            dot = np.sum(normals*b,axis=1)
+            norm = np.hypot(np.hypot(b[:,0],b[:,1]),b[:,2])
+        tangent = valid & np.isfinite(norm) & (norm > null_threshold) & (dot == 0)
+        status[tangent] = LineSet.TANGENT_SEED
+        requested[:,0] = (dot > 0) & ~tangent
+        requested[:,1] = (~(dot > 0)) & ~tangent
+    from ._kernels.streamlines import _copy_path_segment, _PathSegments
+    groups = []
+    counts = np.zeros(2*len(points),dtype=np.int64)
+    retained = 0
+    with (nullcontext(None) if native else worker_context(workers)) as executor:
+        for side in range(2):
+            rows = np.flatnonzero(requested[:,side])
+            for start in range(0,len(rows),seed_batch):
+                selected = rows[start:start+seed_batch]
+                branches = 2*selected+side
+                values, segment_offsets = [], []
+                initial = points.positions[selected]
+                segments = _iter_path_segments(fields,np.ascontiguousarray(positions[selected]),points.ids[selected],
+                    step=step,step_fraction=step_fraction,max_steps=max_steps,direction=2*side-1,
+                    max_length=max_length,null_threshold=null_threshold,workers=workers,backend=backend,schedule=schedule,
+                    memory_limit=remaining(memory_limit,base-fields.nbytes-fields.mesh.nbytes+retained),
+                    executor=executor)
+                try:
+                    for state,paths,point_counts in segments:
+                        raw_bytes = array_bytes(vars(state).values())
+                        new_bytes = int(point_counts.sum())*24
+                        metadata_bytes = (len(selected)+1)*8
+                        admit(base+retained+raw_bytes+new_bytes+metadata_bytes,
+                              memory_limit,"packed trace output")
+                        if new_bytes:
+                            offsets = np.empty(len(selected)+1,dtype=np.int64)
+                            offsets[0] = 0
+                            np.cumsum(point_counts,out=offsets[1:])
+                            segment = np.empty((int(offsets[-1]),3))
+                            copy_workers = min(workers,len(selected),max(1,(new_bytes+(1<<20)-1)//(1<<20)))
+                            copy_prefixes = partial(_copy_path_segment, paths, offsets, segment, initial,
+                                                    workers=copy_workers if native else 1)
+                            run_ranges(len(selected),1 if native else copy_workers,copy_prefixes,
+                                       None if copy_workers == 1 else executor)
+                            values.append(segment)
+                            del copy_prefixes, segment
+                            segment_offsets.append(offsets)
+                            retained += new_bytes+metadata_bytes
+                        initial = None
+                        counts[branches] += point_counts
+                        status[selected,side] = state.status
+                        del paths
+                finally:
+                    segments.close()
+                del state
+                if values:
+                    groups.append((branches,values,segment_offsets))
+        # Packing overlaps retained segments; validation starts after their release.
+        output_bytes = int(counts.sum())*24
+        admit(base+retained+output_bytes+output_bytes//8,memory_limit,"collected trace output")
+        offsets = np.r_[np.int64(0),np.cumsum(counts,dtype=np.int64)]
+        packed = np.empty((int(offsets[-1]),3))
+        for branches,values,segment_offsets in groups:
+            group = _PathSegments(values,segment_offsets,branches)
+            group_bytes = sum(segment.nbytes for segment in values)
+            copy_workers = min(workers,len(branches),max(1,(group_bytes+(1<<20)-1)//(1<<20)))
+            gather = partial(group.copy_range, packed, offsets, workers=copy_workers if native else 1)
+            run_ranges(len(branches),1 if native else copy_workers,gather,
+                       None if copy_workers == 1 else executor)
+            del gather, group
+            values.clear()
+            segment_offsets.clear()
+        groups.clear()
+    return packed, offsets, status

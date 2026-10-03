@@ -7,9 +7,8 @@ import numpy as np
 from ._execution import worker_context
 from ._validation import admit, array_bytes, workers_count
 from .fields import require_fields, require_continuous
-from .geometry import LineSet
+from .spatial import LineSet, LengthUnits
 from .operators.sampling import _sample
-from .reductions import LengthUnits
 
 __all__ = ["LineProfiles", "LineProfile", "sample_line_profiles"]
 

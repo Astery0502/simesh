@@ -32,6 +32,13 @@ at the repository root. The N4 numerical and ownership boundaries remain fixed.
 New work consumes Source/Fields and existing scientific interfaces. Keep
 source/preparation, storage/validity and owned/borrowed lifetime boundaries
 explicit. Change core behavior only for a concrete defect or required capability.
+Group functions or classes by numerical responsibility: coordinate geometry,
+mesh organization, field storage, numerical methods and physical models. Features
+compose these services; lifecycle workflows own reading, preparation and release.
+Keep reusable services independent of their consumers. Implementations import the
+defining module, not the root public facade; preserve public aliases when moving
+definitions. Select numerical backends outside per-cell hot loops, and add an
+abstraction only when a concrete numerical operation needs it.
 Do not restore removed `simesh.amrvac`, `simesh.utils` or `simesh.legacy`
 compatibility dispatchers.
 Allocated padding is not valid halo. A first derivative consumes one valid halo
@@ -50,9 +57,17 @@ Sources or recover missing coverage implicitly.
 - Keep old-package comparisons in separate interpreters. Archived virtual
   environments are not portable; recreate them when historical work needs one.
 
-Default to one agent. Use direct source/contract inspection when it settles a
+Default to one agent. Keep validation at public input, ownership and numerical
+support boundaries; do not repeat it inside already-bound cell loops or silently
+repair missing coverage. Prefer direct, readable numerical code to generic frameworks.
+Bind invariant inputs before worker dispatch; keep mutable numerical scratch
+private and reuse intermediates only while their inputs and support stay valid.
+Use direct source/contract inspection when it settles a
 change; avoid tests for descriptive metadata, incidental call order or unchanged
 simple formulas. Measure performance only for a concrete question or claim.
+`make test` also checks Python/Cython dependency boundaries. Validate compositions
+with representative numerical fields and explicit ownership; compare performance
+at the affected layer without adding timing assertions or content-hash snapshots.
 
 ## Documentation
 

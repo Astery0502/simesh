@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 import numpy as np
 
-from ._validation import frozen_array, indices, array_bytes
+from ._validation import indices, array_bytes
 from .mesh import Mesh, Selection
 
 
@@ -187,6 +187,11 @@ class Fields:
         h = self.storage_halo
         slices = tuple(slice(int(a)+h-support, int(b)+h+support) for a, b in zip(lo, hi))
         return self._values[(slot, *slices, slice(None))]
+
+
+def _publication_bytes(mesh, count):
+    """Reserve the output slot directory and its coverage-validation temporaries."""
+    return mesh.leaf_count*8 + max(mesh.leaf_count+8*count, 33*count)
 
 
 def publish(mesh, values, selection, definitions, storage_halo, valid_halo, scheme, source,

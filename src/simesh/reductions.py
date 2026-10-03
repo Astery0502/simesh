@@ -6,60 +6,17 @@ values. Each operation documents its coverage, weight and surface-side semantics
 
 from dataclasses import dataclass
 import math
-from numbers import Real
 
 import numpy as np
 
 from ._validation import frozen_array
 from .fields import FieldDefinition, require_fields, _field_index
-from .mesh import Selection, _axis_candidates, _cell_edges, _cell_index
+from .mesh import Selection
+from .spatial import LengthUnits, AxisAlignedSurface, _box
+from .geometry import _axis_candidates, _cell_edges, _cell_index
 
 
 REPRESENTATION = "piecewise-constant leaf interiors"
-
-
-@dataclass(frozen=True)
-class LengthUnits:
-    """Explicit isotropic length conversion: output lengths = coordinates * scale."""
-
-    scale: float
-    unit: str
-
-    def __post_init__(self):
-        if (isinstance(self.scale, (bool, np.bool_)) or not isinstance(self.scale, Real)
-                or not math.isfinite(self.scale) or self.scale <= 0):
-            raise ValueError("length scale must be finite and positive")
-        if not isinstance(self.unit, str) or not self.unit.strip():
-            raise ValueError("length unit must be a nonempty label")
-
-
-@dataclass(frozen=True)
-class AxisAlignedSurface:
-    """Rectangle at coordinate on axis, with bounds on the other axes in XYZ order.
-
-    normal is +1 or -1. side chooses the positive/negative coordinate-side
-    cell at internal interfaces; domain faces always use the interior cell.
-    Neither the side nor the selected component changes when normal is reversed.
-    """
-
-    axis: int | str
-    coordinate: float
-    bounds: np.ndarray
-    normal: int = 1
-    side: str = "positive"
-
-    def __post_init__(self):
-        axis = "xyz".index(self.axis) if isinstance(self.axis, str) and self.axis in ("x", "y", "z") else self.axis
-        if isinstance(axis, (bool, np.bool_)) or not isinstance(axis, (int, np.integer)) or axis not in (0, 1, 2):
-            raise ValueError("axis must be x, y, z or 0, 1, 2")
-        if not isinstance(self.coordinate, Real) or not math.isfinite(self.coordinate):
-            raise ValueError("surface coordinate must be finite")
-        if isinstance(self.normal, (bool, np.bool_)) or self.normal not in (-1, 1):
-            raise ValueError("normal must be +1 or -1")
-        if self.side not in ("positive", "negative"):
-            raise ValueError("side must be positive or negative")
-        object.__setattr__(self, "axis", int(axis))
-        object.__setattr__(self, "bounds", frozen_array(_box(self.bounds, 2), float))
 
 
 @dataclass(frozen=True)
@@ -216,13 +173,6 @@ class HistogramResult:
     def __post_init__(self):
         object.__setattr__(self, "edges", frozen_array(self.edges, float))
         object.__setattr__(self, "bin_weights", frozen_array(self.bin_weights, float))
-
-
-def _box(bounds, dimension=3):
-    box = np.asarray(bounds, dtype=float)
-    if box.shape != (2, dimension) or not np.isfinite(box).all() or np.any(box[0] >= box[1]):
-        raise ValueError(f"bounds must be finite strictly ordered (2, {dimension}) vectors")
-    return box
 
 
 def _component(fields, component):

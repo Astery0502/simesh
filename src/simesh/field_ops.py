@@ -1,46 +1,14 @@
-"""Owned component selection and leaf-aligned composition of completed Fields."""
+"""Owned component selection and composition on matching sample locations."""
 
 from collections.abc import Mapping
 from dataclasses import replace
 import math
 import numpy as np
 
-from ._validation import admit, array_bytes
-from .fields import _component_indices, publish, require_fields
-
-
-def _aligned_inputs(inputs):
-    fields = tuple(require_fields(value) for value in inputs)
-    if not fields:
-        raise ValueError("provide at least one field group")
-    first = fields[0]
-    for value in fields[1:]:
-        if (value.mesh is not first.mesh or len(value.leaf_ids) != len(first.leaf_ids) or
-                np.any(value.slot_of_leaf[first.leaf_ids] < 0)):
-            raise ValueError("inputs must share the same Mesh and leaf coverage")
-    return fields
-
-
-def _layout(fields):
-    halo = min(value.valid_halo for value in fields)
-    shape = tuple(n + 2*halo for n in fields[0].mesh.block_shape)
-    boxes = tuple(tuple(slice(value.storage_halo-halo, value.storage_halo+n+halo)
-                        for n in value.mesh.block_shape) for value in fields)
-    return halo, shape, boxes
-
-
-def _admit_output(fields, shape, components, memory_limit, operation, *, scratch=0):
-    first = fields[0]
-    input_bytes = array_bytes(array for value in fields
-                              for array in (value.values, value.leaf_ids, value.slot_of_leaf))
-    # Publication validates the directory with masks and unique slot indices,
-    # after recipe temporaries have been released.
-    metadata_scratch = max(first.mesh.leaf_count + 8*len(first.leaf_ids),
-                           33*len(first.leaf_ids))
-    required = (first.mesh.nbytes + input_bytes +
-                8*len(first.leaf_ids)*math.prod(shape)*components +
-                first.mesh.leaf_count*8 + max(scratch, metadata_scratch))
-    admit(required, memory_limit, operation)
+from ._validation import admit
+from .fields import _component_indices
+from ._field_data import PointwiseLayout, require_field_data
+from .mesh import resolve_selection
 
 
 def _definitions(definitions, names):
@@ -56,7 +24,7 @@ def _definitions(definitions, names):
     return definitions
 
 
-def select_fields(fields, components=None, *, names=None, memory_limit=None):
+def select_fields(fields, components=None, *, names=None, region=None, memory_limit=None):
     """Copy an ordered component subset into compact, independently owned Fields.
 
     Parameters
@@ -67,26 +35,45 @@ def select_fields(fields, components=None, *, names=None, memory_limit=None):
         Names or local component indices, in output order.
     names : sequence of str, optional
         Distinct output names in component order.
+    region : Selection or array-like, optional
+        Explicit target coverage on the original grid. AMR retains complete
+        intersecting leaves on the original Mesh.
+        No missing values are filled and region edges are not physical boundaries.
     memory_limit : int, optional
         Accounted-array budget in bytes for this call, not a process RSS limit.
 
     Returns
     -------
     Fields
-        Independent compact copy, even for a full selection or rename. For one-time
+        Independent copy, even for a full selection or rename. For one-time
         sampling, consumer components avoid this field copy.
     """
-    fields = require_fields(fields)
+    fields = require_field_data(fields)
     selected = _component_indices(fields, components)
     definitions = _definitions(tuple(fields.fields[i] for i in selected), names)
-    halo, shape, (box,) = _layout((fields,))
-    _admit_output((fields,), shape, len(selected), memory_limit, "select fields")
-    output = np.empty((len(fields.leaf_ids), *shape, len(selected)), dtype=np.float64)
-    for slot, leaf in enumerate(fields.leaf_ids):
+    if region is not None:
+        fields = _select_region(fields, region, len(selected), memory_limit)
+    layout = PointwiseLayout((fields,))
+    layout.admit(len(selected), memory_limit, "select fields")
+    output = layout.allocate(len(selected))
+    for index, (data,) in layout.chunks():
+        target = (index, Ellipsis)
         for column, component in enumerate(selected):
-            output[slot, ..., column] = fields.values[(fields.slot_of_leaf[leaf], *box, component)]
-    return publish(fields.mesh, output, fields.selection, definitions, halo, halo,
-                   fields.scheme, fields.source)
+            output[(*target, column)] = data[..., component]
+    return layout.publish(output, definitions, scheme=fields.scheme, source=fields.source,
+                          stats=fields.preparation_stats.copy())
+
+
+def _select_region(fields, region, width, memory_limit):
+    selection = resolve_selection(fields.mesh, region)
+    if np.any(fields.slot_of_leaf[selection.leaf_ids] < 0):
+        raise ValueError("requested region is not covered by the supplied fields")
+    admit(fields.mesh.nbytes+fields.nbytes+fields.mesh.leaf_count*8+
+          len(selection.leaf_ids)*math.prod(n+2*fields.valid_halo for n in fields.mesh.block_shape)*width*8,
+          memory_limit, "field region selection")
+    slots = np.full(fields.mesh.leaf_count, -1, dtype=np.int64)
+    slots[selection.leaf_ids] = fields.slot_of_leaf[selection.leaf_ids]
+    return replace(fields, selection=selection, slot_of_leaf=slots)
 
 
 def merge_fields(inputs, *, names=None, memory_limit=None):
@@ -95,7 +82,8 @@ def merge_fields(inputs, *, names=None, memory_limit=None):
     Parameters
     ----------
     inputs : sequence of Fields
-        Groups sharing Mesh identity and leaf coverage; slot order may differ.
+        Groups sharing grid identity and requested coverage; explicitly select
+        the same region before merging. Storage slot order may differ.
         Components follow group order, then each group's component order.
     names : sequence of str, optional
         Distinct output names in concatenation order; supply them to resolve name
@@ -116,18 +104,18 @@ def merge_fields(inputs, *, names=None, memory_limit=None):
     """
     if isinstance(inputs, Mapping):
         raise TypeError("inputs must be an ordered sequence of Fields")
-    fields = _aligned_inputs(inputs)
-    first = fields[0]
+    layout = PointwiseLayout(inputs)
+    fields = layout.inputs
     definitions = _definitions(tuple(definition for value in fields for definition in value.fields), names)
-    halo, shape, boxes = _layout(fields)
-    _admit_output(fields, shape, len(definitions), memory_limit, "merge fields")
-    output = np.empty((len(first.leaf_ids), *shape, len(definitions)), dtype=np.float64)
-    start = 0
-    for value, box in zip(fields, boxes):
-        stop = start + len(value.fields)
-        for slot, leaf in enumerate(first.leaf_ids):
-            output[slot, ..., start:stop] = value.values[(value.slot_of_leaf[leaf], *box, slice(None))]
-        start = stop
-    return publish(first.mesh, output, first.selection, definitions, halo, halo,
-                   "merge(" + ",".join(value.scheme for value in fields) + ")",
-                   tuple(value.source for value in fields))
+    layout.admit(len(definitions), memory_limit, "merge fields")
+    output = layout.allocate(len(definitions))
+    for index, arrays in layout.chunks():
+        target = (index, Ellipsis)
+        column = 0
+        for data in arrays:
+            width = data.shape[-1]
+            output[(*target, slice(column,column+width))] = data
+            column += width
+    return layout.publish(output, definitions,
+                          scheme="merge(" + ",".join(value.scheme for value in fields) + ")",
+                          source=tuple(value.source for value in fields))

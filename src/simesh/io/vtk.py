@@ -67,7 +67,7 @@ def write_uniform_vtk(path, grid, *, overwrite=False, memory_limit=None):
     - Units, interpretation and source identity are not serialized. Keep writable
       aliases unchanged during export; AMR hierarchy and line geometry are unsupported.
     """
-    from ..applications import UniformResult
+    from .._uniform import UniformResult
 
     destination = _destination(path, overwrite)
     if not isinstance(grid, UniformResult):

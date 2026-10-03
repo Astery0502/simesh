@@ -1,35 +1,19 @@
 """Standard mathematical and explicitly normalized magnetic field diagnostics."""
 
-from dataclasses import dataclass
-import math
 import numpy as np
 
-from .fields import FieldDefinition, require_fields, _field_index
+from .fields import FieldDefinition
+from ._field_data import PointwiseLayout, components as _components
+from .physics.units import MagneticUnits
 from .operators.derived import derive
 from .operators.derivatives import derivative, _curl_terms
-from ._validation import indices, remaining
-
-
-def _components(fields, components=None, *, count=None):
-    require_fields(fields)
-    if components is None:
-        result = np.arange(len(fields.fields),dtype=np.int64)
-    else:
-        components = (components,) if isinstance(components,(str,int,np.integer)) else tuple(components)
-        result = indices([_field_index(fields.fields,c) if isinstance(c,str) else c for c in components],
-                         len(fields.fields),"components")
-    if not len(result) or (count is not None and len(result) != count):
-        raise ValueError(f"select {'nonempty' if count is None else count} components")
-    units = {fields.fields[i].units for i in result}
-    if len(units) != 1:
-        raise ValueError("selected components must have common units")
-    return result, next(iter(units))
+from ._validation import remaining
 
 
 def _recipe(inputs, name, function, units, memory_limit):
     groups = tuple(inputs.values()) if isinstance(inputs,dict) else (inputs,)
-    halo = min(f.valid_halo for f in groups)
-    scratch = 64*math.prod(n+2*halo for n in groups[0].mesh.block_shape)
+    layout = PointwiseLayout(groups)
+    scratch = 64*layout.chunk_cells
     return derive(inputs,name,function,units=units,memory_limit=remaining(memory_limit,scratch))
 
 
@@ -103,7 +87,7 @@ def gradient(fields, component=0, *, name=None, workers=1, memory_limit=None):
     Parameters
     ----------
     fields : Fields
-        Continuous selected components with at least one valid halo.
+        Continuous components with at least one valid halo.
     component : str or int
         Name or local index of the scalar component.
     name : str, optional
@@ -116,12 +100,12 @@ def gradient(fields, component=0, *, name=None, workers=1, memory_limit=None):
     Returns
     -------
     Fields
-        Three gradient components in input units per coordinate length, with one fewer
-        valid halo.
+        Three components in input units per coordinate length; support contracts
+        by one sample on each differentiated axis.
 
     Notes
     -----
-    To interpolate the derivative afterward, prepare the original input with two valid halo layers.
+    Derivative interpolation needs two original valid halo layers.
     """
     selected,units = _components(fields,(component,),count=1)
     component = int(selected[0])
@@ -137,7 +121,7 @@ def divergence(fields, components=(0,1,2), *, name="divergence", workers=1, memo
     Parameters
     ----------
     fields : Fields
-        Continuous selected components with at least one valid halo.
+        Continuous components with at least one valid halo.
     components : sequence of str or int
         Three ordered local vector components with common unit labels.
     name : str, optional
@@ -150,35 +134,17 @@ def divergence(fields, components=(0,1,2), *, name="divergence", workers=1, memo
     Returns
     -------
     Fields
-        Scalar divergence in input units per coordinate length, with one fewer valid
-        halo.
+        Scalar divergence in input units per coordinate length, with support
+        contracted by one sample on each axis.
 
     Notes
     -----
-    To interpolate the derivative afterward, prepare the original input with two valid halo layers.
+    Derivative interpolation needs two original valid halo layers.
     """
     selected,units = _components(fields,components,count=3)
     return derivative(fields,[[(int(component),axis,1.) for axis,component in enumerate(selected)]],
                       [FieldDefinition(name,units+" / coordinate-length","centered-derivative")],
                       workers=workers,memory_limit=memory_limit)
-
-
-@dataclass(frozen=True)
-class MagneticUnits:
-    """SI factors per stored field/coordinate unit, with scalar permeability.
-
-    The default is the conventional vacuum approximation 4*pi*1e-7 H/m.
-    Supply permeability_h_m explicitly when a different or more precise value
-    is required. Metadata labels alone never establish these conversion factors.
-    """
-    field_tesla: float
-    length_m: float
-    permeability_h_m: float = 4*np.pi*1e-7
-
-    def __post_init__(self):
-        if any(not np.isfinite(value) or value <= 0 for value in
-               (self.field_tesla,self.length_m,self.permeability_h_m)):
-            raise ValueError("magnetic field, length and permeability factors must be finite and positive")
 
 
 def current_density(fields, *, units, components=(0,1,2), workers=1, memory_limit=None):
@@ -200,7 +166,7 @@ def current_density(fields, *, units, components=(0,1,2), workers=1, memory_limi
     Returns
     -------
     Fields
-        Three SI current components in A/m², with one fewer valid halo.
+        Three SI current components in A/m², with contracted derivative support.
 
     Notes
     -----

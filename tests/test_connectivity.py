@@ -23,6 +23,36 @@ def magnetic_source(function, *, cells=16, mixed=False):
 BOX = ([-.75,-.75,.125],[.75,.75,.875])
 
 
+@pytest.mark.parametrize("workers", [1, 2])
+def test_unit_gradient_preserves_node_normalization_with_block_scratch(workers):
+    from simesh.connectivity import _unit_gradient
+
+    with magnetic_source(lambda x,y,z: np.array([1+x*y, .3+x*z, 2+y*y]),
+                         cells=8, mixed=True) as source:
+        fields = sm.prepare(source, scheme="exact-phase")
+    padded = np.pad(fields.values, ((0,0),(1,1),(1,1),(1,1),(0,0)), constant_values=np.nan)
+    padded[0,5,5,5,0] = np.nan
+    fields = replace(fields, _values=padded, storage_halo=3,
+                     selection=sm.Selection(fields.mesh, fields.leaf_ids[::-1]))
+
+    def normalize(ctx):
+        x, y, z = (ctx.field(i) for i in range(3))
+        norm = np.hypot(np.hypot(x, y), z)
+        return dict(zip("xyz", (x/norm, y/norm, z/norm)))
+
+    unit = sm.derive_many(fields, dict.fromkeys("xyz", "1"), normalize)
+    terms = [[(component, axis, 1.)] for component in range(3) for axis in range(3)]
+    definitions = [sm.FieldDefinition(f"d{i}") for i in range(9)]
+    reference = sm.derivative(unit, terms, definitions)
+    # The input and gradient fit, but another complete unit-vector field does not.
+    limit = fields.mesh.nbytes+fields.nbytes+reference.nbytes+unit.nbytes//2
+    actual = _unit_gradient(fields, limit, workers=workers)
+    np.testing.assert_array_equal(actual.values, reference.values)
+    np.testing.assert_array_equal(actual.leaf_ids, fields.leaf_ids)
+    assert actual.valid_halo == actual.storage_halo == 1
+    assert not np.shares_memory(actual.values, fields.values)
+
+
 @pytest.mark.parametrize("axis", [0,1,2])
 def test_constant_field_faces_boundary_seeds_and_streaming(axis):
     def field(x,y,z):

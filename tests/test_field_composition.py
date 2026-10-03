@@ -232,8 +232,7 @@ def test_memory_rejection_counts_parent_backing_and_all_outputs(prepared):
 
 @pytest.mark.parametrize("operation", ["select", "merge", "derive"])
 def test_composition_reserves_publication_scratch(monkeypatch, operation):
-    import simesh.field_ops as composition
-    import simesh.operators.derived as recipes
+    import simesh._field_data as field_data
 
     mesh = sm.mesh_from_forest((8, 8, 4), np.ones(256, dtype=bool),
                               lower=(0, 0, 0), upper=(1, 1, 1), block_shape=(1, 1, 1))
@@ -244,8 +243,7 @@ def test_composition_reserves_publication_scratch(monkeypatch, operation):
     limit = mesh.nbytes + fields.nbytes + fields.values.nbytes + 8*mesh.leaf_count
     def forbidden(*args, **kwargs):
         pytest.fail("insufficient publication budget must be rejected before execution")
-    monkeypatch.setattr(composition, "publish", forbidden)
-    monkeypatch.setattr(recipes, "publish", forbidden)
+    monkeypatch.setattr(field_data, "publish", forbidden)
     with pytest.raises(MemoryError):
         if operation == "select":
             select_fields(fields, memory_limit=limit)
@@ -287,3 +285,25 @@ def test_combined_mixed_units_to_curl_qsl_and_selected_bidirectional_trace():
     for other_curl in (select_fields(companion, (2, 1, 0)), merge_fields((companion,))):
         with pytest.raises(ValueError, match="derive from this vector"):
             sm.trace(magnetic, seeds.positions, step=.025, twist=True, curl_field=other_curl)
+
+
+def test_amr_region_selection_detaches_without_filling_missing_leaves():
+    mesh = sm.mesh_from_forest((2, 1, 1), [True, True], lower=(0, 0, 0),
+                              upper=(2, 1, 1), block_shape=(4, 4, 4))
+    with sm.source_from_arrays(mesh, np.ones((2, 1, 4, 4, 4)), ("rho",)) as source:
+        ready = sm.prepare(source, scheme="exact-phase")
+    box = [[.1, .2, .3], [.9, .8, .7]]
+    selected = sm.select_fields(ready, region=box)
+    assert selected.mesh is mesh and selected.valid_halo == ready.valid_halo
+    np.testing.assert_array_equal(selected.leaf_ids, [0])
+    assert not np.shares_memory(selected.values, ready.values)
+    assert sm.volume_integral(selected).value == pytest.approx(.8*.6*.4)
+    with pytest.raises(ValueError, match="not covered"):
+        sm.select_fields(selected, region=[mesh.lower, mesh.upper])
+    other = sm.select_fields(ready, region=[[.2]*3, [.8]*3])
+    for first, second in ((selected, other), (other, selected)):
+        with pytest.raises(ValueError, match="requested coverage"):
+            sm.merge_fields((first, second), names=("a", "b"))
+        with pytest.raises(ValueError, match="requested coverage"):
+            sm.derive({"a": first, "b": second}, "sum",
+                      lambda ctx: ctx.field(0, group="a")+ctx.field(0, group="b"))

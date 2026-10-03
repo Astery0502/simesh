@@ -16,16 +16,18 @@ import zlib
 
 import numpy as np
 
-from .applications import SampledPoints, ConnectivityMap, RayResult, UniformResult
+from .applications import SampledPoints, ConnectivityMap, RayResult
+from ._uniform import UniformResult
 from .connectivity import QSLResult, Boundary, ConnectivityTermination
 from .fields import FieldDefinition
-from .geometry import PointSet, RaySet, LineSet
+from .spatial import PointSet, RaySet, LineSet, Plane, LengthUnits, AxisAlignedSurface
+from .geometry import AxisSlice
 from .line_profiles import LineProfiles
-from .reductions import (LengthUnits, AxisAlignedSurface, Coverage, ScalarResult,
+from .reductions import (Coverage, ScalarResult,
                          Extremum, ExtremaResult, HistogramResult, REPRESENTATION)
 from .mesh import Mesh, mesh_from_forest
 from .projection import LOSStatus
-from .slices import Plane, AxisSlice, AMRSliceResult
+from .slices import AMRSliceResult
 from .tracing import Termination
 
 __all__ = ["save_result", "load_result", "ResultFile", "ResultFileError", "SCHEMA_VERSION"]

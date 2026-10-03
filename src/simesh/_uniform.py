@@ -1,15 +1,61 @@
 """Uniform output validation and interior delivery shared by resident and source workflows."""
 
+from dataclasses import dataclass
 import math
 import numpy as np
 
 from ._validation import admit, workers_count
 from ._execution import worker_context, run_ranges
+from .geometry import _uniform_geometry
 from .fields import require_fields, _component_indices, _input_arrays
 
 
+@dataclass(frozen=True)
+class UniformResult:
+    """Collected cell-center uniform volume with coverage.
+
+    Attributes
+    ----------
+    values : ndarray
+        Float64 values (nx, ny, nz, component).
+    valid : ndarray
+        Coverage mask (nx, ny, nz).
+    lower, upper : ndarray
+        Physical sampling bounds.
+    definitions : tuple of FieldDefinition
+        Output components and units.
+    source_identity : object
+        In-memory value association.
+    """
+    values: np.ndarray
+    valid: np.ndarray
+    lower: np.ndarray
+    upper: np.ndarray
+    definitions: tuple
+    source_identity: object
+
+    @property
+    def usable(self):
+        """Coverage-valid cells whose sampled components are all finite."""
+        return self.valid & np.isfinite(self.values).all(axis=-1)
+
+    @property
+    def spacing(self):
+        """Physical uniform-cell spacing along x, y and z.
+        """
+        return (self.upper-self.lower)/np.asarray(self.valid.shape)
+
+    @property
+    def axes(self):
+        """Cell-center coordinate arrays along x, y and z.
+        """
+        return tuple(lo+(np.arange(count)+.5)*step
+                     for lo,count,step in zip(self.lower,self.valid.shape,self.spacing))
+
+
+
+
 def geometry(mesh, resolution, bounds, interpolation):
-    from .slices import _uniform_geometry
     if interpolation not in ("zero", "native", "linear"):
         raise ValueError("interpolation must be 'zero', 'native', or 'linear'")
     shape, lower, upper = _uniform_geometry(mesh, resolution, bounds)
@@ -85,9 +131,10 @@ def resident(fields, resolution, components, output, bounds, interpolation, work
     require_fields(fields)
     selected = np.asarray(_component_indices(fields, components), dtype=np.int64)
     workers_count(workers)
+    bounds = None if bounds is None else tuple(bounds)
     shape, lower, upper, step = geometry(fields.mesh, resolution, bounds, interpolation)
     slots = fields.slot_of_leaf[fields.leaf_ids]
-    values, valid = output_arrays(shape, len(selected), output, (*_input_arrays(fields), lower, upper),
+    values, valid = output_arrays(shape, len(selected), output, (*_input_arrays(fields), *(bounds or ()), lower, upper),
         fields.nbytes+fields.mesh.nbytes+slots.nbytes+8*len(selected), memory_limit)
     values.fill(np.nan)
     valid.fill(False)
@@ -95,43 +142,4 @@ def resident(fields, resolution, components, output, bounds, interpolation, work
         write_blocks(fields.mesh, fields.leaf_ids, slots, fields.values, fields.storage_halo,
                      selected, lower, step, interpolation, values, valid,
                      workers=workers, executor=executor)
-    from .applications import UniformResult
     return UniformResult(values, valid, lower, upper, tuple(fields.fields[i] for i in selected), fields.value_identity)
-
-
-def slabs(fields, resolution, components, bounds, interpolation, workers, memory_limit):
-    from .slices import SliceResult, Plane
-    require_fields(fields)
-    selected = np.asarray(_component_indices(fields, components), dtype=np.int64)
-    workers_count(workers)
-    shape, lower, upper, step = geometry(fields.mesh, resolution, bounds, interpolation)
-    nx, ny, nz = shape
-    slots = fields.slot_of_leaf[fields.leaf_ids]
-    # Include the previously yielded slab while constructing its successor.
-    retained = nx*ny*(8*len(selected)+9)
-    footprint = fields.nbytes+fields.mesh.nbytes+slots.nbytes+8*len(selected)+retained+nx*ny*8+128*ny+144
-    with worker_context(workers) as executor:
-        for iz in range(nz):
-            fields._check()
-            values, valid = output_arrays((nx, ny, 1), len(selected), None, (), footprint, memory_limit)
-            values.fill(np.nan)
-            valid.fill(False)
-            owners = np.full((nx, ny, 1), -1, dtype=np.int64)
-            write_blocks(fields.mesh, fields.leaf_ids, slots, fields.values, fields.storage_halo,
-                         selected, lower, step, interpolation, values, valid,
-                         workers=workers, executor=executor, owners=owners, z_offset=iz)
-            origin = lower.copy()
-            origin[2] = lower[2]+(iz+.5)*step[2]
-            plane = Plane(origin, [upper[0]-lower[0], 0., 0.], [0., upper[1]-lower[1], 0.], (nx, ny))
-            # Owners describe geometry even when the supplied Fields lack coverage.
-            # Fill missing owners using geometry alone, one row at a time.
-            for ix in range(nx):
-                missing = np.flatnonzero(~valid[ix, :, 0])
-                if len(missing):
-                    points = np.empty((len(missing), 3))
-                    points[:, 0] = lower[0]+(ix+.5)*step[0]
-                    points[:, 1] = lower[1]+(missing+.5)*step[1]
-                    points[:, 2] = origin[2]
-                    owners[ix, missing, 0] = fields.mesh.locate(points)
-            yield iz, SliceResult(plane, values[:, :, 0], valid[:, :, 0], owners[:, :, 0])
-            del values, valid, owners

@@ -12,8 +12,8 @@ units, without conversion to physical current or a thermodynamic emission model.
 from dataclasses import dataclass
 import numpy as np
 
-from .geometry import PointSet, LineSet, native_bottom_seeds
-from .slices import _uniform_geometry
+from .spatial import PointSet, LineSet
+from .geometry import native_bottom_seeds, _uniform_geometry
 from .tracing import Termination, _validate_vector, _resolve_curl
 from .line_profiles import sample_line_profiles
 from .connectivity import Boundary

@@ -189,19 +189,15 @@ in a separate description, as illustrated by the executable example.
 
 ## Field-line integration steps
 
-Magnetic tracing and QSL/Twist diagnostics default to `step_fraction=0.25`:
-steps are capped by one quarter of the smallest local cell edge. RK stages
-entering finer cells cause the step to shrink and restart. An optional `step`
-adds an absolute coordinate-length cap. Use `step_fraction=None, step=...`
-to reproduce fixed-step tracing. This controls spatial sampling, not an
-estimate of local integration error.
+Choose local-cell stepping for trajectories crossing refinement levels, or
+explicit fixed steps when reproducing a calculation. The exact controls and
+support requirements are generated under [trace](api.md#simesh.trace) and
+[qsl](api.md#simesh.qsl). The [current-proxy API](api.md#simesh.current_proxy)
+specifies its additional display-grid constraint.
 
-The same policy applies to raw and application tracing, bounded pools, batched
-paths and current-proxy tracing. The proxy still requires a `step` cap no larger
-than a display cell. Raw traces retain accepted prefixes; QSL diagnostics retain
-their separate boundary-localization behavior. Smaller local steps may require
-larger `max_steps` to reach the boundary. Previously saved figures and results
-retain their original step controls and are not recomputed automatically.
+Inspect termination before interpreting a traced prefix as a full field line.
+Use the [along-line example](../../examples/line_calculus.py) to compare tracing,
+scalar integration and calculations on saved paths.
 
 ## Compose along-line calculations
 
@@ -226,17 +222,11 @@ traced = sm.trace(vector, seeds, integrands=rates, max_length=0.2, workers=4)
 values = traced.integrals
 ```
 
-The rates must share the vector's Mesh and have one valid halo. Their components
-are interpolated at the same RK stage positions; a nonlinear transform prepared
-on grid nodes therefore means "transform, then interpolate". Each integral uses
-positive branch arc length and retains only accepted steps. Inspect termination
-before treating a result as a complete physical line. Weighted averages use two
-rates, weight times quantity and weight; divide their integrals only when the
-weight integral is nonzero. No automatic unit conversion is performed.
-
-`trace_bounded` accepts the same optional rates as resident Fields covering the
-entire Mesh. Its primary/curl pool still manages vector coverage; the rates are
-accounted in the memory budget and are never silently loaded by that pool.
+Weighted averages use two rates, weight times quantity and weight; divide their
+integrals only when the weight integral is nonzero. See
+[trace](api.md#simesh.trace) for reconstruction, support and units, and
+[trace_bounded](../dev/api.md#simesh.bounded.trace_bounded) for resident-integrand
+requirements with a bounded vector pool.
 
 For an existing `LineProfile`, apply NumPy transformations and use the independent
 sampled-curve operations:
@@ -255,17 +245,12 @@ weighted averages, bounded continuation and sampled derivatives on an AMR field.
 
 ## Magnetic connectivity methods
 
-QSL calculations default to single-line variational transport. Prepare two valid
-halo layers, then use `sm.qsl(ready, seeds)` or
-`app.connectivity(ready, points, quantities="q")`. Select
-`method="finite-difference"` to use neighboring-seed endpoint differences;
-`delta` applies only to that method. Both methods are available through batched
-and application interfaces, and saved results retain the selected method.
-
-Variational transport avoids four additional neighboring trajectories per seed,
-but retains a nine-component unit-vector gradient field. Its total memory and
-runtime depend on field coverage and seed count. Changing the default does not
-change previously saved maps; reproduce those with their recorded method.
+Choose between variational transport and neighboring-seed finite differences
+according to field coverage and seed count. Variational transport retains a
+gradient field; finite differences trace additional neighbors. Compare them for
+your problem using the explicit `method` control. The [qsl reference](api.md#simesh.qsl)
+defines available methods, support and perturbation controls for raw, batched and
+application interfaces. Saved results retain the selected method.
 
 ## Compose and save analyses
 

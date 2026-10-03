@@ -81,7 +81,11 @@ make test
 
 `make build` runs `setup.py build_ext --inplace --force` using
 `.venv/bin/python`. Rebuild after editing `.pyx`/`.pxd` files or moving compiled
-modules. `make test` runs pytest on `tests/`; it does not collect archived tests.
+modules. `make test` first checks declared Python/Cython dependencies, then runs pytest
+on `tests/`; it does not collect archived tests. Run `make architecture-check`
+for the dependency check alone, or use `scripts/check_architecture.py --list`
+to inspect its graph. Local imports and cimports are included; dynamic dispatch
+and numerical correctness still need source inspection and workflow checks.
 Old `build.py`, `scripts/build_ext.py` and `make build-amr` workflows belong to
 the archived preceding package.
 
@@ -92,7 +96,7 @@ the archived preceding package.
 | `src/simesh/_kernels/primitives/` | Retained AMR numerical primitives | Separate original Cython arithmetic/checking semantics |
 | `src/simesh/_kernels/*.pyx` | Preparation, sampling, differentiation, tracing, connectivity and LOS | Optimized native configuration; explicit optional OpenMP |
 
-Headers such as `tree.pxd`, `math.pxd` and `native.pxd` are Cython interfaces;
+Headers such as `rk4.pxd`, `tracing_step.pxd` and `native.pxd` are Cython interfaces;
 they are not separately compiled extensions. All build inputs live under `src/`.
 Generated C files and shared objects are ignored by Git and must not be used as
 a substitute for the source files in a release.

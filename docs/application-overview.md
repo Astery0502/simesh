@@ -119,7 +119,7 @@ simesh 主要用于 AMR 模拟数据的后处理：在原生网格上采样、�
 
 结果含请求的诊断量、脚点、长度、边界编号与终止状态。画 Q 图用 `q_valid`，画完整线 twist 图用 `twist_valid`；没有请求的量不应继续读取。诊断阶段不保存全路径，选中种子后用 A03 生成曲线。采样平面定义的是种子位置，不自动成为目标脚点边界。
 
-QSL 使用邻种子脚点差分，不提供算法选择参数。`normalization="mapping"` 与 `"flux"` 是不同归一化选择。`delta` 控制邻种子扰动距离，`step_fraction` 控制局部积分步长，两者应分别检查收敛。twist 若显式传入 `curl_field`，必须使用匹配的原始 `sm.curl(magnetic)`，不能换成物理电流。
+通过 `method` 选择变分传输或邻种子脚点差分；方法、支撑要求和归一化的准确定义见 [QSL 接口](user/api.md#simesh.qsl)。差分方法的种子扰动与轨迹积分步长需要分别检查收敛。twist 若显式传入 `curl_field`，必须使用匹配的原始 `sm.curl(magnetic)`，不能换成物理电流。
 
 参考：[应用接口](user/api.md)。
 

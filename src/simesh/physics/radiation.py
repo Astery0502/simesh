@@ -8,8 +8,9 @@ temperature. Emission retains the explicitly selected fully ionized convention.
 from dataclasses import dataclass
 import numpy as np
 
-from .thermal import (AIA171, EUV, CoronalComposition, BOLTZMANN_ERG_K,
-                      _check_thermal, _map_thermal)
+from .emission import AIA171, EUV
+from .thermodynamics import _check_thermal, _map_thermal
+from .composition import CoronalComposition, BOLTZMANN_ERG_K
 from ._euv_tables import UPSTREAM_COMMIT
 from ..fields import FieldDefinition
 

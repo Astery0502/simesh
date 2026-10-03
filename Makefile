@@ -1,10 +1,13 @@
 PYTHON ?= .venv/bin/python
 
-.PHONY: build test docs docs-check docs-serve
+.PHONY: build test architecture-check docs docs-check docs-serve
 build:
 	$(PYTHON) setup.py build_ext --inplace --force
 
-test:
+architecture-check:
+	$(PYTHON) scripts/check_architecture.py
+
+test: architecture-check
 	$(PYTHON) -m pytest tests -q
 
 docs-check:

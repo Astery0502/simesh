@@ -11,7 +11,7 @@ import tempfile
 import numpy as np
 
 from ._validation import frozen_array
-from .geometry import LineSet
+from .spatial import LineSet
 from .line_profiles import LineProfiles
 from .results_io import save_result, load_result, ResultFileError, _json_object, _unique_object, _keys, _invalid_constant
 

@@ -1,4 +1,4 @@
-"""Explicit classical ideal-gas MHD recovery on completed native Fields.
+"""Explicit classical ideal-gas MHD recovery on completed native fields.
 
 Energy is a density per volume, selected as total (internal + kinetic +
 magnetic) or internal. No file name, field label or metadata selects the EOS,
@@ -7,117 +7,14 @@ energy definition, composition or normalization.
 
 from dataclasses import dataclass
 from enum import IntFlag
-import math
 
 import numpy as np
 
-from .._validation import admit, array_bytes
-from ..diagnostics import MagneticUnits, _components
-from ..fields import FieldDefinition, publish, require_fields
-from .thermal import CoronalComposition, PROTON_MASS_G, BOLTZMANN_ERG_K
-
-
-def _positive_scale(value, label):
-    if (isinstance(value, (bool, np.bool_)) or np.ndim(value) != 0 or
-            not np.isfinite(value) or value <= 0):
-        raise ValueError(f"{label} must be finite positive scalars")
-    return float(value)
-
-
-@dataclass(frozen=True, kw_only=True)
-class MHDUnits:
-    """Gaussian CGS multipliers per stored MHD quantity and coordinate.
-
-    Parameters
-    ----------
-    density_g_cm3 : float
-        Grams per cubic centimeter per stored density.
-    momentum_g_cm2_s : float
-        Grams per square centimeter per second per stored momentum density.
-    energy_erg_cm3 : float
-        Ergs per cubic centimeter per stored total or internal energy density.
-    field_gauss : float
-        Gauss per stored magnetic field; magnetic pressure is B**2/(8*pi).
-    length_cm : float
-        Centimeters per coordinate unit, retained for downstream consumers.
-
-    Notes
-    -----
-    Input factors are independent and never inferred from field metadata.
-    Recovery outputs use CGS, kelvin and dimensionless ratios/status.
-    """
-
-    density_g_cm3: float
-    momentum_g_cm2_s: float
-    energy_erg_cm3: float
-    field_gauss: float
-    length_cm: float
-
-    def __post_init__(self):
-        for name in ("density_g_cm3", "momentum_g_cm2_s", "energy_erg_cm3",
-                     "field_gauss", "length_cm"):
-            object.__setattr__(self, name, _positive_scale(getattr(self, name), "MHD unit multipliers"))
-
-    @classmethod
-    def solar(cls, *, length_cm=1.e9, number_density_cm3=1.e9,
-              temperature_k=1.e6, composition=CoronalComposition()):
-        """Construct the common AMRVAC solar-coronal CGS normalization.
-
-        Parameters
-        ----------
-        length_cm : float, optional
-            Coordinate scale in cm; the default is 10 Mm.
-        number_density_cm3 : float, optional
-            Hydrogen nucleus density scale in cm^-3, not electron density.
-        temperature_k : float, optional
-            Temperature scale in kelvin.
-        composition : CoronalComposition, optional
-            Fully ionized H/He abundance; use the same composition in IdealMHD.
-
-        Returns
-        -------
-        MHDUnits
-            rho0=(1+4a)*mp*nH0, p0=(2+3a)*nH0*kB*T0,
-            v0=sqrt(p0/rho0), momentum0=rho0*v0, energy0=p0 and
-            B0=sqrt(4*pi*p0). The velocity scale is not the sound speed.
-
-        Notes
-        -----
-        This preset follows AMRVAC with si_unit=False, eq_state_units=True and
-        fully ionized H/He. It is a common coronal choice, not a universal solar
-        standard. Match the simulation's scales explicitly when they differ.
-        Constants are shared with CoronalComposition (mp=1.67262192369e-24 g,
-        kB=1.380649e-16 erg/K); older AMRVAC constants differ slightly.
-        """
-        if not isinstance(composition, CoronalComposition):
-            raise TypeError("composition must be an explicit CoronalComposition")
-        length, number_density, temperature = (
-            _positive_scale(value, "solar scales")
-            for value in (length_cm, number_density_cm3, temperature_k))
-        a = composition.helium_abundance
-        rho = ((1 + 4*a)*PROTON_MASS_G)*number_density
-        pressure = ((2 + 3*a)*BOLTZMANN_ERG_K)*number_density*temperature
-        if not (math.isfinite(rho) and rho > 0 and math.isfinite(pressure) and pressure > 0):
-            raise ValueError("solar density and pressure scales must be finite and positive")
-        velocity = math.sqrt(pressure)/math.sqrt(rho)
-        return cls(density_g_cm3=rho, momentum_g_cm2_s=rho*velocity,
-                   energy_erg_cm3=pressure, field_gauss=math.sqrt(4*math.pi)*math.sqrt(pressure),
-                   length_cm=length)
-
-    @property
-    def velocity_cm_s(self):
-        """Centimeters per second per stored velocity, from momentum/density."""
-        return self.momentum_g_cm2_s / self.density_g_cm3
-
-    @property
-    def time_s(self):
-        """Seconds per code time, from length/velocity."""
-        return self.length_cm / self.velocity_cm_s
-
-    @property
-    def magnetic_si(self):
-        """Equivalent SI normalization for the separate magnetic diagnostics."""
-        return MagneticUnits(field_tesla=self.field_gauss*1.e-4, length_m=self.length_cm*.01)
+from ..fields import FieldDefinition
+from .._field_data import PointwiseLayout, require_field_data, components as _components
+from .composition import CoronalComposition
+from .composition import PROTON_MASS_G as PROTON_MASS_G, BOLTZMANN_ERG_K as BOLTZMANN_ERG_K
+from .units import MHDUnits
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -305,13 +202,13 @@ def mhd_fields(conserved, *, model, magnetic=None, density="rho",
     Parameters
     ----------
     conserved : Fields
-        Conserved variables on complete leaves; prepare first if outputs will be
-        interpolated.
+        Conserved variables on supplied nodes. Native interpolation requires
+        prepared halo for reconstruction.
     model : IdealMHD
         Explicit gamma, total/internal energy convention, fully ionized H/He composition and
         Gaussian CGS scales.
     magnetic : Fields, optional
-        Separate magnetic group sharing Mesh identity and leaf coverage; slot order may
+        Separate magnetic group sharing grid identity and coverage; AMR slot order may
         differ. None selects B from conserved.
     density : str or int
         Density component.
@@ -335,8 +232,8 @@ def mhd_fields(conserved, *, model, magnetic=None, density="rho",
     Returns
     -------
     Fields
-        Independent selected CGS quantities and optional categorical status, in conserved
-        leaf order with common valid halo. preparation_stats records
+        Independent selected CGS quantities and optional categorical status with
+        common valid support in conserved leaf order. preparation_stats records
         evaluated_diagnostics and interior/all-node flag counts (not volumes); unchecked
         diagnostic counts are None, not zero.
 
@@ -352,11 +249,9 @@ def mhd_fields(conserved, *, model, magnetic=None, density="rho",
         raise TypeError("model must be an explicit IdealMHD configuration")
     if invalid not in ("raise", "nan"):
         raise ValueError("invalid must be raise or nan")
-    conserved = require_fields(conserved)
-    magnetic = conserved if magnetic is None else require_fields(magnetic)
-    if (magnetic.mesh is not conserved.mesh or len(magnetic.leaf_ids) != len(conserved.leaf_ids) or
-            np.any(magnetic.slot_of_leaf[conserved.leaf_ids] < 0)):
-        raise ValueError("MHD inputs must share the same Mesh and leaf coverage")
+    conserved = require_field_data(conserved)
+    magnetic = conserved if magnetic is None else require_field_data(magnetic)
+    layout = PointwiseLayout((conserved, magnetic))
     rho_id = _select(conserved, density, 1)[0]
     momentum_ids = _select(conserved, momentum, 3)
     energy_id = _select(conserved, energy, 1)[0]
@@ -373,41 +268,26 @@ def mhd_fields(conserved, *, model, magnetic=None, density="rho",
     definitions = tuple(FieldDefinition(name, unit, "categorical-node" if key == "status" else
                                          "pointwise-MHD-recovery")
                         for key in outputs for name, unit in _OUTPUTS[key])
-    halo = min(conserved.valid_halo, magnetic.valid_halo)
-    block_shape = tuple(n + 2*halo for n in conserved.mesh.block_shape)
-    shape = (len(conserved.leaf_ids), *block_shape, len(definitions))
-    input_bytes = array_bytes(array for group in (conserved, magnetic)
-                              for array in (group.values, group.leaf_ids, group.slot_of_leaf))
-    required = (conserved.mesh.nbytes + input_bytes + 8*math.prod(shape) +
-                (384+16*len(diagnostics))*math.prod(block_shape) + 8*conserved.mesh.leaf_count)
-    admit(required, memory_limit, "MHD recovery")
-    values = np.empty(shape, dtype=np.float64)
-    c_box, b_box = (tuple(slice(group.storage_halo-halo, group.storage_halo+n+halo)
-                          for n in group.mesh.block_shape) for group in (conserved, magnetic))
-    interior = tuple(slice(halo, halo+n) for n in conserved.mesh.block_shape)
+    required = layout.admit(len(definitions), memory_limit, "MHD recovery",
+                            scratch_per_cell=384+16*len(diagnostics))
+    values = layout.allocate(len(definitions))
     counts = {region: {flag.name: 0 for flag in MHDStatus} for region in ("interior", "evaluated")}
     invalid_counts = {region: 0 for region in counts}
-    c_values, b_values = conserved.values, magnetic.values
-    for row, leaf in enumerate(conserved.leaf_ids):
-        c_node = (conserved.slot_of_leaf[leaf], *c_box)
-        b_node = (magnetic.slot_of_leaf[leaf], *b_box)
-        recovered, status = _recover(c_values[(*c_node, rho_id)],
-            tuple(c_values[(*c_node, i)] for i in momentum_ids), c_values[(*c_node, energy_id)],
-            tuple(b_values[(*b_node, i)] for i in b_ids), model, outputs, diagnostics)
+    for index, (c_values, b_values) in layout.chunks():
+        recovered, status = _recover(c_values[...,rho_id],
+            tuple(c_values[...,i] for i in momentum_ids), c_values[...,energy_id],
+            tuple(b_values[...,i] for i in b_ids), model, outputs, diagnostics)
         bad = (status & _INVALID_STATE) != 0
         if invalid == "raise" and bad.any():
-            index = np.unravel_index(np.argmax(bad), bad.shape)
-            raise MHDStateError(leaf, tuple(i-halo for i in index), status[index])
-        for region, flags in (("interior", status[interior]), ("evaluated", status)):
+            bad_index = np.unravel_index(np.argmax(bad), bad.shape)
+            raise MHDStateError(conserved.leaf_ids[index],
+                                tuple(i-layout.halo for i in bad_index), status[bad_index])
+        interior = status[tuple(slice(layout.halo,layout.halo+n) for n in conserved.mesh.block_shape)]
+        for region, flags in (("interior", interior), ("evaluated", status)):
             invalid_counts[region] += int(np.count_nonzero(flags & _INVALID_STATE))
             for flag in MHDStatus:
                 counts[region][flag.name] += int(np.count_nonzero(flags & int(flag)))
-        column = 0
-        for key in outputs:
-            for component in recovered[key]:
-                values[row, ..., column] = component
-                column += 1
-        del recovered, status, bad
+        values[index] = np.stack([component for key in outputs for component in recovered[key]], axis=-1)
     if not diagnostics:
         for region in counts:
             counts[region][MHDStatus.UNREPRESENTABLE_DIAGNOSTIC.name] = None
@@ -415,6 +295,6 @@ def mhd_fields(conserved, *, model, magnetic=None, density="rho",
              "evaluated_diagnostics": diagnostics,
              "status_counts": counts, "invalid_state_counts": invalid_counts,
              "controlled_upper_bytes": required}
-    return publish(conserved.mesh, values, conserved.selection, definitions, halo, halo,
-                   f"mhd-{model.energy_kind}({conserved.scheme},{magnetic.scheme})",
-                   (conserved.source, magnetic.source, model), stats)
+    return layout.publish(values, definitions,
+                          scheme=f"mhd-{model.energy_kind}({conserved.scheme},{magnetic.scheme})",
+                          source=(conserved.source, magnetic.source, model), stats=stats)
