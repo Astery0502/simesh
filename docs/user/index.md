@@ -44,6 +44,7 @@ AMRVAC/uniform exports and saving AMR slices reject periodic meshes.
 | --- | --- |
 | [Quickstart](../../examples/user_quickstart.py) | Generated teaching snapshot and reloadable magnetic map |
 | [Magnetic applications](../../examples/standard_applications.py) | Synthetic AMR arcade, Q/twist, paths and LOS; custom NumPy archive |
+| [Numerical quality](../../examples/numerical_quality.py) | Small analytic AMR and Q comparisons printed to the terminal; no data files |
 | [Uniform export](../../examples/uniform_export.py) | AMRVAC fields to NumPy memory maps or uniform VTK using explicit reconstruction |
 | [MHD analysis](../../examples/recovered_state_analysis.py) | Analytic recovered state, reductions, profiles and result files |
 | [Radiation bands](../../examples/radiation_bands.py) | Isothermal snapshot, EUV/radio images, optical depth and convergence checks |
@@ -245,12 +246,18 @@ weighted averages, bounded continuation and sampled derivatives on an AMR field.
 
 ## Magnetic connectivity methods
 
-Choose between variational transport and neighboring-seed finite differences
-according to field coverage and seed count. Variational transport retains a
-gradient field; finite differences trace additional neighbors. Compare them for
-your problem using the explicit `method` control. The [qsl reference](api.md#simesh.qsl)
-defines available methods, support and perturbation controls for raw, batched and
-application interfaces. Saved results retain the selected method.
+QSL defaults to variational transport with a retained node-gradient field.
+Select `method="variational-interpolant"` to differentiate the tracing
+interpolant without retaining a gradient field, or `method="finite-difference"`
+for an independent neighboring-seed endpoint comparison. The [qsl reference](api.md#simesh.qsl)
+defines support and numerical constraints for raw, batched and application
+interfaces. Saved results retain the selected method.
+
+Run `.venv/bin/python examples/numerical_quality.py` for small spatial and step
+comparisons without output files. It also separates native derivative errors,
+sampled-field divergence and coarse/fine normal jumps, and compares different
+orders of sampling and differentiation. The reference is a manufactured field;
+real-snapshot and solver comparisons require matching input and boundary choices.
 
 ## Compose and save analyses
 

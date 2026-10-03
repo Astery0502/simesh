@@ -101,7 +101,7 @@ def test_hyperbolic_q_and_independent_endpoint_differences(mixed, method, worker
 
 
 @pytest.mark.parametrize("a", [-.5,.5])
-@pytest.mark.parametrize("method", ["finite-difference","variational"])
+@pytest.mark.parametrize("method", ["finite-difference","variational","variational-interpolant"])
 def test_helical_twist_whole_line_direction_sign_and_local_sphere(a, method):
     with magnetic_source(lambda x,y,z: np.array([-a*y,a*x,np.ones_like(x)]), mixed=True) as source:
         ready = sm.prepare(source, scheme="exact-phase")
@@ -202,7 +202,7 @@ def test_requested_surface_at_partial_coverage_edge_and_input_contracts():
     assert interior_only_twist_disabled.valid.all() and interior_only_twist_disabled.twist is None
 
 
-@pytest.mark.parametrize("method", ["finite-difference", "variational"])
+@pytest.mark.parametrize("method", ["finite-difference", "variational", "variational-interpolant"])
 @pytest.mark.parametrize("seed_z", [.249, .24949999])
 def test_local_sphere_stops_before_missing_coverage(method, seed_z):
     with magnetic_source(lambda x,y,z: np.array([np.zeros_like(x),np.zeros_like(x),np.ones_like(x)]),
@@ -221,7 +221,7 @@ def test_local_sphere_stops_before_missing_coverage(method, seed_z):
     assert sm.ConnectivityTermination.MISSING_COVERAGE in missing.termination
 
 
-@pytest.mark.parametrize("method", ["variational", "finite-difference"])
+@pytest.mark.parametrize("method", ["variational", "variational-interpolant", "finite-difference"])
 def test_valid_stencils_keep_their_rows_among_failed_seeds(method):
     with magnetic_source(lambda x,y,z: np.array([np.zeros_like(x),np.zeros_like(x),np.ones_like(x)])) as source:
         ready = sm.prepare(source, scheme="exact-phase")

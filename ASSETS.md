@@ -22,8 +22,10 @@ including Scott et al. (2017), Pariat and Démoulin (2012), Titov (2007), and Be
 and Prior (2006).
 Single-line variational transport is the default QSL method; neighboring-seed
 endpoint differences remain available as `method="finite-difference"`.
-Variational transport uses centered gradients of unit-vector nodes on the native
-mesh; it does not import the archived implementation at runtime. See also [Zhang et al. (2022), FastQSL](https://arxiv.org/abs/2208.12569).
+The default uses centered gradients of unit-vector nodes on the native mesh.
+The optional `variational-interpolant` method independently differentiates the
+existing trilinear interpolant and applies the vector-normalization chain rule;
+neither method imports the archived implementation at runtime. See also [Zhang et al. (2022), FastQSL](https://arxiv.org/abs/2208.12569).
 The [FastQSL2 repository](https://github.com/el2718/FastQSL2) declares CC BY-NC-SA 4.0;
 it remains an external comparison reference, not a runtime dependency. Comparison
 used revision `314bbf01ab72e43f82cb6b2e1c2a4d22d93aacdd`.

@@ -7,7 +7,8 @@ ownership and trilinear interpolation are shared with the native N4 consumers.
 
 from libc.math cimport fabs, fmin, fmax, hypot, isfinite, log, nextafter, INFINITY
 from libc.stdint cimport int64_t
-from .native cimport owner_node, interpolate
+from .native cimport (owner_node, interpolate, interpolation_stencil,
+                     interpolate_component, interpolate_unit_gradient)
 from .cartesian cimport contains_point
 from .tracing_step cimport cell_width, trace_step, finer_step
 from .rk4 cimport rk4_trial
@@ -27,13 +28,14 @@ cdef class _Sampler:
     cdef double null_threshold
     cdef double center[3]
     cdef double radius
-    cdef bint twist, variational
+    cdef bint twist, variational, interpolant_gradient
     cdef bint outside_stage
     cdef double min_width, norm
     cdef int64_t node_hint
     cdef int direction
 
-    def __init__(self, fields, gradient, companion, null_threshold, lower, upper):
+    def __init__(self, fields, gradient, companion, null_threshold, lower, upper,
+                 interpolant_gradient):
         mesh = fields.mesh
         self.lo, self.hi = mesh.lower, mesh.upper
         self.sample_lo, self.sample_hi = lower, upper
@@ -41,8 +43,9 @@ cdef class _Sampler:
         self.nlo, self.nhi = mesh.node_lower, mesh.node_upper
         self.bounds, self.spacing = mesh.bounds, mesh.spacing
         self.slots, self.values, self.halo = fields.slot_of_leaf, fields.values, fields.storage_halo
-        self.variational = gradient is not None
-        if self.variational:
+        self.interpolant_gradient = interpolant_gradient
+        self.variational = gradient is not None or interpolant_gradient
+        if gradient is not None:
             self.gslots, self.gradient, self.ghalo = gradient.slot_of_leaf, gradient.values, gradient.storage_halo
         self.null_threshold = null_threshold
         self.radius = 0.
@@ -52,7 +55,8 @@ cdef class _Sampler:
 
     cdef int evaluate(self, const double* p, double* b, double* g,
                       double* alpha, double* width) noexcept nogil:
-        cdef double q[3]
+        cdef double q[3], t[3]
+        cdef int64_t base[3]
         cdef double cb[3]
         cdef double norm, distance
         cdef int a
@@ -80,7 +84,13 @@ cdef class _Sampler:
         if slot < 0:
             return 7
         width[0] = cell_width(self.spacing, leaf)
-        if not interpolate(q, leaf, slot, self.bounds, self.spacing, self.values, self.halo, b):
+        if self.interpolant_gradient:
+            if not interpolation_stencil(q, leaf, self.bounds, self.spacing,
+                                         self.values, self.halo, base, t):
+                return 10
+            for a in range(3):
+                b[a] = interpolate_component(slot, a, self.values, base, t)
+        elif not interpolate(q, leaf, slot, self.bounds, self.spacing, self.values, self.halo, b):
             return 10
         for a in range(3):
             if not isfinite(b[a]):
@@ -92,11 +102,15 @@ cdef class _Sampler:
             return 4
         self.norm = norm
         if self.variational:
-            if self.gslots[leaf] < 0:
-                return 7
-            if not interpolate(q, leaf, self.gslots[leaf], self.bounds, self.spacing,
-                               self.gradient, self.ghalo, g):
-                return 10
+            if self.interpolant_gradient:
+                interpolate_unit_gradient(leaf, slot, self.spacing, self.values,
+                                          base, t, b, norm, g)
+            else:
+                if self.gslots[leaf] < 0:
+                    return 7
+                if not interpolate(q, leaf, self.gslots[leaf], self.bounds, self.spacing,
+                                   self.gradient, self.ghalo, g):
+                    return 10
             for a in range(9):
                 if not isfinite(g[a]):
                     return 9
@@ -362,8 +376,10 @@ def trace_halves(fields, gradient, companion, const double[:, ::1] seeds,
                  double[:, :, :, ::1] vectors, double[:, ::1] scales,
                  double[:, :, ::1] endpoint_fields, double[:, :, ::1] normals,
                  double[:, ::1] lengths, double[:, ::1] twists,
-                 int64_t[:, ::1] steps, int64_t[:, ::1] status, int64_t[:, ::1] faces):
-    cdef _Sampler sampler = _Sampler(fields, gradient, companion, null_threshold, lower, upper)
+                 int64_t[:, ::1] steps, int64_t[:, ::1] status, int64_t[:, ::1] faces,
+                 bint interpolant_gradient=False):
+    cdef _Sampler sampler = _Sampler(fields, gradient, companion, null_threshold, lower, upper,
+                                     interpolant_gradient)
     cdef Py_ssize_t i
     cdef int side
     with nogil:

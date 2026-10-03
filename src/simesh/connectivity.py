@@ -152,14 +152,14 @@ def _controls(fields, seeds, bounds, step_fraction, step, max_steps, max_length,
               null_threshold, boundary_tolerance, local_radius, normalization, workers, twist,
               method, delta, compute_q=True):
     _validate_vector(fields)
-    if method not in ("variational", "finite-difference"):
-        raise ValueError("method must be 'variational' or 'finite-difference'")
+    if method not in ("variational", "variational-interpolant", "finite-difference"):
+        raise ValueError("method must be 'variational', 'variational-interpolant' or 'finite-difference'")
     if not compute_q and delta is not None:
         raise ValueError("delta only applies when Q is requested")
     if compute_q and method == "variational":
         require_fields(fields, halo=2)
-        if delta is not None:
-            raise ValueError("delta only applies to finite-difference mapping")
+    if delta is not None and method != "finite-difference":
+        raise ValueError("delta only applies to finite-difference mapping")
     if delta is not None and (not np.isfinite(delta) or delta <= 0):
         raise ValueError("delta must be a positive finite perturbation distance")
     _step_controls(step, step_fraction)
@@ -233,7 +233,8 @@ def _squashing(vectors, scales, magnetic, normals, seed_strength, normalization)
 
 
 def _trace_arrays(fields, gradient, companion, seeds, lo, hi, tolerance, *, step_fraction,
-                  step, max_steps, max_length, null_threshold, local_radius, workers, executor, centers=None):
+                  step, max_steps, max_length, null_threshold, local_radius, workers, executor, centers=None,
+                  interpolant_gradient=False):
     from ._kernels.connectivity import trace_halves
     n = len(seeds)
     positions = np.full((n,2,3), np.nan)
@@ -249,7 +250,7 @@ def _trace_arrays(fields, gradient, companion, seeds, lo, hi, tolerance, *, step
                      0. if step_fraction is None else step_fraction, np.inf if step is None else step, max_steps,
                      max_length, null_threshold, tolerance, local_radius or 0.,
                      positions[s], vectors[s], scales[s], magnetic[s], normals[s],
-                     lengths[s], twists[s], steps[s], status[s], faces[s])
+                     lengths[s], twists[s], steps[s], status[s], faces[s], interpolant_gradient)
     run_ranges(n, workers, run, executor)
     return positions, vectors, scales, magnetic, normals, lengths, twists, steps, status, faces
 
@@ -299,7 +300,8 @@ def _stencil(fields, seeds, lo, hi, tolerance, delta, radius):
 def _batch(fields, gradient, companion, seeds, lo, hi, tolerance, *, normalization, method, delta,
            compute_q=True, **controls):
     positions, vectors, scales, magnetic, normals, lengths, twists, steps, status, faces = _trace_arrays(
-        fields, gradient, companion, seeds, lo, hi, tolerance, **controls)
+        fields, gradient, companion, seeds, lo, hi, tolerance,
+        interpolant_gradient=compute_q and method == "variational-interpolant", **controls)
     complete = np.all(np.isin(status, (3,12)), axis=1)
     regular = np.all(np.isin(status, (1,2,3,12)), axis=1)
     total_twist = None if companion is None else twists.sum(axis=1)
@@ -361,7 +363,7 @@ def _iter_diagnostics(fields, seeds, *, bounds=None, step_fraction=.25, step=Non
     local_radius replaces distant surfaces by a sphere centered on each seed.
 
     Finite differences trace four neighboring seeds and differentiate the actual
-    endpoint map. The variational method uses centered gradients of unit nodes.
+    endpoint map. Variational gradients follow the method selected in qsl.
     'mapping' normalizes by transported areas; 'flux' uses the divergence-free
     magnetic-flux identity used by FastQSL. Neither is a separatrix detector.
     """
@@ -461,12 +463,9 @@ def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
     normalization : str
         mapping uses mapped area; flux uses the magnetic-flux relation. These definitions
         can differ.
-    method : {"variational", "finite-difference"}, optional
-        variational (default) transports two transverse vectors along each field
-        line, using centered gradients of the unit-vector nodes and two valid
-        primary halo layers. It retains a nine-component gradient field.
-        finite-difference uses four neighboring-seed footpoints and one valid
-        primary halo layer when twist does not require additional support.
+    method : {"variational", "variational-interpolant", "finite-difference"}, optional
+        Gradient or endpoint approximation; see [qsl][simesh.qsl] for the method
+        definitions, support requirements and interpolation constraints.
     delta : float, optional
         Positive neighbor-seed perturbation distance, only for finite-difference Q.
     twist : bool
@@ -488,7 +487,7 @@ def iter_qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
 
     Notes
     -----
-    The variational method requires two primary halo layers. With automatic curl, twist also requires two; a supplied matching curl needs interpolation support.
+    Method-specific numerical constraints are defined in [qsl][simesh.qsl].
     """
     return _iter_diagnostics(fields,seeds,bounds=bounds,step_fraction=step_fraction,step=step,
         max_steps=max_steps,max_length=max_length,null_threshold=null_threshold,
@@ -531,12 +530,16 @@ def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
     normalization : str
         mapping uses mapped area; flux uses the magnetic-flux relation. These definitions
         can differ.
-    method : {"variational", "finite-difference"}, optional
-        variational (default) transports two transverse vectors along each field
-        line, using centered gradients of the unit-vector nodes and two valid
-        primary halo layers. It retains a nine-component gradient field.
+    method : {"variational", "variational-interpolant", "finite-difference"}, optional
+        variational (default) transports two transverse vectors using centered
+        gradients of unit-vector nodes. It requires two valid primary halo
+        layers and retains a nine-component gradient field.
+        variational-interpolant differentiates the local trilinear magnetic
+        interpolant, then applies the normalization chain rule at each RK stage.
+        It requires one valid primary halo layer and no retained gradient field.
+        At interpolation knots it uses the same owning stencil as field sampling.
         finite-difference uses four neighboring-seed footpoints and one valid
-        primary halo layer when twist does not require additional support.
+        primary halo layer. Automatic twist requires two layers for every method.
     delta : float, optional
         Positive neighbor-seed perturbation distance, only for finite-difference Q.
     twist : bool
@@ -558,7 +561,14 @@ def qsl(fields, seeds, *, bounds=None, step_fraction=.25, step=None,
 
     Notes
     -----
-    The variational method requires two primary halo layers. With automatic curl, twist also requires two; a supplied matching curl needs interpolation support.
+    The interpolant gradient is piecewise defined. It neither enforces continuity
+    across AMR interfaces nor includes sensitivity jumps at discontinuous field
+    interfaces. Check spatial and step convergence against finite-difference
+    mapping, especially when crossing refinement interfaces.
+
+    Neither interpolation nor these gradients guarantees a divergence-free field;
+    flux normalization requires that additional physical assumption. A supplied
+    matching curl for twist needs valid interpolation support.
     """
     if type(twist) is not bool:
         raise ValueError("twist must be boolean")

@@ -14,7 +14,7 @@ def magnetic():
         return sm.prepare(source, scheme="exact-phase")
 
 
-@pytest.mark.parametrize("method,halo", [("variational",2), ("finite-difference",1)])
+@pytest.mark.parametrize("method,halo", [("variational",2), ("variational-interpolant",1), ("finite-difference",1)])
 def test_diagnostic_selection_is_shared_by_point_surface_bottom_and_batches(magnetic, method, halo):
     magnetic = replace(magnetic, valid_halo=halo)
     points = sm.PointSet.boundary(magnetic.mesh, "zmin", (2, 2))

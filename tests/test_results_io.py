@@ -399,7 +399,7 @@ def test_empty_and_batched_connectivity_maps(tmp_path, magnetic, points, quantit
         np.testing.assert_array_equal(restored.points.ids, points.ids[2*index:2*index+2])
 
 
-@pytest.mark.parametrize("method", ["variational", "finite-difference"])
+@pytest.mark.parametrize("method", ["variational", "variational-interpolant", "finite-difference"])
 def test_flux_and_native_scalar_radius(tmp_path, magnetic, points, method):
     result = app.connectivity(magnetic, points, quantities=("q",),
                               normalization="flux", local_radius=np.float64(.15), method=method)

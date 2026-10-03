@@ -34,7 +34,7 @@ def test_steps_follow_local_cells_and_restart_at_finer_stages(source, direction,
         assert distances[-1] > distances[0]
 
 
-@pytest.mark.parametrize("method", ["variational","finite-difference"])
+@pytest.mark.parametrize("method", ["variational","variational-interpolant","finite-difference"])
 def test_qsl_and_trace_share_local_and_fixed_step_controls(source, method):
     fields = sm.prepare(source, scheme="exact-phase")
     seeds = np.array([[.13,.17,.51]])
