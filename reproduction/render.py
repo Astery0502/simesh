@@ -1,6 +1,7 @@
 """Render manuscript figures with separately supplied numerical inputs."""
 
 import argparse
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -11,8 +12,8 @@ ROOT = Path(__file__).resolve().parent
 
 def figure_number(value):
     number = int(value)
-    if number not in range(1, 8):
-        raise argparse.ArgumentTypeError("figure number must be between 1 and 7")
+    if number not in range(1, 9):
+        raise argparse.ArgumentTypeError("figure number must be between 1 and 8")
     return number
 
 
@@ -29,7 +30,7 @@ def main():
         nargs="*",
         type=figure_number,
         metavar="N",
-        help="Figure numbers (1–7); default: all",
+        help="Figure numbers (1–8); default: all",
     )
     parser.add_argument(
         "--output",
@@ -39,9 +40,19 @@ def main():
     )
     args = parser.parse_args()
     output = args.output.resolve()
-    figures = list(dict.fromkeys(args.figures or range(1, 8)))
+    figures = list(dict.fromkeys(args.figures or range(1, 9)))
     inputs = args.data.resolve()
     if any(number >= 3 for number in figures):
+        release_path = inputs / "release.json"
+        if (inputs / "manifest.json").exists() and not release_path.is_file():
+            parser.error(
+                "the historical seven-figure bundle does not match these scripts; "
+                "use the 2026-10-12 eight-figure plotting-data release"
+            )
+        if release_path.is_file():
+            release = json.loads(release_path.read_text())
+            if release.get("manuscript_figures") != 8:
+                parser.error("the plotting-data release must use manuscript Figures 1–8")
         for number in figures:
             if number >= 3 and not (inputs / f"figure{number}").is_dir():
                 parser.error(

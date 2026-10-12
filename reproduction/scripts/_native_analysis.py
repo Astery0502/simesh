@@ -32,6 +32,13 @@ def load_products():
     with np.load(DATA / "figure3/native-analysis.npz") as archive:
         data = dict(archive)
     summary = json.loads((DATA / "figure3/native-analysis.json").read_text())
+    current_profile = DATA / "figure3/current-profile.npz"
+    if current_profile.exists():
+        with np.load(current_profile) as archive:
+            data.update(dict(archive))
+        summary["current_profile"] = json.loads(
+            (DATA / "figure3/current-profile.json").read_text()
+        )
     return data, summary
 
 
@@ -205,19 +212,23 @@ def draw_volume(ax, data, norm):
         ax.plot(
             *points.T,
             color=COLORS[1],
-            linewidth=1.8 if branch // 2 == 1 else 1.0,
-            alpha=1.0 if branch // 2 == 1 else 0.65,
+            linewidth=2.6 if branch // 2 == 1 else 1.1,
+            alpha=1.0 if branch // 2 == 1 else 0.55,
             zorder=12,
         )
     seed = data["seed_positions_Mm"][1]
     ax.scatter(*seed, s=13, color=COLORS[1], depthshade=False, zorder=14)
-    ax.text(
-        *(seed + (0.03, -0.10, 0.07)),
-        r"$\ell$",
-        color=COLORS[1],
-        fontsize=12,
-        zorder=15,
-    )
+    if "profile_current_A_m2" in data:
+        for index, label, marker in zip(data["marker_indices"], "ASB", ("^", "o", "s")):
+            point = data["profile_positions_Mm"][index]
+            ax.scatter(*point, s=28, color=COLORS[1], marker=marker,
+                       edgecolors="white", linewidths=0.6, depthshade=False, zorder=16)
+            ax.text(*(point + (0.03, -0.10, 0.07)), label,
+                    color=COLORS[1], fontsize=10, zorder=17,
+                    bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.85, "pad": 0.3})
+    else:
+        ax.text(*(seed + (0.03, -0.10, 0.07)), r"$\ell$",
+                color=COLORS[1], fontsize=12, zorder=15)
     point = data["point_Mm"]
     ax.scatter(
         *point,
@@ -285,7 +296,7 @@ def draw_panel(figure, data, *, left=0, bottom=0):
         figure,
         left + 3.25,
         bottom + 6.05,
-        "One L4 block and four L5 blocks",
+        "One L4 and four L5 blocks with 3D field lines",
         ha="center",
         color=patch.INK,
     )
@@ -300,7 +311,9 @@ def draw_panel(figure, data, *, left=0, bottom=0):
                 markersize=4,
                 label="1  Point / plane",
             ),
-            Line2D([], [], color=COLORS[1], linewidth=1.5, label="2  Field lines"),
+            Line2D([], [], color=COLORS[1], linewidth=1.5,
+                   label=(r"2  Field line $\ell$: A-S-B" if "profile_current_A_m2" in data
+                          else "2  3D field-line segments")),
             Line2D(
                 [], [], color=COLORS[2], linestyle="dashed", label="3  Selected region"
             ),
@@ -319,7 +332,7 @@ def draw_panel(figure, data, *, left=0, bottom=0):
     bounds = data["bounds_Mm"]
     titles = (
         "1  Sampling & diagnostics",
-        "2  Along-line profile",
+        r"2  Current along $\ell$" if "profile_current_A_m2" in data else "2  Along-line profile",
         "3  Regional statistics",
         "4  LOS column density",
     )
@@ -386,7 +399,10 @@ def draw_panel(figure, data, *, left=0, bottom=0):
     colorbar.set_label(r"$|J|$ [$\mu$A m$^{-2}$]", fontsize=9, labelpad=2)
 
     ax = axes[1]
-    distance, values = data["profile_arclength_Mm"], data["profile_B_gauss"]
+    distance = data["profile_arclength_Mm"]
+    current_profile = "profile_current_A_m2" in data
+    values = (data["profile_current_A_m2"] * 1e6 if current_profile
+              else data["profile_B_gauss"])
     ax.axvspan(
         distance.min(), 0, color=overview.LEVEL_COLORS[2], alpha=0.15, linewidth=0
     )
@@ -395,9 +411,23 @@ def draw_panel(figure, data, *, left=0, bottom=0):
     )
     ax.axvline(0, color=patch.INTERFACE, linewidth=0.8)
     ax.plot(distance, values, color=COLORS[1], linewidth=1.5)
+    if current_profile:
+        for index, label, marker, offset, alignment in zip(
+            data["marker_indices"], "ASB", ("^", "o", "s"),
+            ((4, 8), (-8, -13), (-4, 8)), ("left", "right", "right"),
+        ):
+            ax.plot(distance[index], values[index], marker=marker, color=COLORS[1],
+                    markersize=5, markeredgecolor="white", markeredgewidth=0.5,
+                    clip_on=False, zorder=5)
+            ax.annotate(label, (distance[index], values[index]), xytext=offset,
+                        textcoords="offset points", ha=alignment, color=COLORS[1], fontsize=8.5)
     ax.text(0.06, 0.08, "L5", transform=ax.transAxes, fontsize=8.5, color=patch.INK)
     ax.text(0.83, 0.08, "L4", transform=ax.transAxes, fontsize=8.5, color=patch.INK)
-    ax.set(xlabel="s [Mm]", ylabel=r"$|B|$ [G]", xlim=(distance.min(), distance.max()))
+    ax.set(xlabel="s [Mm]",
+           ylabel=r"$|J|$ [$\mu$A m$^{-2}$]" if current_profile else r"$|B|$ [G]",
+           xlim=(distance.min(), distance.max()))
+    if current_profile:
+        ax.margins(y=0.18)
     ax.grid(axis="y", color="#e3e8e8", linewidth=0.5)
 
     ax = axes[2]
@@ -465,8 +495,7 @@ CAPTION = (
     "The colored native-cell plane is the z = 5.052 Mm section used above. "
     "(1) Current magnitude, computed by native centered curl and explicitly "
     "normalized in SI, is sampled on a 96 x 64 local plane and at P. "
-    "(2) The highlighted field line provides a sampled magnetic-strength "
-    "profile across the L5/L4 interface; s = 0 is its seed. The three field "
+    "(2) {profile_description} The three field "
     "lines are actual RK4 traces, with only their stored in-volume samples "
     "displayed. Integration was limited to 1.5 Mm per branch on explicitly "
     "prepared surrounding leaves; endpoints are not physical footpoints. "
@@ -482,6 +511,19 @@ CAPTION = (
 )
 
 
+def caption(data):
+    """Describe the quantity selected by the retained data product."""
+    description = (
+        "The current-density magnitude is sampled along the highlighted field "
+        "line across the L5/L4 interface. A, S, B mark matching positions on "
+        "the three-dimensional path and profile; s = 0 is the seed S."
+        if "profile_current_A_m2" in data else
+        "The highlighted field line provides a sampled magnetic-strength "
+        "profile across the L5/L4 interface; s = 0 is its seed."
+    )
+    return CAPTION.format(profile_description=description)
+
+
 def save_standalone(data):
     figure = plt.figure(figsize=(WIDTH, HEIGHT))
     draw_panel(figure, data)
@@ -490,4 +532,4 @@ def save_standalone(data):
             OUT / f"{STEM}.{suffix}", dpi=300, bbox_inches="tight", pad_inches=0.05
         )
     plt.close(figure)
-    (OUT / f"{STEM}.txt").write_text(CAPTION + "\n")
+    (OUT / f"{STEM}.txt").write_text(caption(data) + "\n")

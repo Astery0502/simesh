@@ -9,7 +9,7 @@ from _paths import data_directory, OUTPUT
 
 DATA_ROOT = data_directory()
 
-DATA = DATA_ROOT / "figure4"
+DATA = DATA_ROOT / "figure5"
 
 
 def render_schematic():

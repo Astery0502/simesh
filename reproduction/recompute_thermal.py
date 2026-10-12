@@ -119,20 +119,123 @@ def verify_integral(prepared, retained, length_cm, workers):
     }
 
 
+def prepare_radiation(mesh, state, model, euv, absorber):
+    """Evaluate cell-center coefficients before preparing their AMR support."""
+    values = np.empty((mesh.leaf_count, 2, *mesh.block_shape), dtype=np.float64)
+    for first in range(0, mesh.leaf_count, CHUNK):
+        last = min(first + CHUNK, mesh.leaf_count)
+        rho, temperature = state[first:last, 0], state[first:last, 1]
+        values[first:last, 0] = euv.emissivity(rho, temperature)
+        hydrogen = euv.composition.number_density(rho, convention="amrvac-hydrogen")
+        values[first:last, 1] = absorber.opacity(hydrogen, temperature, wavelength=euv.wavelength)
+    with sm.source_from_arrays(
+        mesh, values, ("emissivity", "opacity"),
+        units={"emissivity": "DN s^-1 pixel^-1 cm^-1", "opacity": "cm^-1"}, copy=False,
+    ) as source:
+        prepared = sm.prepare(source, scheme="exact-phase", workers=1, memory_limit=MEMORY_LIMIT)
+    return replace(prepared, preparation_stats={
+        **prepared.preparation_stats,
+        "radiation_units": "DN s^-1 pixel^-1",
+        "model": euv.identity,
+        "temperature": "Recovered ideal-MHD temperature at native cell centers",
+        "density_unit_g_cm3": model.units.density_g_cm3,
+        "absorption": absorber.identity,
+    })
+
+
+def verify_transfer(prepared, retained, length_cm, subdivisions, workers):
+    """Check traversal independently and refine the transfer quadrature."""
+    indices = np.unique(np.r_[np.linspace(0, len(retained.intensity.values)-1, 64).astype(int),
+                              np.argmax(retained.intensity.values),
+                              np.argmax(retained.optical_depth.values),
+                              np.argmax(retained.absorption_fraction)])
+    mask = np.zeros(len(retained.intensity.values), dtype=bool)
+    mask[indices] = True
+    rays = retained.intensity.rays.select(mask.reshape(retained.intensity.rays.origins.shape))
+    refined = sm.radiative_los(prepared, rays, length_unit_cm=length_cm,
+                               subdivisions=2*subdivisions, workers=workers)
+    if not refined.complete:
+        raise ValueError("Refined transfer has incomplete coverage")
+    checks = {}
+    for name in ("intensity", "optical_depth", "thin_intensity"):
+        expected = getattr(retained, name).values[indices]
+        actual = getattr(refined, name).values
+        scale = max(float(np.max(np.abs(expected))), np.finfo(float).tiny)
+        error = float(np.max(np.abs(actual-expected))/scale)
+        if not np.isfinite(error) or error >= 1e-3:
+            raise ValueError(f"Transfer refinement exceeds tolerance for {name}: {error:g}")
+        checks[name+"_max_error_over_peak"] = error
+    subset = np.zeros(len(indices), dtype=bool)
+    subset[np.unique(np.r_[np.linspace(0, len(indices)-1, 8).astype(int),
+                            np.argmax(retained.optical_depth.values[indices])])] = True
+    independent_rays = rays.select(subset.reshape(rays.origins.shape))
+    reference = sm.radiative_los(prepared, independent_rays, length_unit_cm=length_cm,
+        subdivisions=subdivisions, implementation="reference")
+    if not reference.complete:
+        raise ValueError("Independent transfer has incomplete coverage")
+    for name in ("intensity", "optical_depth", "thin_intensity"):
+        np.testing.assert_allclose(getattr(reference, name).values,
+                                   getattr(retained, name).values[indices[subset]],
+                                   rtol=1e-9, atol=1e-12)
+    return {"refined_ray_count": len(indices), "reference_ray_count": int(subset.sum()),
+            "subdivisions": [subdivisions, 2*subdivisions], **checks,
+            "scope": "Traversal and quadrature of the same cell-center coefficient reconstruction"}
+
+
 def compute_bands(
-    mesh, state, model, views, wavelengths, pixels, output, workers, verify
+    mesh, state, model, views, wavelengths, pixels, output, workers, verify,
+    absorption=False, subdivisions=4,
 ):
     """Share each emissivity field across views and write only final results."""
     rays = {view: make_rays(mesh, view, pixels) for view in views}
     for view in views:
         (output / f"view-{view}").mkdir()
     for wave in wavelengths:
-        emission = np.empty((mesh.leaf_count, 1, *mesh.block_shape), dtype=np.float64)
         euv = sm.EUV(
             wavelength=wave,
             density_convention="electron-hydrogen",
             composition=model.composition,
         )
+        if absorption:
+            print(f"Preparing emission and absorption at {wave} Angstrom", flush=True)
+            absorber = sm.HHeAbsorption(helium_abundance=model.composition.helium_abundance)
+            prepared = prepare_radiation(mesh, state, model, euv, absorber)
+            for view in views:
+                print(f"Transferring {wave} Angstrom along +{view.upper()}", flush=True)
+                result = sm.radiative_los(prepared, rays[view], length_unit_cm=model.units.length_cm,
+                    subdivisions=subdivisions, workers=workers, ray_batch=2048,
+                    memory_limit=MEMORY_LIMIT)
+                if not result.complete or not np.isfinite(result.intensity.values).all():
+                    raise ValueError("Radiative transfer requires complete finite coverage")
+                if np.any(result.intensity.values < 0) or np.any(
+                    result.intensity.values > result.thin_intensity.values*(1+1e-12)
+                ):
+                    raise ValueError("Absorbed intensity must lie between zero and unabsorbed intensity")
+                directory = output / f"view-{view}"
+                metadata = {"wavelength_angstrom": wave, "model": euv.identity,
+                            "energy_kind": model.energy_kind, "units": asdict(model.units),
+                            "absorption": absorber.identity}
+                for name, product in (("", result.intensity), ("-tau", result.optical_depth),
+                                      ("-thin", result.thin_intensity)):
+                    target = directory / f"euv{wave}-plus-{view}{name}.result.npz"
+                    sm.save_result(target, product, metadata=metadata)
+                    np.testing.assert_array_equal(sm.load_result(target).result.values, product.values)
+                np.savez_compressed(directory / f"euv{wave}-absorption.npz",
+                                    absorption_fraction=result.absorption_fraction)
+                report = {"max_optical_depth": float(result.optical_depth.values.max()),
+                          "max_absorption_fraction": float(result.absorption_fraction.max()),
+                          "total_absorption_fraction": float(1-result.intensity.values.sum()/
+                              result.thin_intensity.values.sum()) if result.thin_intensity.values.sum() else 0.}
+                if verify:
+                    report["verification"] = verify_transfer(prepared, result, model.units.length_cm,
+                                                             subdivisions, workers)
+                write_json(directory / f"euv{wave}-transfer-check.json", report)
+                print(f"Completed {wave} Angstrom, absorbed fraction {report['total_absorption_fraction']:.3%}", flush=True)
+                del result
+            del prepared
+            gc.collect()
+            continue
+        emission = np.empty((mesh.leaf_count, 1, *mesh.block_shape), dtype=np.float64)
         for first in range(0, mesh.leaf_count, CHUNK):
             last = min(first + CHUNK, mesh.leaf_count)
             emission[first:last, 0] = euv.emissivity(
@@ -289,8 +392,12 @@ def main(default_views=None):
     parser.add_argument(
         "--verify",
         action="store_true",
-        help="Check 94 Angstrom with independent quadrature",
+        help="Check 94 Angstrom thin quadrature, or every band's absorbed transfer",
     )
+    parser.add_argument("--absorption", action="store_true",
+                        help="Include LTE Saha H/He continuum absorption and save transfer diagnostics")
+    parser.add_argument("--subdivisions", type=int, default=4,
+                        help="Midpoint slabs per interpolation interval for absorbed transfer")
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
     output = args.output.resolve()
@@ -311,6 +418,8 @@ def main(default_views=None):
         )
     if args.workers < 1:
         parser.error("workers must be positive")
+    if args.subdivisions < 1:
+        parser.error("subdivisions must be positive")
     config = json.loads(config_path.read_text())
     model = sm.IdealMHD(
         gamma=config["gamma"],
@@ -321,7 +430,7 @@ def main(default_views=None):
     wavelengths = list(dict.fromkeys(args.bands or config["wavelengths_angstrom"]))
     if not set(wavelengths).issubset(config["wavelengths_angstrom"]):
         parser.error("bands must be present in the supplied scientific configuration")
-    if args.verify and 94 not in wavelengths:
+    if args.verify and not args.absorption and 94 not in wavelengths:
         parser.error("--verify requires the 94 Angstrom band")
     views = list(dict.fromkeys(args.views))
     output.mkdir(parents=True, exist_ok=True)
@@ -339,9 +448,13 @@ def main(default_views=None):
         "views": views,
         "pixels": config["pixels"],
         "preparation": "exact-phase",
-        "quadrature": "gauss2",
-        "step_fraction": 0.5,
-        "model": "Optically thin electron-hydrogen emission; no absorption, PSF or noise",
+        "quadrature": "ordered-midpoint-slabs" if args.absorption else "gauss2",
+        "step_fraction": None if args.absorption else 0.5,
+        "subdivisions": args.subdivisions if args.absorption else None,
+        "absorption": sm.HHeAbsorption(helium_abundance=model.composition.helium_abundance).identity
+                      if args.absorption else None,
+        "model": "Electron-hydrogen emission with LTE Saha H/He continuum absorption; no scattering, PSF or noise"
+                 if args.absorption else "Optically thin electron-hydrogen emission; no absorption, PSF or noise",
         "calibration_status": config.get(
             "calibration_status", "Not independently established"
         ),
@@ -360,6 +473,8 @@ def main(default_views=None):
             output,
             args.workers,
             args.verify,
+            args.absorption,
+            args.subdivisions,
         )
         if args.diagnostics:
             print("Computing native thermal diagnostics", flush=True)

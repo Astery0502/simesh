@@ -49,7 +49,7 @@ def main():
             value,
             ha="center",
             va="center",
-            fontsize=size,
+            fontsize=max(11.5, size + 2),
             color=color,
             fontweight="bold" if bold else "normal",
             fontfamily="DejaVu Sans Mono" if code else "DejaVu Sans",
@@ -77,7 +77,7 @@ def main():
     # Balanced input panels retain the two-sided flow around the shared mesh.
     box(65, 45, 250, 275)
     box(685, 45, 250, 275)
-    text(190, 70, "Discrete fields", 12, bold=True)
+    text(190, 70, "Named field components", 11, bold=True)
     text(190, 103, "Source", 11, PYTHON, code=True)
     text(190, 132, "open_amrvac()", 9.5, PYTHON, code=True)
     text(190, 155, "source_from_arrays()", 9.5, PYTHON, code=True)
@@ -97,7 +97,7 @@ def main():
     text(810, 70, "Analysis geometry", 12, bold=True)
     text(810, 108, "PointSet", 11, PYTHON, code=True)
     text(810, 130, "Sampling positions", 9)
-    text(810, 152, "PointSet() / PointSet.from_plane()", 8, PYTHON, code=True)
+    text(810, 156, "PointSet() /\nPointSet.from_plane()", 8, PYTHON, code=True)
     text(810, 202, "RaySet", 11, PYTHON, code=True)
     text(810, 224, "Line-of-sight rays", 9)
     text(810, 274, "LineSet", 11, PYTHON, code=True)
@@ -126,7 +126,7 @@ def main():
             "volume_integral()",
             "weighted_mean()",
         ),
-        (609, "Tracing and\nmagnetic-topology", "app.trace()", "app.connectivity()"),
+        (609, "Tracing and\ntopology analysis", "app.trace()", "app.connectivity()"),
         (826, "Synthetic observations", "app.los()", "app.radiative_los()"),
     ):
         text(x, 414, heading, 8.5, INK, bold=True)

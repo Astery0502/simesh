@@ -1,4 +1,4 @@
-"""Draw the saved three-dimensional comparison geometry for Figure 4."""
+"""Draw the saved three-dimensional comparison geometry for Figure 5."""
 
 import matplotlib.patheffects as effects
 from matplotlib.colors import LinearSegmentedColormap, PowerNorm, to_rgba

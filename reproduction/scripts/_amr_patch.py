@@ -36,7 +36,7 @@ def style():
     plt.rcParams.update(
         {
             "font.family": "DejaVu Sans",
-            "font.size": 10,
+            "font.size": 12,
             "pdf.fonttype": 42,
             "svg.fonttype": "none",
             "figure.facecolor": "white",
@@ -182,7 +182,7 @@ def draw_patch(ax, geometry, rows):
             ha="center",
             va="center",
             color=color,
-            fontsize=9,
+            fontsize=12,
             fontweight="bold",
             bbox={"boxstyle": "circle,pad=0.25", "fc": "white", "ec": color, "lw": 1},
             arrowprops={
@@ -207,7 +207,7 @@ def draw_patch(ax, geometry, rows):
         ha="center",
         va="center",
         color=INK,
-        fontsize=9,
+        fontsize=12,
         bbox={"fc": LEVEL_COLORS[1], "ec": "none", "pad": 2},
         arrowprops={
             "arrowstyle": "-",
@@ -228,7 +228,7 @@ def draw_patch(ax, geometry, rows):
     )
     ax.set_xticks((-5, -4, -3, -2.5))
     ax.set_yticks((0, 0.5, 1, 1.5))
-    ax.tick_params(labelsize=9, pad=2)
+    ax.tick_params(labelsize=12, pad=2)
     for spine in ax.spines.values():
         spine.set_visible(False)
     return ax
@@ -327,11 +327,11 @@ def draw_panel(figure, left, bottom, geometry, rows):
         left + 0.12,
         bottom + 6.43,
         "(b) Local patch and interface preparation",
-        fontsize=11,
+        fontsize=13,
         fontweight="bold",
         color=INK,
     )
-    ax = axes_inches(figure, left + 0.64, bottom + 2.75, 4.8, 3.2)
+    ax = axes_inches(figure, left + 0.79, bottom + 2.95, 4.5, 3.0)
     draw_patch(ax, geometry, rows)
     text_inches(
         figure,
@@ -353,9 +353,9 @@ def draw_panel(figure, left, bottom, geometry, rows):
         figure,
         left + 3.04,
         bottom + 2.18,
-        r"Native $8 \times 8$ cells per block  ·  $\Delta_c = 2\Delta_f$",
+        r"$8 \times 8$ section of an $8^3$-cell block  ·  $\Delta_c = 2\Delta_f$",
         ha="center",
-        fontsize=9,
+        fontsize=12,
         color=INK,
     )
 
@@ -368,7 +368,7 @@ def draw_panel(figure, left, bottom, geometry, rows):
             bottom + 1.93,
             title,
             ha="center",
-            fontsize=10,
+            fontsize=12,
             color=TRANSFER_COLORS[kind],
         )
         draw_transfer(

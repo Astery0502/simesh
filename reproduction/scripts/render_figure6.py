@@ -1,110 +1,192 @@
-"""Render the manuscript magnetic-topology figure from saved scientific products."""
+"""Render x=0 diagnostic maps and 20 spatially separated high-twist field lines."""
 
+import json
 import numpy as np
 import matplotlib
 
 matplotlib.use("Agg")
-from matplotlib.colors import LogNorm
+import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
+from matplotlib.colors import Normalize, LogNorm, rgb_to_hsv, hsv_to_rgb
 
 from _paths import data_directory, OUTPUT
 
 DATA = data_directory()
-from _topology import build_figure
-import matplotlib.pyplot as plt
+
+CACHE = DATA / "figure6"
+OUT = OUTPUT
+PDF = OUTPUT
+D = np.load(CACHE / "diagnostics.npz")
+P = np.load(CACHE / "sampling.npz")
+A = np.load(CACHE / "amr-slice.npz")
+L = np.load(CACHE / "lines.npz")
+S = json.loads((CACHE / "selection.json").read_text())
+plt.rcParams.update(
+    {
+        "font.family": "DejaVu Sans",
+        "font.size": 10,
+        "pdf.fonttype": 42,
+        "svg.fonttype": "none",
+    }
+)
+
+
+def raster(rect, values):
+    lower, upper = A["lower"], A["upper"]
+    dy = np.min(rect[:, 1] - rect[:, 0])
+    dz = np.min(rect[:, 3] - rect[:, 2])
+    image = np.full(
+        (round((upper[2] - lower[2]) / dz), round((upper[1] - lower[1]) / dy)), np.nan
+    )
+    ys = np.rint((rect[:, :2] - lower[1]) / dy).astype(int)
+    zs = np.rint((rect[:, 2:] - lower[2]) / dz).astype(int)
+    for y, z, value in zip(ys, zs, values):
+        image[z[0] : z[1], y[0] : y[1]] = value
+    return image
 
 
 def main():
-    fig = build_figure()
-    original_axes = list(fig.axes)
-    labels = [
-        axis
-        for axis in original_axes
-        if axis.get_ylabel() == r"$|J|$" or axis.get_xlabel() == r"$|J|$"
+    fig = plt.figure(figsize=(11.4, 5.8))
+    extent = np.array([A["lower"][1], A["upper"][1], A["lower"][2], A["upper"][2]]) * 10
+    ratio = A["ratio"]
+    pos = ratio[np.isfinite(ratio) & (ratio > 0)]
+    panels = [
+        (
+            P["rectangles"],
+            np.where(D["valid"], D["log10_q"], np.nan),
+            "inferno",
+            Normalize(np.log10(2), 3),
+            r"$\log_{10} Q$",
+            "max",
+        ),
+        (
+            P["rectangles"],
+            np.where(D["complete"], D["twist"], np.nan),
+            "RdBu_r",
+            Normalize(-3, 3),
+            r"$T_w$",
+            "both",
+        ),
+        (
+            A["rectangles"],
+            ratio,
+            "magma",
+            LogNorm(*np.percentile(pos, [1, 99.8])),
+            r"$|J|/|B|$ [A m$^{-2}$ T$^{-1}$]",
+            "both",
+        ),
     ]
-    assert len(labels) == 1, "Expected one current-proxy colorbar"
-    axis = labels[0]
-    setter = axis.set_ylabel if axis.get_ylabel() == r"$|J|$" else axis.set_xlabel
-    setter(r"$j_*$ (code units)", color="black")
-    fig.set_size_inches(16, 11.8, forward=False)
-    # Compact the map columns and keep the 3D view close to their colorbars.
-    bounds = [
-        [0.060, 0.595, 0.250, 0.365],
-        [0.065, 0.540, 0.240, 0.014],
-        [0.380, 0.595, 0.250, 0.365],
-        [0.385, 0.540, 0.240, 0.014],
-        [0.095, 0.065, 0.500, 0.445],
-        [0.055, 0.150, 0.014, 0.260],
-        [0.610, 0.150, 0.014, 0.260],
-    ]
-    for ax, position in zip(original_axes, bounds):
-        ax.set_position(position)
-    spatial = original_axes[4]
-    spatial.patch.set_visible(False)
-    panel_c = next(text for text in spatial.texts if text.get_text() == "(c)")
-    panel_c.remove()
-    # Place the panel letter just above the visible z-axis endpoint.
-    spatial.text(
-        spatial.get_xlim()[1],
-        spatial.get_ylim()[0],
-        spatial.get_zlim()[1] + 4,
-        "(c)",
-        ha="center",
-        va="bottom",
-        fontsize=18,
+    locations = [(0.055, 0.535), (0.54, 0.535), (0.055, 0.12)]
+    panel_width = 0.395
+    panel_height = panel_width * 11.4 / 5.8 / 2
+    colors = plt.get_cmap("tab20")(np.arange(20))
+    # Strengthen pale categorical colors for legibility at publication size.
+    hsv = rgb_to_hsv(colors[:, :3])
+    hsv[:, 1] = np.maximum(hsv[:, 1], 0.65)
+    hsv[:, 2] = np.minimum(hsv[:, 2], 0.78)
+    colors[:, :3] = hsv_to_rgb(hsv)
+    for i, ((rect, values, cmap, norm, label, extend), (left, bottom)) in enumerate(
+        zip(panels, locations)
+    ):
+        ax = fig.add_axes([left, bottom, panel_width, panel_height])
+        cm = plt.get_cmap(cmap).copy()
+        cm.set_bad("#b9bdc4")
+        im = ax.imshow(
+            raster(rect, values),
+            origin="lower",
+            extent=extent,
+            cmap=cm,
+            norm=norm,
+            interpolation="nearest",
+            aspect="equal",
+            rasterized=True,
+        )
+        ax.set(xlim=extent[:2], ylim=extent[2:])
+        ax.set_xticks([-10, 0, 10])
+        ax.set_yticks([0, 5, 10])
+        if i == 2:
+            ax.set_xlabel("y [Mm]")
+        else:
+            ax.tick_params(labelbottom=False)
+        if i != 1:
+            ax.set_ylabel("z [Mm]")
+        else:
+            ax.tick_params(labelleft=False)
+        ax.text(
+            0.025,
+            0.965,
+            f"({chr(97 + i)})",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=12,
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.9, pad=2),
+        )
+        cb = fig.colorbar(
+            im,
+            cax=fig.add_axes([left + panel_width + 0.006, bottom, 0.009, panel_height]),
+            orientation="vertical",
+            extend=extend,
+        )
+        cb.set_label(label, fontsize=10, labelpad=3)
+        cb.ax.tick_params(labelsize=9, pad=2)
+        cb.set_ticks(([1, 2, 3], [-3, 0, 3], [0.01, 1, 100])[i])
+        if i == 1:
+            ax.scatter(
+                L["seeds"][:, 1] * 10,
+                L["seeds"][:, 2] * 10,
+                s=18,
+                facecolors="none",
+                edgecolors=colors,
+                linewidths=0.8,
+            )
+    # Orthographic projection along x uses the same y-z frame as the slices.
+    ax = fig.add_axes([0.54, 0.12, panel_width, panel_height])
+    ax.set_facecolor("#F7F9FB")
+    for i, color in enumerate(colors):
+        for side in range(2):
+            a, b = L["offsets"][2 * i + side : 2 * i + side + 2]
+            xyz = L["positions"][a:b] * 10
+            ax.plot(
+                xyz[:, 1],
+                xyz[:, 2],
+                color=color,
+                lw=1.35,
+                solid_capstyle="round",
+                solid_joinstyle="round",
+                path_effects=[
+                    path_effects.Stroke(linewidth=2.05, foreground="white"),
+                    path_effects.Normal(),
+                ],
+            )
+    ax.scatter(
+        L["seeds"][:, 1] * 10,
+        L["seeds"][:, 2] * 10,
+        s=14,
+        facecolors=colors,
+        edgecolors="white",
+        linewidths=0.55,
+        zorder=4,
     )
-    with np.load(DATA / "figure6/projection.npz", allow_pickle=False) as data:
-        lower, upper = data["lower_Mm"], data["upper_Mm"]
-        projection = data["projection"]
-    maximum = float(np.percentile(projection[projection > 0], 99.5))
-    image = projection / maximum
-    palette = plt.get_cmap("magma").copy()
-    palette.set_bad("black")
-    proxy_ax = fig.add_axes([0.715, 0.230, 0.265, 0.620])
-    proxy_ax.imshow(
-        np.ma.masked_less_equal(image.T, 0),
-        origin="lower",
-        extent=[lower[0], upper[0], lower[1], upper[1]],
-        cmap=palette,
-        norm=LogNorm(0.001, 1),
-        interpolation="nearest",
-        aspect="equal",
-    )
-    proxy_ax.set(xlabel="x [Mm]", ylabel="y [Mm]")
-    proxy_ax.text(
+    ax.set(xlim=extent[:2], ylim=extent[2:], xlabel="y [Mm]", aspect="equal")
+    ax.set_xticks([-10, 0, 10])
+    ax.set_yticks([0, 5, 10])
+    ax.tick_params(labelleft=False)
+    ax.text(
         0.025,
-        0.975,
+        0.965,
         "(d)",
-        transform=proxy_ax.transAxes,
+        transform=ax.transAxes,
         ha="left",
         va="top",
-        fontsize=18,
-        bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=2),
+        fontsize=12,
+        bbox=dict(facecolor="white", edgecolor="none", alpha=0.9, pad=2),
     )
-    proxy_ax.text(
-        0.975,
-        0.975,
-        "z = 6–80 Mm",
-        transform=proxy_ax.transAxes,
-        ha="right",
-        va="top",
-        fontsize=13,
-        bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=2),
-    )
-    # Apply typography to inherited axes as well as the new scientific panels.
-    for ax in fig.axes:
-        ax.tick_params(axis="both", which="major", labelsize=13)
-        for coordinate in ("xaxis", "yaxis", "zaxis"):
-            if hasattr(ax, coordinate):
-                getattr(ax, coordinate).label.set_fontsize(15)
-        for text in ax.texts:
-            if text.get_text().startswith("("):
-                text.set_fontsize(18)
-    spatial.tick_params(axis="z", labelsize=13, pad=2)
-    spatial.xaxis.labelpad = 10
-    spatial.yaxis.labelpad = 10
-    spatial.zaxis.labelpad = 0
-    for ext in ("png", "pdf"):
-        fig.savefig(OUTPUT / f"figure6-magnetic-topology.{ext}", dpi=240)
+    for suffix in ("png", "pdf", "svg"):
+        target = (PDF if suffix == "pdf" else OUT) / f"figure6-current-sheet.{suffix}"
+        temporary = target.with_name(f"{target.stem}.tmp.{suffix}")
+        fig.savefig(temporary, dpi=240, facecolor="white")
+        temporary.replace(target)
     plt.close(fig)
 
 

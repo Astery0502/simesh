@@ -14,7 +14,7 @@ DATA = data_directory()
 
 
 def build_figure():
-    OUT = DATA / "figure6"
+    OUT = DATA / "figure7"
 
     with np.load(OUT / "lines.npz") as d:
         positions = d["positions"]
